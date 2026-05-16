@@ -1,0 +1,5 @@
+<!doctype html><html><head><title>VRE AI NEWS</title><link rel="stylesheet" href="/static/css/style.css"></head><body>
+<h1>VRE AI NEWS</h1>
+<form><input name="q" placeholder="Search"><button>Search</button></form>
+<div class="grid">{% for a in articles %}<article><img src="{{a.image_url}}"/><h3>{{a.title}}</h3><p>{{a.summary}}</p><small>{{a.category}}</small></article>{% endfor %}</div>
+</body></html>
