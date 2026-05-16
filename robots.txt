@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://vre-ai-news.example.com/sitemap.xml
