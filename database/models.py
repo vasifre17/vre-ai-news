@@ -12,6 +12,7 @@ class Article(Base):
     source_title = Column(String(500))
     source_url = Column(String(1000))
     title = Column(String(500), index=True)
+    slug = Column(String(500), unique=True, index=True, nullable=True)
     summary = Column(Text)
     content = Column(Text)
     seo_title = Column(String(500))

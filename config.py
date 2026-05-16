@@ -15,6 +15,7 @@ class Settings(BaseModel):
     publish_mode: str = os.getenv("PUBLISH_MODE", "manual")
     fetch_interval_min: int = int(os.getenv("FETCH_INTERVAL_MIN", "15"))
     pexels_api_key: str = os.getenv("PEXELS_API_KEY", "")
+    site_url: str = os.getenv("SITE_URL", "http://localhost:8000")
 
 
 settings = Settings()
