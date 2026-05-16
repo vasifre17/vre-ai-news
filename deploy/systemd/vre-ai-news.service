@@ -1,0 +1,15 @@
+[Unit]
+Description=VRE AI NEWS FastAPI Service
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/vre-ai-news
+EnvironmentFile=/opt/vre-ai-news/.env
+ExecStart=/opt/vre-ai-news/.venv/bin/uvicorn main:app --host 127.0.0.1 --port 8000 --proxy-headers --forwarded-allow-ips='*'
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
