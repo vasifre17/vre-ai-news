@@ -1,0 +1,7 @@
+<!doctype html><html><head><title>{{article.seo_title or article.title}}</title>
+<link rel="canonical" href="{{ canonical }}">
+<meta property="og:type" content="article"><meta property="og:title" content="{{article.seo_title or article.title}}"><meta property="og:url" content="{{canonical}}"><meta property="og:image" content="{{article.image_url or ''}}">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"NewsArticle","headline":"{{article.title}}","datePublished":"{{article.published_at}}","mainEntityOfPage":"{{canonical}}"}</script>
+<link rel="stylesheet" href="/assets/styles.css"></head><body>
+<main class="container section article-layout"><article class="glass article"><h1>{{article.title}}</h1><p class="lede">{{article.summary}}</p>{% if article.image_url %}<img src="{{article.image_url}}" alt="{{article.title}}">{% endif %}<p>{{article.content}}</p><p><small>{{article.category}} • {{article.published_at|format_published_at}}</small></p></article></main>
+</body></html>
