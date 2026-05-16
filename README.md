@@ -1,0 +1,42 @@
+# VRE AI NEWS CMS
+
+AI-powered FastAPI news CMS with scheduler, admin panel, SEO routes, templates, and publishing pipeline.
+
+## Local development
+1. Install dependencies:
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+2. Configure env:
+```bash
+cp .env.example .env
+python scripts/generate_admin_hash.py
+```
+3. Initialize DB:
+```bash
+python scripts/init_db.py
+```
+4. Run app:
+```bash
+uvicorn main:app --reload
+```
+5. Open:
+- Public site: `http://127.0.0.1:8000`
+- Admin login: `http://127.0.0.1:8000/admin/login`
+
+## Production deployment
+- Docker + PostgreSQL: use `docker compose up -d --build`
+- VPS guide: see `DEPLOYMENT.md`
+- Security baseline: see `SECURITY.md`
+
+## Included production assets
+- `Dockerfile`
+- `docker-compose.yml`
+- `.env.example`
+- `scripts/generate_admin_hash.py`
+- `scripts/init_db.py`
+- `scripts/backup_db.sh`
+- `deploy/systemd/vre-ai-news.service`
+- `deploy/nginx/vre-ai-news.conf`

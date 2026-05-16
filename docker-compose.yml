@@ -1,0 +1,33 @@
+services:
+  app:
+    build: .
+    container_name: vre-ai-news-app
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      - db
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./logs:/app/logs
+      - ./uploads:/app/uploads
+
+  db:
+    image: postgres:16-alpine
+    container_name: vre-ai-news-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: vre_news
+      POSTGRES_USER: vre_user
+      POSTGRES_PASSWORD: vre_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vre_user -d vre_news"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
