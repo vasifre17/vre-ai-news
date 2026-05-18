@@ -1,7 +1,18 @@
 <!doctype html><html><head><title>{{article.seo_title or article.title}}</title>
 <link rel="canonical" href="{{ canonical }}">
 <meta property="og:type" content="article"><meta property="og:title" content="{{article.seo_title or article.title}}"><meta property="og:url" content="{{canonical}}"><meta property="og:image" content="{{article.image_url or ''}}">
+{% if narration and narration.status == 'ready' and narration.audio_path %}<meta itemprop="audio" content="{{site_url}}{{narration.audio_path}}">{% endif %}
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"NewsArticle","headline":"{{article.title}}","datePublished":"{{article.published_at}}","mainEntityOfPage":"{{canonical}}"}</script>
 <link rel="stylesheet" href="/assets/styles.css"></head><body>
-<main class="container section article-layout"><article class="glass article"><h1>{{article.title}}</h1><p class="lede">{{article.summary}}</p>{% if article.image_url %}<img src="{{article.image_url}}" alt="{{article.title}}">{% endif %}<p>{{article.content}}</p><p><small>{{article.category}} • {{article.published_at|format_published_at}}</small></p></article></main>
+<main class="container section article-layout"><article class="glass article"><h1>{{article.title}}</h1><p class="lede">{{article.summary}}</p>{% if article.image_url %}<img src="{{article.image_url}}" alt="{{article.title}}">{% endif %}<p>{{article.content}}</p><p><small>{{article.category}} • {{article.published_at|format_published_at}}</small></p>
+<section class="glass audio-news" data-audio-ready="{{ '1' if narration and narration.status == 'ready' else '0' }}"><h3>Listen to this article</h3>
+{% if narration and narration.status == 'ready' and narration.audio_path %}
+<audio id="narration" preload="none" src="{{narration.audio_path}}"></audio>
+<div class="audio-controls"><button class="btn" id="playBtn">Play</button><button class="btn" id="pauseBtn">Pause</button><input id="seek" type="range" value="0" min="0" step="1"><span id="time">0:00 / 0:00</span><select id="speed"><option>1</option><option>1.25</option><option>1.5</option><option>1.75</option><option>2</option></select>{% if narration.allow_download %}<a class="btn" href="{{narration.audio_path}}" download>Download audio</a>{% endif %}</div>
+{% else %}<p>Narration is {{ narration.status if narration else 'pending' }}. Article publishing is not blocked.</p>{% endif %}</section></article></main>
+<script>
+(() => {const w=document.querySelector('.audio-news');if(!w||w.dataset.audioReady!=='1')return;const a=document.getElementById('narration'),play=document.getElementById('playBtn'),pause=document.getElementById('pauseBtn'),seek=document.getElementById('seek'),speed=document.getElementById('speed'),time=document.getElementById('time');
+const fmt=t=>`${Math.floor(t/60)}:${String(Math.floor(t%60)).padStart(2,'0')}`;play.onclick=()=>a.play();pause.onclick=()=>a.pause();speed.onchange=()=>a.playbackRate=parseFloat(speed.value);a.onloadedmetadata=()=>{seek.max=Math.floor(a.duration||0);time.textContent=`0:00 / ${fmt(a.duration||0)}`};a.ontimeupdate=()=>{seek.value=Math.floor(a.currentTime);time.textContent=`${fmt(a.currentTime)} / ${fmt(a.duration||0)}`};seek.oninput=()=>a.currentTime=Number(seek.value);
+})();
+</script>
 </body></html>
