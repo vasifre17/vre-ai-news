@@ -1,3 +1,3 @@
-<!doctype html><html><body><h2>Dashboard</h2><p>Drafts: {{drafts}} | Published: {{published}}</p><a href="/admin/articles?status=draft">Drafts</a> <a href="/admin/articles?status=published">Published</a>
+<!doctype html><html><body><h2>Dashboard</h2><p>Drafts: {{drafts}} | Published: {{published}}</p><a href="/admin/translations">Translations</a><a href="/admin/articles?status=draft">Drafts</a> <a href="/admin/articles?status=published">Published</a>
 <form method="post" action="/admin/settings/mode"><select name="mode"><option value="auto">AUTO</option><option value="manual">MANUAL</option></select><button>Set Mode</button></form>
 <h3>Logs</h3>{% for l in logs %}<div>[{{l.level}}] {{l.message}}</div>{% endfor %}</body></html>

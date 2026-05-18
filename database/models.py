@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
 from sqlalchemy.orm import declarative_base, relationship
 
 Base = declarative_base()
@@ -16,6 +16,7 @@ class Article(Base):
     summary = Column(Text)
     content = Column(Text)
     seo_title = Column(String(500))
+    meta_description = Column(String(500), default="")
     tags = Column(String(500))
     category = Column(String(100), index=True)
     image_url = Column(String(1000))
@@ -25,6 +26,26 @@ class Article(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow)
     revisions = relationship("ArticleRevision", back_populates="article", cascade="all, delete-orphan")
+    translations = relationship("ArticleTranslation", back_populates="article", cascade="all, delete-orphan")
+
+
+class ArticleTranslation(Base):
+    __tablename__ = "article_translations"
+    id = Column(Integer, primary_key=True)
+    article_id = Column(Integer, ForeignKey("articles.id", ondelete="CASCADE"), index=True)
+    language = Column(String(20), index=True)
+    title = Column(String(500))
+    summary = Column(Text)
+    content = Column(Text)
+    seo_title = Column(String(500))
+    meta_description = Column(String(500), default="")
+    tags = Column(String(500))
+    slug = Column(String(500), index=True)
+    status = Column(String(20), default="pending")
+    last_error = Column(Text, default="")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+    article = relationship("Article", back_populates="translations")
 
 
 class ArticleRevision(Base):

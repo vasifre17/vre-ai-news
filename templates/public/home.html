@@ -1,7 +1,7 @@
-<!doctype html><html><head><title>VRE AI NEWS</title><link rel="stylesheet" href="/assets/styles.css"><link rel="canonical" href="{{ canonical }}"></head><body>
-<header class="site-header glass"><nav class="nav container"><a class="logo" href="/">VRE <span>AI NEWS</span></a><form class="search-wrap" action="/search"><input type="search" name="q" value="{{q}}" placeholder="Search"></form></nav>
-<nav class="categories container">{% for c in categories %}<a href="/category/{{c}}">{{c}}</a>{% endfor %}</nav></header>
+<!doctype html><html><head><title>VRE AI NEWS</title><link rel="stylesheet" href="/assets/styles.css"><link rel="canonical" href="{{ canonical }}">{% for k,v in hreflangs.items() %}<link rel="alternate" hreflang="{{k}}" href="{{v}}">{% endfor %}</head><body>
+<header class="site-header glass"><nav class="nav container"><a class="logo" href="/{{lang}}/">VRE <span>AI NEWS</span></a><form class="search-wrap" action="/{{lang}}/search"><input type="search" name="q" value="{{q}}" placeholder="{{t('search', lang)}}"></form><div class="lang-switch">{% for code,label in labels.items() %}<a href="/{{code}}/">{{label}}</a>{% if not loop.last %} | {% endif %}{% endfor %}</div></nav>
+<nav class="categories container">{% for c in categories %}<a href="/{{lang}}/category/{{c}}">{{category_label(c, lang)}}</a>{% endfor %}</nav></header>
 <main class="container section">
-{% if articles|length == 0 %}<div class="glass" style="padding:2rem">No published articles yet. Please check back soon.</div>{% endif %}
-<div class="grid cards">{% for a in articles %}<article class="card glass">{% if a.image_url %}<img src="{{a.image_url}}" alt="{{a.title}}">{% endif %}<h3><a href="/article/{{a.slug or a.id}}">{{a.title}}</a></h3><p>{{a.summary}}</p><small>{{a.category}} • {{a.published_at|format_published_at}}</small></article>{% endfor %}</div>
-</main></body></html>
+{% if articles|length == 0 %}<div class="glass" style="padding:2rem">{{t('no_articles', lang)}}</div>{% endif %}
+<div class="grid cards">{% for a in articles %}<article class="card glass">{% if a.image_url %}<img src="{{a.image_url}}" alt="{{a.title}}">{% endif %}<h3><a href="/{{lang}}/article/{{a.slug or a.id}}">{{a.title}}</a></h3><p>{{a.summary}}</p><small>{{category_label(a.category,lang)}} • {{a.published_at|format_published_at}}</small></article>{% endfor %}</div>
+</main><footer class="container"><div class="lang-switch">{% for code,label in labels.items() %}<a href="/{{code}}/">{{label}}</a>{% if not loop.last %} | {% endif %}{% endfor %}</div></footer></body></html>
