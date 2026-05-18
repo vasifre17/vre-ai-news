@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import declarative_base, relationship
 
 Base = declarative_base()
@@ -21,10 +21,32 @@ class Article(Base):
     image_url = Column(String(1000))
     language = Column(String(20), default="az")
     status = Column(String(20), default="draft")
+    narration_enabled = Column(Boolean, default=True)
     published_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow)
     revisions = relationship("ArticleRevision", back_populates="article", cascade="all, delete-orphan")
+    narrations = relationship("ArticleNarration", back_populates="article", cascade="all, delete-orphan")
+
+
+class ArticleNarration(Base):
+    __tablename__ = "article_narrations"
+    __table_args__ = (UniqueConstraint("article_id", "language", name="uq_article_narration_lang"),)
+
+    id = Column(Integer, primary_key=True)
+    article_id = Column(Integer, ForeignKey("articles.id", ondelete="CASCADE"), index=True)
+    language = Column(String(20), default="az", index=True)
+    status = Column(String(20), default="pending", index=True)  # pending|generating|ready|failed
+    audio_path = Column(String(1000), nullable=True)
+    error_message = Column(Text, nullable=True)
+    duration_seconds = Column(Integer, nullable=True)
+    file_size_bytes = Column(Integer, nullable=True)
+    provider = Column(String(50), default="openai")
+    allow_download = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+    article = relationship("Article", back_populates="narrations")
 
 
 class ArticleRevision(Base):

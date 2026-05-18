@@ -12,3 +12,4 @@
 .article-layout{display:grid;grid-template-columns:2fr 1fr;gap:1rem}.article img{width:100%;border-radius:12px}
 @keyframes slideDown{from{transform:translateY(-40px);opacity:0}to{transform:translateY(0);opacity:1}}
 @media (max-width:900px){.hero,.article-layout{grid-template-columns:1fr}.nav{flex-wrap:wrap}}
+.audio-news{margin-top:1.25rem;padding:1rem}.audio-controls{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center}#seek{flex:1;min-width:180px}

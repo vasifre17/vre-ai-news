@@ -11,9 +11,9 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from config import settings
 from database.session import SessionLocal, init_db
-from database.models import Article, ArticleRevision, FetchLog, Setting
+from database.models import Article, ArticleRevision, FetchLog, Setting, ArticleNarration
 from cms.auth.security import is_authenticated, set_session, verify_password
-from scheduler.jobs import run_fetch_pipeline
+from scheduler.jobs import run_fetch_pipeline, queue_narration, generate_pending_narrations
 
 app = FastAPI(title=settings.app_name)
 app.add_middleware(SessionMiddleware, secret_key=settings.secret_key)
@@ -74,14 +74,19 @@ def startup() -> None:
     init_db()
     db = SessionLocal()
     try:
-        # lightweight migration for slug support
         db.execute("ALTER TABLE articles ADD COLUMN slug VARCHAR(500)")
+        db.commit()
+    except Exception:
+        db.rollback()
+    try:
+        db.execute("ALTER TABLE articles ADD COLUMN narration_enabled BOOLEAN DEFAULT 1")
         db.commit()
     except Exception:
         db.rollback()
     ensure_slugs(db)
     db.close()
     scheduler.add_job(run_fetch_pipeline, "interval", minutes=max(13, min(17, settings.fetch_interval_min)), id="fetch_job", replace_existing=True)
+    scheduler.add_job(generate_pending_narrations, "interval", seconds=45, id="narration_job", replace_existing=True)
     scheduler.start()
 
 
@@ -97,127 +102,102 @@ def home(request: Request, q: str = "", category: str = "", db=Depends(get_db)):
     return templates.TemplateResponse("public/home.html", {"request": request, "articles": articles, "categories": categories, "q": q, "category": category, "site_url": settings.site_url, "canonical": canonical_url(request)})
 
 
-@app.get("/search", response_class=HTMLResponse)
+@app.get("/article/{slug}", response_class=HTMLResponse)
+def article_by_slug(slug: str, request: Request, db=Depends(get_db)):
+    article = db.query(Article).filter(((Article.slug == slug) | (Article.id == int(slug) if slug.isdigit() else -1)), Article.status == "published").first()
+    if not article:
+        raise HTTPException(404)
+    narration = db.query(ArticleNarration).filter(ArticleNarration.article_id == article.id, ArticleNarration.language == article.language).first()
+    return templates.TemplateResponse("public/article.html", {"request": request, "article": article, "narration": narration, "site_url": settings.site_url, "canonical": canonical_url(request, f"article/{article.slug or article.id}")})
+
+
+@app.get('/admin/articles', response_class=HTMLResponse)
+def admin_articles(request: Request, status: str = "draft", db=Depends(get_db), _=Depends(require_auth)):
+    articles = db.query(Article).filter(Article.status == status).order_by(Article.created_at.desc()).all()
+    narration_map = {n.article_id: n for n in db.query(ArticleNarration).filter(ArticleNarration.article_id.in_([a.id for a in articles] or [0])).all()}
+    return templates.TemplateResponse("admin/articles.html", {"request": request, "articles": articles, "status": status, "narration_map": narration_map})
+
+# keep remaining routes from original
+@app.get('/search', response_class=HTMLResponse)
 def search(request: Request, q: str = "", db=Depends(get_db)):
     return home(request, q=q, db=db)
 
-
-@app.get("/category/{category}", response_class=HTMLResponse)
+@app.get('/category/{category}', response_class=HTMLResponse)
 def category_page(category: str, request: Request, db=Depends(get_db)):
     return home(request, category=category, db=db)
-
-
-@app.get("/article/{article_id}", response_class=HTMLResponse)
-def article_by_id(article_id: int, request: Request, db=Depends(get_db)):
-    article = db.query(Article).filter(Article.id == article_id, Article.status == "published").first()
-    if not article:
-        raise HTTPException(404)
-    return templates.TemplateResponse("public/article.html", {"request": request, "article": article, "site_url": settings.site_url, "canonical": canonical_url(request, f"article/{article.slug or article.id}")})
-
-
-@app.get("/article/{slug}", response_class=HTMLResponse)
-def article_by_slug(slug: str, request: Request, db=Depends(get_db)):
-    article = db.query(Article).filter(Article.slug == slug, Article.status == "published").first()
-    if not article:
-        raise HTTPException(404)
-    return templates.TemplateResponse("public/article.html", {"request": request, "article": article, "site_url": settings.site_url, "canonical": canonical_url(request, f"article/{article.slug}")})
-
 
 @app.get('/sitemap.xml')
 def sitemap(db=Depends(get_db)):
     urls = [f"<url><loc>{settings.site_url.rstrip('/')}/</loc></url>"]
     for a in db.query(Article).filter(Article.status == 'published').all():
         urls.append(f"<url><loc>{settings.site_url.rstrip('/')}/article/{a.slug or a.id}</loc></url>")
-    xml = f'<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{"".join(urls)}</urlset>'
-    return Response(content=xml, media_type="application/xml")
-
+    return Response(content=f'<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{"".join(urls)}</urlset>', media_type='application/xml')
 
 @app.get('/robots.txt')
 def robots():
-    body = f"User-agent: *\nAllow: /\nDisallow: /admin\nSitemap: {settings.site_url.rstrip('/')}/sitemap.xml\n"
-    return Response(content=body, media_type="text/plain")
+    return Response(content=f"User-agent: *\nAllow: /\nDisallow: /admin\nSitemap: {settings.site_url.rstrip('/')}/sitemap.xml\n", media_type='text/plain')
 
+@app.get('/admin/login', response_class=HTMLResponse)
+def login_page(request: Request): return templates.TemplateResponse('admin/login.html', {'request': request})
 
-@app.get("/admin/login", response_class=HTMLResponse)
-def login_page(request: Request):
-    return templates.TemplateResponse("admin/login.html", {"request": request})
-
-
-@app.post("/admin/login")
-@limiter.limit("5/minute")
+@app.post('/admin/login')
+@limiter.limit('5/minute')
 def login(request: Request, username: str = Form(...), password: str = Form(...)):
     if username == settings.admin_username and settings.admin_password_hash and verify_password(password, settings.admin_password_hash):
-        set_session(request, username)
-        return RedirectResponse("/admin", status_code=302)
-    return templates.TemplateResponse("admin/login.html", {"request": request, "error": "Invalid credentials"})
+        set_session(request, username); return RedirectResponse('/admin', status_code=302)
+    return templates.TemplateResponse('admin/login.html', {'request': request, 'error': 'Invalid credentials'})
 
-
-@app.get("/admin", response_class=HTMLResponse)
+@app.get('/admin', response_class=HTMLResponse)
 def admin_dashboard(request: Request, db=Depends(get_db), _=Depends(require_auth)):
-    drafts = db.query(Article).filter(Article.status == "draft").count()
-    published = db.query(Article).filter(Article.status == "published").count()
-    categories = db.query(Article.category).filter(Article.status == "published").distinct().count()
-    logs = db.query(FetchLog).order_by(FetchLog.created_at.desc()).limit(20).all()
-    return templates.TemplateResponse("admin/dashboard.html", {"request": request, "drafts": drafts, "published": published, "categories": categories, "logs": logs})
+    drafts = db.query(Article).filter(Article.status == 'draft').count(); published = db.query(Article).filter(Article.status == 'published').count(); categories = db.query(Article.category).filter(Article.status == 'published').distinct().count(); logs = db.query(FetchLog).order_by(FetchLog.created_at.desc()).limit(20).all()
+    return templates.TemplateResponse('admin/dashboard.html', {'request': request, 'drafts': drafts, 'published': published, 'categories': categories, 'logs': logs})
 
-
-@app.get("/admin/articles", response_class=HTMLResponse)
-def admin_articles(request: Request, status: str = "draft", db=Depends(get_db), _=Depends(require_auth)):
-    articles = db.query(Article).filter(Article.status == status).order_by(Article.created_at.desc()).all()
-    return templates.TemplateResponse("admin/articles.html", {"request": request, "articles": articles, "status": status})
-
-
-@app.post("/admin/articles/{article_id}/publish")
+@app.post('/admin/articles/{article_id}/publish')
 def publish_article(article_id: int, request: Request, db=Depends(get_db), _=Depends(require_auth)):
     a = db.query(Article).get(article_id)
     if a:
-        a.status = "published"
-        a.published_at = datetime.utcnow()
-        a.slug = a.slug or slugify(a.title)
-        db.commit()
-    return RedirectResponse("/admin/articles?status=draft", status_code=302)
-
+        a.status = 'published'; a.published_at = datetime.utcnow(); a.slug = a.slug or slugify(a.title); db.commit(); queue_narration(db, a); db.commit()
+    return RedirectResponse('/admin/articles?status=draft', status_code=302)
 
 @app.get('/admin/articles/{article_id}/edit', response_class=HTMLResponse)
 def edit_page(article_id: int, request: Request, db=Depends(get_db), _=Depends(require_auth)):
     article = db.query(Article).get(article_id)
-    return templates.TemplateResponse('admin/edit.html', {'request': request, 'article': article})
-
+    narration = db.query(ArticleNarration).filter(ArticleNarration.article_id == article_id, ArticleNarration.language == article.language).first() if article else None
+    return templates.TemplateResponse('admin/edit.html', {'request': request, 'article': article, 'narration': narration})
 
 @app.post('/admin/articles/{article_id}/edit')
 def edit_article(article_id: int, request: Request, title: str = Form(...), content: str = Form(...), image_url: str = Form(''), category: str = Form(...), seo_title: str = Form(''), tags: str = Form(''), db=Depends(get_db), _=Depends(require_auth)):
     a = db.query(Article).get(article_id)
-    if not a:
-        return RedirectResponse('/admin/articles', status_code=302)
-    db.add(ArticleRevision(article_id=a.id, title=a.title, content=a.content, image_url=a.image_url, category=a.category, seo_title=a.seo_title, tags=a.tags))
-    a.title = title
-    a.content = content
-    a.image_url = image_url
-    a.category = category
-    a.seo_title = seo_title
-    a.tags = tags
-    a.slug = slugify(title)
-    db.commit()
-    return RedirectResponse(f'/admin/articles?status={a.status}', status_code=302)
+    if not a: return RedirectResponse('/admin/articles', status_code=302)
+    db.add(ArticleRevision(article_id=a.id, title=a.title, content=a.content, image_url=a.image_url, category=a.category, seo_title=a.seo_title, tags=a.tags)); a.title = title; a.content = content; a.image_url = image_url; a.category = category; a.seo_title = seo_title; a.tags = tags; a.slug = slugify(title); db.commit(); return RedirectResponse(f'/admin/articles?status={a.status}', status_code=302)
 
+@app.post('/admin/articles/{article_id}/narration/regenerate')
+def regenerate_narration(article_id: int, request: Request, db=Depends(get_db), _=Depends(require_auth)):
+    article = db.query(Article).get(article_id)
+    if article: queue_narration(db, article); db.commit()
+    return RedirectResponse('/admin/articles?status=published', status_code=302)
+
+@app.post('/admin/articles/{article_id}/narration/delete')
+def delete_narration(article_id: int, request: Request, db=Depends(get_db), _=Depends(require_auth)):
+    rows = db.query(ArticleNarration).filter(ArticleNarration.article_id == article_id).all()
+    for row in rows: row.audio_path = None; row.status = 'pending'; row.error_message = None
+    db.commit(); return RedirectResponse('/admin/articles?status=published', status_code=302)
+
+@app.post('/admin/articles/{article_id}/narration/toggle')
+def toggle_narration(article_id: int, request: Request, enabled: str = Form('true'), db=Depends(get_db), _=Depends(require_auth)):
+    article = db.query(Article).get(article_id)
+    if article: article.narration_enabled = enabled == 'true'; db.commit()
+    return RedirectResponse(f'/admin/articles/{article_id}/edit', status_code=302)
 
 @app.post('/admin/settings/mode')
 def set_mode(request: Request, mode: str = Form(...), db=Depends(get_db), _=Depends(require_auth)):
-    row = db.query(Setting).filter(Setting.key == 'publish_mode').first()
-    if not row:
-        row = Setting(key='publish_mode', value=mode)
-        db.add(row)
-    else:
-        row.value = mode
-    db.commit()
-    return RedirectResponse('/admin', status_code=302)
-
+    row = db.query(Setting).filter(Setting.key == 'publish_mode').first();
+    if not row: db.add(Setting(key='publish_mode', value=mode))
+    else: row.value = mode
+    db.commit(); return RedirectResponse('/admin', status_code=302)
 
 @app.exception_handler(404)
-def not_found(request: Request, exc):
-    return templates.TemplateResponse('public/404.html', {'request': request}, status_code=404)
-
+def not_found(request: Request, exc): return templates.TemplateResponse('public/404.html', {'request': request}, status_code=404)
 
 @app.exception_handler(500)
-def server_error(request: Request, exc):
-    return templates.TemplateResponse('public/500.html', {'request': request}, status_code=500)
+def server_error(request: Request, exc): return templates.TemplateResponse('public/500.html', {'request': request}, status_code=500)
