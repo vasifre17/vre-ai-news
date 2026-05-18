@@ -11,9 +11,10 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from config import settings
 from database.session import SessionLocal, init_db
-from database.models import Article, ArticleRevision, FetchLog, Setting, ArticleNarration
+from database.models import Article, ArticleRevision, FetchLog, Setting, ArticleNarration, ArticleTranslation
 from cms.auth.security import is_authenticated, set_session, verify_password
 from scheduler.jobs import run_fetch_pipeline, queue_narration, generate_pending_narrations
+from ai.pipeline import AIEngine
 
 app = FastAPI(title=settings.app_name)
 app.add_middleware(SessionMiddleware, secret_key=settings.secret_key)
@@ -23,6 +24,8 @@ templates = Jinja2Templates(directory="templates")
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 scheduler = BackgroundScheduler()
+ai_engine = AIEngine()
+SUPPORTED_LANGUAGES = ["az", "en", "ru", "tr", "zh", "es"]
 
 
 def slugify(text: str) -> str:
@@ -54,6 +57,19 @@ def canonical_url(request: Request, path: str = "") -> str:
     return f"{settings.site_url.rstrip('/')}/{path.lstrip('/')}"
 
 
+def article_url(language: str, slug: str) -> str:
+    return f"/{language}/article/{slug}"
+
+
+def get_translation(article: Article, language: str):
+    if language == "az":
+        return article
+    for t in article.translations:
+        if t.language == language:
+            return t
+    return None
+
+
 def ensure_slugs(db):
     used = set()
     for a in db.query(Article).all():
@@ -83,6 +99,11 @@ def startup() -> None:
         db.commit()
     except Exception:
         db.rollback()
+    try:
+        db.execute("ALTER TABLE article_translations ADD COLUMN slug VARCHAR(500)")
+        db.commit()
+    except Exception:
+        db.rollback()
     ensure_slugs(db)
     db.close()
     scheduler.add_job(run_fetch_pipeline, "interval", minutes=max(13, min(17, settings.fetch_interval_min)), id="fetch_job", replace_existing=True)
@@ -91,7 +112,9 @@ def startup() -> None:
 
 
 @app.get("/", response_class=HTMLResponse)
-def home(request: Request, q: str = "", category: str = "", db=Depends(get_db)):
+@app.get("/{language}/", response_class=HTMLResponse)
+def home(request: Request, language: str = "az", q: str = "", category: str = "", db=Depends(get_db)):
+    language = language if language in SUPPORTED_LANGUAGES else "az"
     query = db.query(Article).filter(Article.status == "published")
     if q:
         query = query.filter((Article.title.ilike(f"%{q}%")) | (Article.summary.ilike(f"%{q}%")))
@@ -99,16 +122,28 @@ def home(request: Request, q: str = "", category: str = "", db=Depends(get_db)):
         query = query.filter(Article.category == category)
     articles = query.order_by(Article.published_at.desc(), Article.created_at.desc()).limit(30).all()
     categories = [c[0] for c in db.query(Article.category).filter(Article.status == "published").distinct().all() if c[0]]
-    return templates.TemplateResponse("public/home.html", {"request": request, "articles": articles, "categories": categories, "q": q, "category": category, "site_url": settings.site_url, "canonical": canonical_url(request)})
+    article_cards = []
+    for a in articles:
+        tr = get_translation(a, language)
+        article_cards.append({"article": a, "t": tr, "url": article_url(language, tr.slug if tr else (a.slug or str(a.id)))})
+    return templates.TemplateResponse("public/home.html", {"request": request, "articles": article_cards, "categories": categories, "q": q, "category": category, "site_url": settings.site_url, "canonical": canonical_url(request, f'{language}/'), "language": language, "languages": SUPPORTED_LANGUAGES})
 
 
 @app.get("/article/{slug}", response_class=HTMLResponse)
-def article_by_slug(slug: str, request: Request, db=Depends(get_db)):
+@app.get("/{language}/article/{slug}", response_class=HTMLResponse)
+def article_by_slug(slug: str, request: Request, language: str = "az", db=Depends(get_db)):
+    language = language if language in SUPPORTED_LANGUAGES else "az"
     article = db.query(Article).filter(((Article.slug == slug) | (Article.id == int(slug) if slug.isdigit() else -1)), Article.status == "published").first()
+    if not article and language != "az":
+        tr = db.query(ArticleTranslation).filter(ArticleTranslation.slug == slug, ArticleTranslation.language == language).first()
+        article = db.query(Article).get(tr.article_id) if tr else None
     if not article:
         raise HTTPException(404)
+    tr = get_translation(article, language)
+    view = tr if tr else article
     narration = db.query(ArticleNarration).filter(ArticleNarration.article_id == article.id, ArticleNarration.language == article.language).first()
-    return templates.TemplateResponse("public/article.html", {"request": request, "article": article, "narration": narration, "site_url": settings.site_url, "canonical": canonical_url(request, f"article/{article.slug or article.id}")})
+    alt_links = {lang: article_url(lang, (get_translation(article, lang).slug if get_translation(article, lang) else (article.slug or str(article.id)))) for lang in SUPPORTED_LANGUAGES}
+    return templates.TemplateResponse("public/article.html", {"request": request, "article": view, "root_article": article, "narration": narration, "site_url": settings.site_url, "canonical": canonical_url(request, f"{language}/article/{view.slug or article.slug or article.id}"), "language": language, "languages": SUPPORTED_LANGUAGES, "alt_links": alt_links})
 
 
 @app.get('/admin/articles', response_class=HTMLResponse)
@@ -130,7 +165,9 @@ def category_page(category: str, request: Request, db=Depends(get_db)):
 def sitemap(db=Depends(get_db)):
     urls = [f"<url><loc>{settings.site_url.rstrip('/')}/</loc></url>"]
     for a in db.query(Article).filter(Article.status == 'published').all():
-        urls.append(f"<url><loc>{settings.site_url.rstrip('/')}/article/{a.slug or a.id}</loc></url>")
+        urls.append(f"<url><loc>{settings.site_url.rstrip('/')}/az/article/{a.slug or a.id}</loc></url>")
+        for tr in a.translations:
+            urls.append(f"<url><loc>{settings.site_url.rstrip('/')}/{tr.language}/article/{tr.slug}</loc></url>")
     return Response(content=f'<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{"".join(urls)}</urlset>', media_type='application/xml')
 
 @app.get('/robots.txt')
@@ -150,7 +187,35 @@ def login(request: Request, username: str = Form(...), password: str = Form(...)
 @app.get('/admin', response_class=HTMLResponse)
 def admin_dashboard(request: Request, db=Depends(get_db), _=Depends(require_auth)):
     drafts = db.query(Article).filter(Article.status == 'draft').count(); published = db.query(Article).filter(Article.status == 'published').count(); categories = db.query(Article.category).filter(Article.status == 'published').distinct().count(); logs = db.query(FetchLog).order_by(FetchLog.created_at.desc()).limit(20).all()
-    return templates.TemplateResponse('admin/dashboard.html', {'request': request, 'drafts': drafts, 'published': published, 'categories': categories, 'logs': logs})
+    return templates.TemplateResponse('admin/dashboard.html', {'request': request, 'drafts': drafts, 'published': published, 'categories': categories, 'logs': logs, "languages": SUPPORTED_LANGUAGES})
+
+@app.get('/admin/translations', response_class=HTMLResponse)
+def admin_translations(request: Request, db=Depends(get_db), _=Depends(require_auth)):
+    articles = db.query(Article).filter(Article.status == 'published').order_by(Article.published_at.desc()).all()
+    return templates.TemplateResponse('admin/translations.html', {'request': request, 'articles': articles, 'languages': SUPPORTED_LANGUAGES})
+
+@app.post('/admin/translations/{article_id}/generate')
+def admin_generate_translations(article_id: int, request: Request, db=Depends(get_db), _=Depends(require_auth)):
+    article = db.query(Article).get(article_id)
+    if not article:
+        return RedirectResponse('/admin/translations', status_code=302)
+    source = {"title": article.title, "summary": article.summary, "content": article.content, "seo_title": article.seo_title, "tags": article.tags}
+    for lang in SUPPORTED_LANGUAGES:
+        if lang == "az":
+            continue
+        payload = ai_engine.translate_article(source, lang)
+        row = db.query(ArticleTranslation).filter(ArticleTranslation.article_id == article.id, ArticleTranslation.language == lang).first()
+        if not row:
+            row = ArticleTranslation(article_id=article.id, language=lang)
+            db.add(row)
+        row.title = payload.get("title", article.title)
+        row.summary = payload.get("summary", article.summary)
+        row.content = payload.get("content", article.content)
+        row.seo_title = payload.get("seo_title", row.title)
+        row.tags = payload.get("tags", article.tags)
+        row.slug = slugify(row.title) + f"-{lang}"
+    db.commit()
+    return RedirectResponse('/admin/translations', status_code=302)
 
 @app.post('/admin/articles/{article_id}/publish')
 def publish_article(article_id: int, request: Request, db=Depends(get_db), _=Depends(require_auth)):

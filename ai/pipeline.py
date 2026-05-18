@@ -46,3 +46,26 @@ class AIEngine:
         if any(k in t for k in ["health", "education", "society", "hospital", "school"]):
             return "Social"
         return "World"
+
+    def translate_article(self, article: Dict[str, str], target_language: str) -> Dict[str, str]:
+        if not self.client:
+            return {
+                "title": article.get("title", ""),
+                "summary": article.get("summary", ""),
+                "content": article.get("content", ""),
+                "seo_title": article.get("seo_title", article.get("title", "")),
+                "tags": article.get("tags", "news"),
+            }
+        prompt = (
+            "Translate the provided Azerbaijani news article to target language. "
+            "Return JSON keys: title,summary,content,seo_title,tags. Keep journalistic tone."
+        )
+        resp = self.client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": json.dumps({"target_language": target_language, "article": article}, ensure_ascii=False)},
+            ],
+            response_format={"type": "json_object"},
+        )
+        return json.loads(resp.choices[0].message.content)

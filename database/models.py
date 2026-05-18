@@ -27,6 +27,26 @@ class Article(Base):
     updated_at = Column(DateTime, default=datetime.utcnow)
     revisions = relationship("ArticleRevision", back_populates="article", cascade="all, delete-orphan")
     narrations = relationship("ArticleNarration", back_populates="article", cascade="all, delete-orphan")
+    translations = relationship("ArticleTranslation", back_populates="article", cascade="all, delete-orphan")
+
+
+class ArticleTranslation(Base):
+    __tablename__ = "article_translations"
+    __table_args__ = (UniqueConstraint("article_id", "language", name="uq_article_translation_lang"),)
+
+    id = Column(Integer, primary_key=True)
+    article_id = Column(Integer, ForeignKey("articles.id", ondelete="CASCADE"), index=True)
+    language = Column(String(20), default="az", index=True)
+    title = Column(String(500))
+    slug = Column(String(500), index=True)
+    summary = Column(Text)
+    content = Column(Text)
+    seo_title = Column(String(500))
+    tags = Column(String(500))
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+    article = relationship("Article", back_populates="translations")
 
 
 class ArticleNarration(Base):
