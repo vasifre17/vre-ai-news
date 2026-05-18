@@ -1,7 +1,7 @@
 <!doctype html><html><head><title>VRE AI NEWS</title><link rel="stylesheet" href="/assets/styles.css"><link rel="canonical" href="{{ canonical }}"></head><body>
-<header class="site-header glass"><nav class="nav container"><a class="logo" href="/">VRE <span>AI NEWS</span></a><form class="search-wrap" action="/search"><input type="search" name="q" value="{{q}}" placeholder="Search"></form></nav>
+<header class="site-header glass"><nav class="nav container"><a class="logo" href="/{{language}}/">VRE <span>AI NEWS</span></a><form class="search-wrap" action="/search"><input type="search" name="q" value="{{q}}" placeholder="Search"></form><div>{% for lang in languages %}<a href="/{{lang}}/">{{lang|upper}}</a> {% endfor %}</div></nav>
 <nav class="categories container">{% for c in categories %}<a href="/category/{{c}}">{{c}}</a>{% endfor %}</nav></header>
 <main class="container section">
 {% if articles|length == 0 %}<div class="glass" style="padding:2rem">No published articles yet. Please check back soon.</div>{% endif %}
-<div class="grid cards">{% for a in articles %}<article class="card glass">{% if a.image_url %}<img src="{{a.image_url}}" alt="{{a.title}}">{% endif %}<h3><a href="/article/{{a.slug or a.id}}">{{a.title}}</a></h3><p>{{a.summary}}</p><small>{{a.category}} • {{a.published_at|format_published_at}}</small></article>{% endfor %}</div>
-</main></body></html>
+<div class="grid cards">{% for row in articles %}<article class="card glass">{% if row.article.image_url %}<img src="{{row.article.image_url}}" alt="{{row.t.title if row.t else row.article.title}}">{% endif %}<h3><a href="{{row.url}}">{{row.t.title if row.t else row.article.title}}</a></h3><p>{{row.t.summary if row.t else row.article.summary}}</p><small>{{row.article.category}} • {{row.article.published_at|format_published_at}}</small></article>{% endfor %}</div>
+</main><footer class="container">{% for lang in languages %}<a href="/{{lang}}/">{{lang|upper}}</a> {% endfor %}</footer></body></html>
