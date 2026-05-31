@@ -8,10 +8,10 @@ from ai.audio_service import AudioNarrationService
 from config import settings
 
 
-def queue_narration(db, article: Article) -> None:
+def queue_narration(db, article: Article, language: str | None = None) -> None:
     if not article.narration_enabled:
         return
-    language = (article.language or "az").lower()
+    language = (language or article.language or "az").lower()
     row = db.query(ArticleNarration).filter(ArticleNarration.article_id == article.id, ArticleNarration.language == language).first()
     if row:
         row.status = "pending"
@@ -32,7 +32,13 @@ def generate_pending_narrations() -> None:
             db.commit()
             article = narration.article
             try:
-                audio_path, file_size = service.generate(article.id, narration.language, article.title, article.summary or "", article.content or "")
+                translation = None
+                if narration.language != (article.language or "az").lower():
+                    translation = next((t for t in article.translations if t.language == narration.language), None)
+                title = translation.title if translation else article.title
+                summary = (translation.summary if translation else article.summary) or ""
+                content = (translation.content if translation else article.content) or ""
+                audio_path, file_size = service.generate(article.id, narration.language, title, summary, content)
                 narration.audio_path = audio_path
                 narration.file_size_bytes = file_size
                 narration.status = "ready"

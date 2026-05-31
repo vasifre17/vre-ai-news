@@ -1,5 +1,6 @@
 from datetime import datetime
 import re
+from sqlalchemy import or_
 from fastapi import FastAPI, Request, Depends, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -87,6 +88,7 @@ def ensure_slugs(db):
 
 @app.on_event("startup")
 def startup() -> None:
+    settings.validate_production_or_raise()
     init_db()
     db = SessionLocal()
     try:
@@ -133,7 +135,10 @@ def home(request: Request, language: str = "az", q: str = "", category: str = ""
 @app.get("/{language}/article/{slug}", response_class=HTMLResponse)
 def article_by_slug(slug: str, request: Request, language: str = "az", db=Depends(get_db)):
     language = language if language in SUPPORTED_LANGUAGES else "az"
-    article = db.query(Article).filter(((Article.slug == slug) | (Article.id == int(slug) if slug.isdigit() else -1)), Article.status == "published").first()
+    slug_filters = [Article.slug == slug]
+    if slug.isdigit():
+        slug_filters.append(Article.id == int(slug))
+    article = db.query(Article).filter(or_(*slug_filters), Article.status == "published").first()
     if not article and language != "az":
         tr = db.query(ArticleTranslation).filter(ArticleTranslation.slug == slug, ArticleTranslation.language == language).first()
         article = db.query(Article).get(tr.article_id) if tr else None
@@ -141,7 +146,7 @@ def article_by_slug(slug: str, request: Request, language: str = "az", db=Depend
         raise HTTPException(404)
     tr = get_translation(article, language)
     view = tr if tr else article
-    narration = db.query(ArticleNarration).filter(ArticleNarration.article_id == article.id, ArticleNarration.language == article.language).first()
+    narration = db.query(ArticleNarration).filter(ArticleNarration.article_id == article.id, ArticleNarration.language == language).first()
     alt_links = {lang: article_url(lang, (get_translation(article, lang).slug if get_translation(article, lang) else (article.slug or str(article.id)))) for lang in SUPPORTED_LANGUAGES}
     return templates.TemplateResponse("public/article.html", {"request": request, "article": view, "root_article": article, "narration": narration, "site_url": settings.site_url, "canonical": canonical_url(request, f"{language}/article/{view.slug or article.slug or article.id}"), "language": language, "languages": SUPPORTED_LANGUAGES, "alt_links": alt_links})
 
@@ -163,11 +168,13 @@ def category_page(category: str, request: Request, db=Depends(get_db)):
 
 @app.get('/sitemap.xml')
 def sitemap(db=Depends(get_db)):
-    urls = [f"<url><loc>{settings.site_url.rstrip('/')}/</loc></url>"]
+    base_url = settings.site_url.rstrip("/")
+    urls = [f"<url><loc>{base_url}/</loc></url>"]
+    urls.extend(f"<url><loc>{base_url}/{lang}/</loc></url>" for lang in SUPPORTED_LANGUAGES)
     for a in db.query(Article).filter(Article.status == 'published').all():
-        urls.append(f"<url><loc>{settings.site_url.rstrip('/')}/az/article/{a.slug or a.id}</loc></url>")
+        urls.append(f"<url><loc>{base_url}/az/article/{a.slug or a.id}</loc></url>")
         for tr in a.translations:
-            urls.append(f"<url><loc>{settings.site_url.rstrip('/')}/{tr.language}/article/{tr.slug}</loc></url>")
+            urls.append(f"<url><loc>{base_url}/{tr.language}/article/{tr.slug}</loc></url>")
     return Response(content=f'<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{"".join(urls)}</urlset>', media_type='application/xml')
 
 @app.get('/robots.txt')
@@ -214,6 +221,8 @@ def admin_generate_translations(article_id: int, request: Request, db=Depends(ge
         row.seo_title = payload.get("seo_title", row.title)
         row.tags = payload.get("tags", article.tags)
         row.slug = slugify(row.title) + f"-{lang}"
+        if article.status == "published" and article.narration_enabled:
+            queue_narration(db, article, lang)
     db.commit()
     return RedirectResponse('/admin/translations', status_code=302)
 

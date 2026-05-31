@@ -1,3 +1,4 @@
+import bcrypt
 from passlib.context import CryptContext
 from fastapi import Request
 from itsdangerous import URLSafeSerializer
@@ -8,11 +9,13 @@ serializer = URLSafeSerializer(settings.secret_key, salt="session")
 
 
 def verify_password(plain: str, hashed: str) -> bool:
+    if hashed.startswith(("$2a$", "$2b$", "$2y$")):
+        return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
     return pwd_context.verify(plain, hashed)
 
 
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
 def set_session(request: Request, username: str) -> None:
