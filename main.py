@@ -63,6 +63,14 @@ PUBLIC_LABELS = {
         "no_articles": "Hələ dərc edilmiş məqalə yoxdur. Tezliklə yenidən yoxlayın.",
         "related_empty": "Redaksiya böyüdükcə oxşar xəbərlər burada görünəcək.",
         "footer_tagline": "Yüksək səviyyəli AI xəbər analitikası",
+        "about": "Haqqımızda",
+        "contact": "Əlaqə",
+        "site_name": "Adı",
+        "domain_owner": "Domen adının sahibi",
+        "mobile_whatsapp": "Mobil və WhatsApp",
+        "youtube": "YouTube",
+        "tiktok": "TikTok",
+        "founder_ceo": "VREYC-in təsisçisi və baş direktoru Vasif Cəbrayıllıdır.",
         "email": "E-poçt",
     },
     "en": {
@@ -89,6 +97,14 @@ PUBLIC_LABELS = {
         "no_articles": "No published articles yet. Please check back soon.",
         "related_empty": "Related articles will appear here as the newsroom grows.",
         "footer_tagline": "Premium AI news intelligence",
+        "about": "About",
+        "contact": "Contact",
+        "site_name": "Name",
+        "domain_owner": "Domain owner",
+        "mobile_whatsapp": "Mobile and WhatsApp",
+        "youtube": "YouTube",
+        "tiktok": "TikTok",
+        "founder_ceo": "VREYC founder and chief executive is Vasif Jabrayilli.",
         "email": "Email",
     },
     "ru": {
@@ -115,6 +131,14 @@ PUBLIC_LABELS = {
         "no_articles": "Опубликованных статей пока нет. Загляните позже.",
         "related_empty": "Похожие статьи появятся здесь по мере роста редакции.",
         "footer_tagline": "Премиальная AI-аналитика новостей",
+        "about": "About",
+        "contact": "Contact",
+        "site_name": "Name",
+        "domain_owner": "Domain owner",
+        "mobile_whatsapp": "Mobile and WhatsApp",
+        "youtube": "YouTube",
+        "tiktok": "TikTok",
+        "founder_ceo": "VREYC founder and chief executive is Vasif Jabrayilli.",
         "email": "Эл. почта",
     },
     "tr": {
@@ -141,6 +165,14 @@ PUBLIC_LABELS = {
         "no_articles": "Henüz yayımlanmış makale yok. Lütfen yakında tekrar kontrol edin.",
         "related_empty": "Editoryal içerik büyüdükçe ilgili haberler burada görünecek.",
         "footer_tagline": "Premium AI haber istihbaratı",
+        "about": "About",
+        "contact": "Contact",
+        "site_name": "Name",
+        "domain_owner": "Domain owner",
+        "mobile_whatsapp": "Mobile and WhatsApp",
+        "youtube": "YouTube",
+        "tiktok": "TikTok",
+        "founder_ceo": "VREYC founder and chief executive is Vasif Jabrayilli.",
         "email": "E-posta",
     },
     "zh": {
@@ -167,6 +199,14 @@ PUBLIC_LABELS = {
         "no_articles": "暂无已发布文章。请稍后再查看。",
         "related_empty": "随着 newsroom 内容增长，相关新闻将显示在这里。",
         "footer_tagline": "高端 AI 新闻情报",
+        "about": "About",
+        "contact": "Contact",
+        "site_name": "Name",
+        "domain_owner": "Domain owner",
+        "mobile_whatsapp": "Mobile and WhatsApp",
+        "youtube": "YouTube",
+        "tiktok": "TikTok",
+        "founder_ceo": "VREYC founder and chief executive is Vasif Jabrayilli.",
         "email": "电子邮件",
     },
     "es": {
@@ -193,6 +233,14 @@ PUBLIC_LABELS = {
         "no_articles": "Aún no hay artículos publicados. Vuelve pronto.",
         "related_empty": "Los artículos relacionados aparecerán aquí a medida que crezca la redacción.",
         "footer_tagline": "Inteligencia premium de noticias con AI",
+        "about": "About",
+        "contact": "Contact",
+        "site_name": "Name",
+        "domain_owner": "Domain owner",
+        "mobile_whatsapp": "Mobile and WhatsApp",
+        "youtube": "YouTube",
+        "tiktok": "TikTok",
+        "founder_ceo": "VREYC founder and chief executive is Vasif Jabrayilli.",
         "email": "Correo",
     },
 }
@@ -239,10 +287,22 @@ def is_uploaded_file(value) -> bool:
     return bool(getattr(value, "filename", None)) and hasattr(value, "file")
 
 
-def image_srcset(path: str | None) -> str:
-    if not path or not path.startswith(UPLOAD_URL_PREFIX):
+def public_image_url(path: str | None) -> str:
+    if not path:
         return ""
-    source = Path(path.lstrip("/"))
+    value = path.strip()
+    if value.startswith(("http://", "https://", "/")):
+        return value
+    if value.startswith(("static/", "assets/")):
+        return f"/{value}"
+    return value
+
+
+def image_srcset(path: str | None) -> str:
+    public_path = public_image_url(path)
+    if not public_path.startswith(UPLOAD_URL_PREFIX):
+        return ""
+    source = Path(public_path.lstrip("/"))
     parts = []
     for width in IMAGE_VARIANT_WIDTHS:
         variant = source.with_name(f"{source.stem}-{width}.webp")
@@ -292,6 +352,7 @@ def save_image_upload(file, alt_text: str = "") -> MediaAsset | None:
 
 templates.env.filters["format_published_at"] = format_published_at
 templates.env.filters["image_srcset"] = image_srcset
+templates.env.filters["public_image_url"] = public_image_url
 
 
 def get_db():
