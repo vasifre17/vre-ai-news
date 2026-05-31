@@ -1,3 +1,44 @@
-<!doctype html><html><head><title>VREYC Admin Dashboard</title></head><body><h2>VREYC Admin Dashboard</h2><p>Drafts: {{drafts}} | Published: {{published}}</p><a href="/admin/articles?status=draft">Drafts</a> <a href="/admin/articles?status=published">Published</a> <a href="/admin/translations">Translations</a>
-<form method="post" action="/admin/settings/mode"><select name="mode"><option value="auto">AUTO</option><option value="manual">MANUAL</option></select><button>Set Mode</button></form>
-<h3>Logs</h3>{% for l in logs %}<div>[{{l.level}}] {{l.message}}</div>{% endfor %}</body></html>
+{% extends "admin/_base.html" %}
+{% set title = 'Dashboard | VREYC Admin' %}
+{% set heading = 'Dashboard overview' %}
+{% block content %}
+<section class="stats-grid">
+  <article class="stat-card"><span>Total articles</span><strong>{{ total_articles }}</strong><small>Across all statuses</small></article>
+  <article class="stat-card"><span>Published</span><strong>{{ published }}</strong><small>Live on VREYC</small></article>
+  <article class="stat-card"><span>Drafts</span><strong>{{ drafts }}</strong><small>Awaiting editorial review</small></article>
+  <article class="stat-card"><span>Media assets</span><strong>{{ media_count }}</strong><small>Stored in library</small></article>
+</section>
+
+<section class="panel-grid two">
+  <div class="panel">
+    <div class="panel-head"><h2>Editorial workflow</h2><a class="btn primary" href="/admin/articles/new">New article</a></div>
+    <div class="workflow-row"><span>Categories</span><strong>{{ categories }}</strong></div>
+    <div class="workflow-row"><span>Languages</span><strong>{{ languages|join(', ')|upper }}</strong></div>
+    <div class="workflow-row"><span>Publishing</span><strong>Manual + protected</strong></div>
+  </div>
+  <div class="panel ai-panel">
+    <p class="eyebrow">AI tools placeholders</p>
+    <h2>Newsroom intelligence</h2>
+    <div class="tool-list">
+      <span>SEO headline optimizer</span><span>Auto translation QA</span><span>Image prompt assistant</span><span>Audio narration review</span>
+    </div>
+  </div>
+</section>
+
+<section class="panel-grid two">
+  <div class="panel">
+    <div class="panel-head"><h2>Recent articles</h2><a href="/admin/articles">Manage all</a></div>
+    <div class="table-wrap">
+      <table><thead><tr><th>Title</th><th>Status</th><th>Updated</th></tr></thead><tbody>
+      {% for article in recent_articles %}<tr><td><a href="/admin/articles/{{ article.id }}/edit">{{ article.title or 'Untitled' }}</a></td><td><span class="badge {{ article.status }}">{{ article.status }}</span></td><td>{{ article.updated_at|format_published_at }}</td></tr>{% else %}<tr><td colspan="3">No articles yet.</td></tr>{% endfor %}
+      </tbody></table>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><h2>Fetch logs</h2></div>
+    <div class="activity-list">
+      {% for log in logs %}<div><span class="badge">{{ log.level }}</span><p>{{ log.message }}</p><small>{{ log.created_at|format_published_at }}</small></div>{% else %}<p class="muted">No fetch logs yet.</p>{% endfor %}
+    </div>
+  </div>
+</section>
+{% endblock %}

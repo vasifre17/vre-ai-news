@@ -1,7 +1,36 @@
-<!doctype html><html><head><title>Edit Article | VREYC Admin</title></head><body><h2>VREYC Admin — Edit Article</h2><form method="post"><input name="title" value="{{article.title}}"><input name="category" value="{{article.category}}"><input name="image_url" value="{{article.image_url}}"><input name="seo_title" value="{{article.seo_title}}"><input name="tags" value="{{article.tags}}"><textarea name="content">{{article.content}}</textarea><button>Save</button></form>
-<h3>Narration</h3><p>Status: {{narration.status if narration else 'pending'}} | Enabled: {{article.narration_enabled}}</p>
-<form method="post" action="/admin/articles/{{article.id}}/narration/toggle"><input type="hidden" name="enabled" value="{{'false' if article.narration_enabled else 'true'}}"><button>{{'Disable' if article.narration_enabled else 'Enable'}} narration</button></form>
-<form method="post" action="/admin/articles/{{article.id}}/narration/regenerate"><button>Regenerate narration</button></form>
-<form method="post" action="/admin/articles/{{article.id}}/narration/delete"><button>Delete narration</button></form>
-{% if narration and narration.audio_path %}<audio controls src="{{narration.audio_path}}"></audio>{% endif %}
-</body></html>
+{% extends "admin/_base.html" %}
+{% set title = ('New Article' if mode == 'new' else 'Edit Article') ~ ' | VREYC Admin' %}
+{% set heading = 'Create article' if mode == 'new' else 'Edit article' %}
+{% block content %}
+<form method="post" class="article-editor">
+  <section class="panel editor-main">
+    <div class="panel-head wrap"><div><h2>Multilingual content</h2><p class="muted">Manage localized fields for AZ, EN, RU, TR, ZH and ES.</p></div><button class="btn primary" type="submit">Save article</button></div>
+    <div class="language-editor">
+      {% for lang in languages %}
+      {% set item = translations.get(lang) %}
+      <details class="locale-panel" {% if lang == 'az' %}open{% endif %}>
+        <summary><span>{{ lang|upper }}</span>{{ language_labels[lang] }}</summary>
+        <div class="form-grid two">
+          <label>Title<input name="title_{{ lang }}" value="{{ item.title if item else '' }}" {% if lang == 'az' %}required{% endif %}></label>
+          <label>Slug<input name="slug_{{ lang }}" value="{{ item.slug if item else '' }}" placeholder="seo-friendly-slug"></label>
+        </div>
+        <label>SEO title<input name="seo_title_{{ lang }}" value="{{ item.seo_title if item else '' }}"></label>
+        <label>Meta description<textarea name="meta_description_{{ lang }}" rows="2">{{ item.meta_description if item else '' }}</textarea></label>
+        <label>Summary<textarea name="summary_{{ lang }}" rows="3">{{ item.summary if item else '' }}</textarea></label>
+        <label>Content<textarea name="content_{{ lang }}" rows="10">{{ item.content if item else '' }}</textarea></label>
+        <label>Tags<input name="tags_{{ lang }}" value="{{ item.tags if item else '' }}" placeholder="AI, policy, economy"></label>
+      </details>
+      {% endfor %}
+    </div>
+  </section>
+  <aside class="panel editor-side">
+    <h2>Publishing</h2>
+    <label>Status<select name="status"><option value="draft" {{ 'selected' if not article or article.status == 'draft' else '' }}>Draft</option><option value="published" {{ 'selected' if article and article.status == 'published' else '' }}>Published</option></select></label>
+    <label>Category<select name="category"><option value="">Uncategorized</option>{% for c in categories %}<option value="{{ c.name }}" {{ 'selected' if article and article.category == c.name else '' }}>{{ c.name }}</option>{% endfor %}</select></label>
+    <label>Hero image URL<input name="image_url" value="{{ article.image_url if article else '' }}" placeholder="/static/uploads/media/image.jpg"></label>
+    <label class="check"><input type="checkbox" name="narration_enabled" {{ 'checked' if not article or article.narration_enabled else '' }}> Enable audio narration</label>
+    <div class="side-actions"><button class="btn primary full" type="submit">Save changes</button><a class="btn full" href="/admin/articles">Back to articles</a></div>
+    {% if article %}<hr><h3>Narration</h3><p class="muted">Status: {{ narration.status if narration else 'pending' }}</p><div class="actions vertical"><form method="post" action="/admin/articles/{{ article.id }}/narration/regenerate"><button class="btn small" type="submit">Regenerate</button></form><form method="post" action="/admin/articles/{{ article.id }}/narration/delete"><button class="btn small danger" type="submit">Delete narration</button></form></div>{% if narration and narration.audio_path %}<audio controls src="{{ narration.audio_path }}"></audio>{% endif %}{% endif %}
+  </aside>
+</form>
+{% endblock %}

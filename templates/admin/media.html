@@ -1,0 +1,7 @@
+{% extends "admin/_base.html" %}
+{% set title = 'Media Library | VREYC Admin' %}
+{% set heading = 'Media upload library' %}
+{% block content %}
+<section class="panel"><div class="panel-head wrap"><div><h2>Upload media</h2><p class="muted">Upload images and reusable assets for article hero media.</p></div></div><form method="post" enctype="multipart/form-data" class="upload-box"><input name="file" type="file" required><input name="alt_text" placeholder="Alt text / caption"><button class="btn primary" type="submit">Upload asset</button></form></section>
+<section class="media-grid">{% for asset in assets %}<article class="media-card"><div class="media-preview">{% if asset.content_type and asset.content_type.startswith('image') %}<img src="{{ asset.path }}" alt="{{ asset.alt_text or asset.filename }}">{% else %}<span>{{ asset.content_type or 'file' }}</span>{% endif %}</div><div><strong>{{ asset.filename }}</strong><code>{{ asset.path }}</code><p>{{ asset.alt_text or 'No alt text' }}</p><small>{{ (asset.size_bytes or 0) // 1024 }} KB</small></div><form method="post" action="/admin/media/{{ asset.id }}/delete" onsubmit="return confirm('Delete media asset?')"><button class="btn small danger">Delete</button></form></article>{% else %}<div class="panel"><p class="muted">No media assets uploaded yet.</p></div>{% endfor %}</section>
+{% endblock %}

@@ -1,7 +1,10 @@
 from datetime import datetime
 import re
-from sqlalchemy import or_
-from fastapi import FastAPI, Request, Depends, Form, HTTPException
+import shutil
+from pathlib import Path
+from uuid import uuid4
+from sqlalchemy import or_, text
+from fastapi import FastAPI, Request, Depends, Form, HTTPException, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -12,8 +15,8 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from config import settings
 from database.session import SessionLocal, init_db
-from database.models import Article, ArticleRevision, FetchLog, Setting, ArticleNarration, ArticleTranslation
-from cms.auth.security import is_authenticated, set_session, verify_password
+from database.models import Article, ArticleRevision, FetchLog, Setting, ArticleNarration, ArticleTranslation, Category, MediaAsset
+from cms.auth.security import is_authenticated, set_session, clear_session, verify_password
 from scheduler.jobs import run_fetch_pipeline, queue_narration, generate_pending_narrations
 from ai.pipeline import AIEngine
 
@@ -27,6 +30,8 @@ app.state.limiter = limiter
 scheduler = BackgroundScheduler()
 ai_engine = AIEngine()
 SUPPORTED_LANGUAGES = ["az", "en", "ru", "tr", "zh", "es"]
+LANGUAGE_LABELS = {"az": "Azerbaijani", "en": "English", "ru": "Russian", "tr": "Turkish", "zh": "Chinese", "es": "Spanish"}
+UPLOAD_DIR = Path("static/uploads/media")
 
 
 def slugify(text: str) -> str:
@@ -71,6 +76,28 @@ def get_translation(article: Article, language: str):
     return None
 
 
+def unique_article_slug(db, requested_slug: str, current_id: int | None = None) -> str:
+    root = slugify(requested_slug)
+    candidate = root
+    suffix = 2
+    while True:
+        query = db.query(Article).filter(Article.slug == candidate)
+        if current_id:
+            query = query.filter(Article.id != current_id)
+        if not query.first():
+            return candidate
+        candidate = f"{root}-{suffix}"
+        suffix += 1
+
+
+def get_or_create_translation(db, article: Article, language: str) -> ArticleTranslation:
+    row = db.query(ArticleTranslation).filter(ArticleTranslation.article_id == article.id, ArticleTranslation.language == language).first()
+    if not row:
+        row = ArticleTranslation(article_id=article.id, language=language)
+        db.add(row)
+    return row
+
+
 def ensure_slugs(db):
     used = set()
     for a in db.query(Article).all():
@@ -86,26 +113,45 @@ def ensure_slugs(db):
     db.commit()
 
 
+def get_settings_map(db) -> dict[str, str]:
+    return {row.key: row.value for row in db.query(Setting).all()}
+
+
+def save_setting(db, key: str, value: str) -> None:
+    row = db.query(Setting).filter(Setting.key == key).first()
+    if not row:
+        db.add(Setting(key=key, value=value))
+    else:
+        row.value = value
+
+
+def article_form_context(db, article: Article | None = None) -> dict:
+    categories = db.query(Category).order_by(Category.name.asc()).all()
+    if not categories:
+        names = [c[0] for c in db.query(Article.category).filter(Article.category.isnot(None)).distinct().all() if c[0]]
+        categories = [Category(name=name, slug=slugify(name), description="") for name in names]
+    translations = {lang: get_translation(article, lang) for lang in SUPPORTED_LANGUAGES} if article else {lang: None for lang in SUPPORTED_LANGUAGES}
+    return {"categories": categories, "languages": SUPPORTED_LANGUAGES, "language_labels": LANGUAGE_LABELS, "translations": translations}
+
+
 @app.on_event("startup")
 def startup() -> None:
     settings.validate_production_or_raise()
     init_db()
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     db = SessionLocal()
-    try:
-        db.execute("ALTER TABLE articles ADD COLUMN slug VARCHAR(500)")
-        db.commit()
-    except Exception:
-        db.rollback()
-    try:
-        db.execute("ALTER TABLE articles ADD COLUMN narration_enabled BOOLEAN DEFAULT 1")
-        db.commit()
-    except Exception:
-        db.rollback()
-    try:
-        db.execute("ALTER TABLE article_translations ADD COLUMN slug VARCHAR(500)")
-        db.commit()
-    except Exception:
-        db.rollback()
+    for statement in [
+        "ALTER TABLE articles ADD COLUMN slug VARCHAR(500)",
+        "ALTER TABLE articles ADD COLUMN narration_enabled BOOLEAN DEFAULT 1",
+        "ALTER TABLE articles ADD COLUMN meta_description TEXT",
+        "ALTER TABLE article_translations ADD COLUMN slug VARCHAR(500)",
+        "ALTER TABLE article_translations ADD COLUMN meta_description TEXT",
+    ]:
+        try:
+            db.execute(text(statement))
+            db.commit()
+        except Exception:
+            db.rollback()
     ensure_slugs(db)
     db.close()
     scheduler.add_job(run_fetch_pipeline, "interval", minutes=max(13, min(17, settings.fetch_interval_min)), id="fetch_job", replace_existing=True)
@@ -151,20 +197,15 @@ def article_by_slug(slug: str, request: Request, language: str = "az", db=Depend
     return templates.TemplateResponse("public/article.html", {"request": request, "article": view, "root_article": article, "narration": narration, "site_url": settings.site_url, "canonical": canonical_url(request, f"{language}/article/{view.slug or article.slug or article.id}"), "language": language, "languages": SUPPORTED_LANGUAGES, "alt_links": alt_links})
 
 
-@app.get('/admin/articles', response_class=HTMLResponse)
-def admin_articles(request: Request, status: str = "draft", db=Depends(get_db), _=Depends(require_auth)):
-    articles = db.query(Article).filter(Article.status == status).order_by(Article.created_at.desc()).all()
-    narration_map = {n.article_id: n for n in db.query(ArticleNarration).filter(ArticleNarration.article_id.in_([a.id for a in articles] or [0])).all()}
-    return templates.TemplateResponse("admin/articles.html", {"request": request, "articles": articles, "status": status, "narration_map": narration_map})
-
-# keep remaining routes from original
 @app.get('/search', response_class=HTMLResponse)
 def search(request: Request, q: str = "", db=Depends(get_db)):
     return home(request, q=q, db=db)
 
+
 @app.get('/category/{category}', response_class=HTMLResponse)
 def category_page(category: str, request: Request, db=Depends(get_db)):
     return home(request, category=category, db=db)
+
 
 @app.get('/sitemap.xml')
 def sitemap(db=Depends(get_db)):
@@ -177,48 +218,308 @@ def sitemap(db=Depends(get_db)):
             urls.append(f"<url><loc>{base_url}/{tr.language}/article/{tr.slug}</loc></url>")
     return Response(content=f'<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{"".join(urls)}</urlset>', media_type='application/xml')
 
+
 @app.get('/robots.txt')
 def robots():
     return Response(content=f"User-agent: *\nAllow: /\nDisallow: /admin\nSitemap: {settings.site_url.rstrip('/')}/sitemap.xml\n", media_type='text/plain')
 
+
+@app.exception_handler(401)
+def unauthorized(request: Request, exc):
+    if request.url.path.startswith('/admin'):
+        return RedirectResponse('/admin/login', status_code=302)
+    return Response(status_code=401)
+
+
 @app.get('/admin/login', response_class=HTMLResponse)
-def login_page(request: Request): return templates.TemplateResponse('admin/login.html', {'request': request})
+def login_page(request: Request):
+    if is_authenticated(request):
+        return RedirectResponse('/admin', status_code=302)
+    return templates.TemplateResponse('admin/login.html', {'request': request})
+
 
 @app.post('/admin/login')
 @limiter.limit('5/minute')
 def login(request: Request, username: str = Form(...), password: str = Form(...)):
     if username == settings.admin_username and settings.admin_password_hash and verify_password(password, settings.admin_password_hash):
-        set_session(request, username); return RedirectResponse('/admin', status_code=302)
-    return templates.TemplateResponse('admin/login.html', {'request': request, 'error': 'Invalid credentials'})
+        set_session(request, username)
+        return RedirectResponse('/admin', status_code=302)
+    return templates.TemplateResponse('admin/login.html', {'request': request, 'error': 'Invalid credentials'}, status_code=401)
+
+
+@app.post('/admin/logout')
+def logout(request: Request):
+    clear_session(request)
+    return RedirectResponse('/admin/login', status_code=302)
+
 
 @app.get('/admin', response_class=HTMLResponse)
 def admin_dashboard(request: Request, db=Depends(get_db), _=Depends(require_auth)):
-    drafts = db.query(Article).filter(Article.status == 'draft').count(); published = db.query(Article).filter(Article.status == 'published').count(); categories = db.query(Article.category).filter(Article.status == 'published').distinct().count(); logs = db.query(FetchLog).order_by(FetchLog.created_at.desc()).limit(20).all()
-    return templates.TemplateResponse('admin/dashboard.html', {'request': request, 'drafts': drafts, 'published': published, 'categories': categories, 'logs': logs, "languages": SUPPORTED_LANGUAGES})
+    drafts = db.query(Article).filter(Article.status == 'draft').count()
+    published = db.query(Article).filter(Article.status == 'published').count()
+    total_articles = db.query(Article).count()
+    categories = db.query(Category).count() or db.query(Article.category).filter(Article.category.isnot(None)).distinct().count()
+    media_count = db.query(MediaAsset).count()
+    logs = db.query(FetchLog).order_by(FetchLog.created_at.desc()).limit(8).all()
+    recent_articles = db.query(Article).order_by(Article.updated_at.desc(), Article.created_at.desc()).limit(6).all()
+    return templates.TemplateResponse('admin/dashboard.html', {'request': request, 'drafts': drafts, 'published': published, 'total_articles': total_articles, 'categories': categories, 'media_count': media_count, 'logs': logs, 'recent_articles': recent_articles, "languages": SUPPORTED_LANGUAGES})
+
+
+@app.get('/admin/articles', response_class=HTMLResponse)
+def admin_articles(request: Request, status: str = "all", db=Depends(get_db), _=Depends(require_auth)):
+    query = db.query(Article)
+    if status in {"draft", "published"}:
+        query = query.filter(Article.status == status)
+    articles = query.order_by(Article.updated_at.desc(), Article.created_at.desc()).all()
+    narration_map = {n.article_id: n for n in db.query(ArticleNarration).filter(ArticleNarration.article_id.in_([a.id for a in articles] or [0])).all()}
+    return templates.TemplateResponse("admin/articles.html", {"request": request, "articles": articles, "status": status, "narration_map": narration_map, "languages": SUPPORTED_LANGUAGES})
+
+
+@app.get('/admin/articles/new', response_class=HTMLResponse)
+def new_article_page(request: Request, db=Depends(get_db), _=Depends(require_auth)):
+    context = article_form_context(db)
+    context.update({'request': request, 'article': None, 'mode': 'new', 'narration': None})
+    return templates.TemplateResponse('admin/edit.html', context)
+
+
+@app.post('/admin/articles/new')
+async def create_article(request: Request, db=Depends(get_db), _=Depends(require_auth)):
+    form = await request.form()
+    title = form.get('title_az') or form.get('title') or 'Untitled article'
+    article = Article(
+        title=title,
+        slug=unique_article_slug(db, form.get('slug_az') or title),
+        summary=form.get('summary_az', ''),
+        content=form.get('content_az', ''),
+        seo_title=form.get('seo_title_az', ''),
+        meta_description=form.get('meta_description_az', ''),
+        tags=form.get('tags_az', ''),
+        image_url=form.get('image_url', ''),
+        category=form.get('category', ''),
+        status=form.get('status', 'draft'),
+        language='az',
+        narration_enabled=form.get('narration_enabled') == 'on',
+        published_at=datetime.utcnow() if form.get('status') == 'published' else None,
+    )
+    db.add(article)
+    db.flush()
+    for lang in SUPPORTED_LANGUAGES:
+        if lang == 'az':
+            continue
+        if any(form.get(f'{field}_{lang}', '') for field in ['title', 'summary', 'content', 'seo_title', 'meta_description', 'tags', 'slug']):
+            row = ArticleTranslation(article_id=article.id, language=lang)
+            row.title = form.get(f'title_{lang}', '')
+            row.slug = slugify(form.get(f'slug_{lang}') or row.title or f'{article.slug}-{lang}')
+            row.summary = form.get(f'summary_{lang}', '')
+            row.content = form.get(f'content_{lang}', '')
+            row.seo_title = form.get(f'seo_title_{lang}', '')
+            row.meta_description = form.get(f'meta_description_{lang}', '')
+            row.tags = form.get(f'tags_{lang}', '')
+            db.add(row)
+    db.commit()
+    return RedirectResponse('/admin/articles', status_code=302)
+
+
+@app.post('/admin/articles/{article_id}/publish')
+def publish_article(article_id: int, request: Request, db=Depends(get_db), _=Depends(require_auth)):
+    a = db.query(Article).get(article_id)
+    if a:
+        a.status = 'published'
+        a.published_at = a.published_at or datetime.utcnow()
+        a.slug = a.slug or unique_article_slug(db, a.title, a.id)
+        a.updated_at = datetime.utcnow()
+        db.commit()
+        queue_narration(db, a)
+        db.commit()
+    return RedirectResponse('/admin/articles?status=published', status_code=302)
+
+
+@app.post('/admin/articles/{article_id}/unpublish')
+def unpublish_article(article_id: int, request: Request, db=Depends(get_db), _=Depends(require_auth)):
+    a = db.query(Article).get(article_id)
+    if a:
+        a.status = 'draft'
+        a.updated_at = datetime.utcnow()
+        db.commit()
+    return RedirectResponse('/admin/articles?status=draft', status_code=302)
+
+
+@app.get('/admin/articles/{article_id}/edit', response_class=HTMLResponse)
+def edit_page(article_id: int, request: Request, db=Depends(get_db), _=Depends(require_auth)):
+    article = db.query(Article).get(article_id)
+    if not article:
+        raise HTTPException(404)
+    narration = db.query(ArticleNarration).filter(ArticleNarration.article_id == article_id, ArticleNarration.language == article.language).first()
+    context = article_form_context(db, article)
+    context.update({'request': request, 'article': article, 'mode': 'edit', 'narration': narration})
+    return templates.TemplateResponse('admin/edit.html', context)
+
+
+@app.post('/admin/articles/{article_id}/edit')
+async def edit_article(article_id: int, request: Request, db=Depends(get_db), _=Depends(require_auth)):
+    form = await request.form()
+    a = db.query(Article).get(article_id)
+    if not a:
+        return RedirectResponse('/admin/articles', status_code=302)
+    db.add(ArticleRevision(article_id=a.id, title=a.title, content=a.content, image_url=a.image_url, category=a.category, seo_title=a.seo_title, tags=a.tags))
+    a.title = form.get('title_az') or form.get('title') or a.title
+    a.slug = unique_article_slug(db, form.get('slug_az') or a.title, a.id)
+    a.summary = form.get('summary_az', '')
+    a.content = form.get('content_az', '')
+    a.seo_title = form.get('seo_title_az', '')
+    a.meta_description = form.get('meta_description_az', '')
+    a.tags = form.get('tags_az', '')
+    a.image_url = form.get('image_url', '')
+    a.category = form.get('category', '')
+    old_status = a.status
+    a.status = form.get('status', 'draft')
+    a.narration_enabled = form.get('narration_enabled') == 'on'
+    a.updated_at = datetime.utcnow()
+    if a.status == 'published' and (old_status != 'published' or not a.published_at):
+        a.published_at = datetime.utcnow()
+    for lang in SUPPORTED_LANGUAGES:
+        if lang == 'az':
+            continue
+        has_content = any(form.get(f'{field}_{lang}', '') for field in ['title', 'summary', 'content', 'seo_title', 'meta_description', 'tags', 'slug'])
+        row = db.query(ArticleTranslation).filter(ArticleTranslation.article_id == a.id, ArticleTranslation.language == lang).first()
+        if not has_content and row:
+            db.delete(row)
+            continue
+        if has_content:
+            row = row or ArticleTranslation(article_id=a.id, language=lang)
+            if row.id is None:
+                db.add(row)
+            row.title = form.get(f'title_{lang}', '')
+            row.slug = slugify(form.get(f'slug_{lang}') or row.title or f'{a.slug}-{lang}')
+            row.summary = form.get(f'summary_{lang}', '')
+            row.content = form.get(f'content_{lang}', '')
+            row.seo_title = form.get(f'seo_title_{lang}', '')
+            row.meta_description = form.get(f'meta_description_{lang}', '')
+            row.tags = form.get(f'tags_{lang}', '')
+            row.updated_at = datetime.utcnow()
+    db.commit()
+    return RedirectResponse(f'/admin/articles/{a.id}/edit?saved=1', status_code=302)
+
+
+@app.post('/admin/articles/{article_id}/delete')
+def delete_article(article_id: int, request: Request, db=Depends(get_db), _=Depends(require_auth)):
+    article = db.query(Article).get(article_id)
+    status = article.status if article else 'all'
+    if article:
+        db.delete(article)
+        db.commit()
+    return RedirectResponse(f'/admin/articles?status={status}', status_code=302)
+
+
+@app.get('/admin/categories', response_class=HTMLResponse)
+def categories_page(request: Request, db=Depends(get_db), _=Depends(require_auth)):
+    categories = db.query(Category).order_by(Category.name.asc()).all()
+    counts = {c.name: db.query(Article).filter(Article.category == c.name).count() for c in categories}
+    return templates.TemplateResponse('admin/categories.html', {'request': request, 'categories': categories, 'counts': counts})
+
+
+@app.post('/admin/categories')
+def create_category(request: Request, name: str = Form(...), description: str = Form(''), color: str = Form('#48a6ff'), db=Depends(get_db), _=Depends(require_auth)):
+    name = name.strip()
+    if name and not db.query(Category).filter(Category.name == name).first():
+        db.add(Category(name=name, slug=slugify(name), description=description, color=color))
+        db.commit()
+    return RedirectResponse('/admin/categories', status_code=302)
+
+
+@app.post('/admin/categories/{category_id}/edit')
+def update_category(category_id: int, request: Request, name: str = Form(...), description: str = Form(''), color: str = Form('#48a6ff'), db=Depends(get_db), _=Depends(require_auth)):
+    category = db.query(Category).get(category_id)
+    if category:
+        old_name = category.name
+        category.name = name.strip()
+        category.slug = slugify(name)
+        category.description = description
+        category.color = color
+        for article in db.query(Article).filter(Article.category == old_name).all():
+            article.category = category.name
+        db.commit()
+    return RedirectResponse('/admin/categories', status_code=302)
+
+
+@app.post('/admin/categories/{category_id}/delete')
+def delete_category(category_id: int, request: Request, db=Depends(get_db), _=Depends(require_auth)):
+    category = db.query(Category).get(category_id)
+    if category:
+        db.delete(category)
+        db.commit()
+    return RedirectResponse('/admin/categories', status_code=302)
+
+
+@app.get('/admin/media', response_class=HTMLResponse)
+def media_page(request: Request, db=Depends(get_db), _=Depends(require_auth)):
+    assets = db.query(MediaAsset).order_by(MediaAsset.created_at.desc()).all()
+    return templates.TemplateResponse('admin/media.html', {'request': request, 'assets': assets})
+
+
+@app.post('/admin/media')
+async def upload_media(request: Request, file: UploadFile = File(...), alt_text: str = Form(''), db=Depends(get_db), _=Depends(require_auth)):
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    suffix = Path(file.filename or 'upload.bin').suffix.lower()
+    safe_name = f"{uuid4().hex}{suffix}"
+    target = UPLOAD_DIR / safe_name
+    with target.open('wb') as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    stat = target.stat()
+    asset = MediaAsset(filename=file.filename or safe_name, path=f"/static/uploads/media/{safe_name}", content_type=file.content_type or 'application/octet-stream', size_bytes=stat.st_size, alt_text=alt_text)
+    db.add(asset)
+    db.commit()
+    return RedirectResponse('/admin/media', status_code=302)
+
+
+@app.post('/admin/media/{asset_id}/delete')
+def delete_media(asset_id: int, request: Request, db=Depends(get_db), _=Depends(require_auth)):
+    asset = db.query(MediaAsset).get(asset_id)
+    if asset:
+        local_path = Path(asset.path.lstrip('/'))
+        if local_path.exists() and local_path.is_file():
+            local_path.unlink()
+        db.delete(asset)
+        db.commit()
+    return RedirectResponse('/admin/media', status_code=302)
+
+
+@app.get('/admin/settings', response_class=HTMLResponse)
+def settings_page(request: Request, db=Depends(get_db), _=Depends(require_auth)):
+    admin_settings = get_settings_map(db)
+    return templates.TemplateResponse('admin/settings.html', {'request': request, 'settings_map': admin_settings, 'config': settings, 'languages': SUPPORTED_LANGUAGES})
+
+
+@app.post('/admin/settings')
+def save_settings(request: Request, site_name: str = Form('VREYC'), editor_name: str = Form('Editor'), publish_mode: str = Form('manual'), default_language: str = Form('az'), db=Depends(get_db), _=Depends(require_auth)):
+    for key, value in {'site_name': site_name, 'editor_name': editor_name, 'publish_mode': publish_mode, 'default_language': default_language}.items():
+        save_setting(db, key, value)
+    db.commit()
+    return RedirectResponse('/admin/settings?saved=1', status_code=302)
+
 
 @app.get('/admin/translations', response_class=HTMLResponse)
 def admin_translations(request: Request, db=Depends(get_db), _=Depends(require_auth)):
     articles = db.query(Article).filter(Article.status == 'published').order_by(Article.published_at.desc()).all()
     return templates.TemplateResponse('admin/translations.html', {'request': request, 'articles': articles, 'languages': SUPPORTED_LANGUAGES})
 
+
 @app.post('/admin/translations/{article_id}/generate')
 def admin_generate_translations(article_id: int, request: Request, db=Depends(get_db), _=Depends(require_auth)):
     article = db.query(Article).get(article_id)
     if not article:
         return RedirectResponse('/admin/translations', status_code=302)
-    source = {"title": article.title, "summary": article.summary, "content": article.content, "seo_title": article.seo_title, "tags": article.tags}
+    source = {"title": article.title, "summary": article.summary, "content": article.content, "seo_title": article.seo_title, "tags": article.tags, "meta_description": article.meta_description}
     for lang in SUPPORTED_LANGUAGES:
         if lang == "az":
             continue
         payload = ai_engine.translate_article(source, lang)
-        row = db.query(ArticleTranslation).filter(ArticleTranslation.article_id == article.id, ArticleTranslation.language == lang).first()
-        if not row:
-            row = ArticleTranslation(article_id=article.id, language=lang)
-            db.add(row)
+        row = get_or_create_translation(db, article, lang)
         row.title = payload.get("title", article.title)
         row.summary = payload.get("summary", article.summary)
         row.content = payload.get("content", article.content)
         row.seo_title = payload.get("seo_title", row.title)
+        row.meta_description = payload.get("meta_description", article.meta_description)
         row.tags = payload.get("tags", article.tags)
         row.slug = slugify(row.title) + f"-{lang}"
         if article.status == "published" and article.narration_enabled:
@@ -226,52 +527,48 @@ def admin_generate_translations(article_id: int, request: Request, db=Depends(ge
     db.commit()
     return RedirectResponse('/admin/translations', status_code=302)
 
-@app.post('/admin/articles/{article_id}/publish')
-def publish_article(article_id: int, request: Request, db=Depends(get_db), _=Depends(require_auth)):
-    a = db.query(Article).get(article_id)
-    if a:
-        a.status = 'published'; a.published_at = datetime.utcnow(); a.slug = a.slug or slugify(a.title); db.commit(); queue_narration(db, a); db.commit()
-    return RedirectResponse('/admin/articles?status=draft', status_code=302)
-
-@app.get('/admin/articles/{article_id}/edit', response_class=HTMLResponse)
-def edit_page(article_id: int, request: Request, db=Depends(get_db), _=Depends(require_auth)):
-    article = db.query(Article).get(article_id)
-    narration = db.query(ArticleNarration).filter(ArticleNarration.article_id == article_id, ArticleNarration.language == article.language).first() if article else None
-    return templates.TemplateResponse('admin/edit.html', {'request': request, 'article': article, 'narration': narration})
-
-@app.post('/admin/articles/{article_id}/edit')
-def edit_article(article_id: int, request: Request, title: str = Form(...), content: str = Form(...), image_url: str = Form(''), category: str = Form(...), seo_title: str = Form(''), tags: str = Form(''), db=Depends(get_db), _=Depends(require_auth)):
-    a = db.query(Article).get(article_id)
-    if not a: return RedirectResponse('/admin/articles', status_code=302)
-    db.add(ArticleRevision(article_id=a.id, title=a.title, content=a.content, image_url=a.image_url, category=a.category, seo_title=a.seo_title, tags=a.tags)); a.title = title; a.content = content; a.image_url = image_url; a.category = category; a.seo_title = seo_title; a.tags = tags; a.slug = slugify(title); db.commit(); return RedirectResponse(f'/admin/articles?status={a.status}', status_code=302)
 
 @app.post('/admin/articles/{article_id}/narration/regenerate')
 def regenerate_narration(article_id: int, request: Request, db=Depends(get_db), _=Depends(require_auth)):
     article = db.query(Article).get(article_id)
-    if article: queue_narration(db, article); db.commit()
-    return RedirectResponse('/admin/articles?status=published', status_code=302)
+    if article:
+        queue_narration(db, article)
+        db.commit()
+    return RedirectResponse(f'/admin/articles/{article_id}/edit', status_code=302)
+
 
 @app.post('/admin/articles/{article_id}/narration/delete')
 def delete_narration(article_id: int, request: Request, db=Depends(get_db), _=Depends(require_auth)):
     rows = db.query(ArticleNarration).filter(ArticleNarration.article_id == article_id).all()
-    for row in rows: row.audio_path = None; row.status = 'pending'; row.error_message = None
-    db.commit(); return RedirectResponse('/admin/articles?status=published', status_code=302)
+    for row in rows:
+        row.audio_path = None
+        row.status = 'pending'
+        row.error_message = None
+    db.commit()
+    return RedirectResponse(f'/admin/articles/{article_id}/edit', status_code=302)
+
 
 @app.post('/admin/articles/{article_id}/narration/toggle')
 def toggle_narration(article_id: int, request: Request, enabled: str = Form('true'), db=Depends(get_db), _=Depends(require_auth)):
     article = db.query(Article).get(article_id)
-    if article: article.narration_enabled = enabled == 'true'; db.commit()
+    if article:
+        article.narration_enabled = enabled == 'true'
+        db.commit()
     return RedirectResponse(f'/admin/articles/{article_id}/edit', status_code=302)
+
 
 @app.post('/admin/settings/mode')
 def set_mode(request: Request, mode: str = Form(...), db=Depends(get_db), _=Depends(require_auth)):
-    row = db.query(Setting).filter(Setting.key == 'publish_mode').first();
-    if not row: db.add(Setting(key='publish_mode', value=mode))
-    else: row.value = mode
-    db.commit(); return RedirectResponse('/admin', status_code=302)
+    save_setting(db, 'publish_mode', mode)
+    db.commit()
+    return RedirectResponse('/admin/settings', status_code=302)
+
 
 @app.exception_handler(404)
-def not_found(request: Request, exc): return templates.TemplateResponse('public/404.html', {'request': request}, status_code=404)
+def not_found(request: Request, exc):
+    return templates.TemplateResponse('public/404.html', {'request': request}, status_code=404)
+
 
 @app.exception_handler(500)
-def server_error(request: Request, exc): return templates.TemplateResponse('public/500.html', {'request': request}, status_code=500)
+def server_error(request: Request, exc):
+    return templates.TemplateResponse('public/500.html', {'request': request}, status_code=500)
