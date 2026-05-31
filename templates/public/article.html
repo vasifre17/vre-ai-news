@@ -1,21 +1,30 @@
-<!doctype html><html><head><title>{{article.seo_title or article.title}} | VREYC</title><meta name="description" content="{{article.summary or article.title}}"><meta name="robots" content="index,follow,max-image-preview:large">
-<link rel="canonical" href="{{ canonical }}">
-{% for lang, link in alt_links.items() %}<link rel="alternate" hreflang="{{lang}}" href="{{site_url}}{{link}}">{% endfor %}
-<link rel="alternate" hreflang="x-default" href="{{site_url}}/az/">
-<meta property="og:type" content="article"><meta property="og:site_name" content="VREYC"><meta property="og:title" content="{{article.seo_title or article.title}}"><meta property="og:description" content="{{article.summary or article.title}}"><meta property="og:url" content="{{canonical}}"><meta property="og:image" content="{{article.image_url or site_url + '/assets/og-cover.jpg'}}"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="{{article.seo_title or article.title}}"><meta name="twitter:description" content="{{article.summary or article.title}}"><meta name="twitter:image" content="{{article.image_url or site_url + '/assets/og-cover.jpg'}}">
-{% if narration and narration.status == 'ready' and narration.audio_path %}<meta itemprop="audio" content="{{site_url}}{{narration.audio_path}}">{% endif %}
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"NewsArticle","headline":"{{article.title}}","datePublished":"{{article.published_at}}","mainEntityOfPage":"{{canonical}}","publisher":{"@type":"Organization","name":"VREYC"}}</script>
-<link rel="stylesheet" href="/assets/styles.css"></head><body>
-<header class="container"><a class="logo" href="/{{language}}/">VREYC</a> {% for lang in languages %}<a href="{{alt_links[lang]}}">{{lang|upper}}</a> {% endfor %}</header>
-<main class="container section article-layout"><article class="glass article"><h1>{{article.title}}</h1><p class="lede">{{article.summary}}</p>{% if root_article.image_url %}<img src="{{root_article.image_url}}" alt="{{article.title}}">{% endif %}<p>{{article.content}}</p><p><small>{{root_article.category}} • {{root_article.published_at|format_published_at}}</small></p>
-<section class="glass audio-news" data-audio-ready="{{ '1' if narration and narration.status == 'ready' else '0' }}"><h3>Listen to this article</h3>
-{% if narration and narration.status == 'ready' and narration.audio_path %}
-<audio id="narration" preload="none" src="{{narration.audio_path}}"></audio>
-<div class="audio-controls"><button class="btn" id="playBtn">Play</button><button class="btn" id="pauseBtn">Pause</button><input id="seek" type="range" value="0" min="0" step="1"><span id="time">0:00 / 0:00</span><select id="speed"><option>1</option><option>1.25</option><option>1.5</option><option>1.75</option><option>2</option></select>{% if narration.allow_download %}<a class="btn" href="{{narration.audio_path}}" download>Download audio</a>{% endif %}</div>
-{% else %}<p>Narration is {{ narration.status if narration else 'pending' }}. Article publishing is not blocked.</p>{% endif %}</section></article></main>
-<script>
-(() => {const w=document.querySelector('.audio-news');if(!w||w.dataset.audioReady!=='1')return;const a=document.getElementById('narration'),play=document.getElementById('playBtn'),pause=document.getElementById('pauseBtn'),seek=document.getElementById('seek'),speed=document.getElementById('speed'),time=document.getElementById('time');
-const fmt=t=>`${Math.floor(t/60)}:${String(Math.floor(t%60)).padStart(2,'0')}`;play.onclick=()=>a.play();pause.onclick=()=>a.pause();speed.onchange=()=>a.playbackRate=parseFloat(speed.value);a.onloadedmetadata=()=>{seek.max=Math.floor(a.duration||0);time.textContent=`0:00 / ${fmt(a.duration||0)}`};a.ontimeupdate=()=>{seek.value=Math.floor(a.currentTime);time.textContent=`${fmt(a.currentTime)} / ${fmt(a.duration||0)}`};seek.oninput=()=>a.currentTime=Number(seek.value);
-})();
-</script>
-</body></html>
+<!doctype html>
+<html lang="{{ language }}">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{article.seo_title or article.title}} | VREYC</title><meta name="description" content="{{article.meta_description or article.summary or article.title}}"><meta name="robots" content="index,follow,max-image-preview:large">
+  <link rel="canonical" href="{{ canonical }}">{% for lang, link in alt_links.items() %}<link rel="alternate" hreflang="{{lang}}" href="{{site_url}}{{link}}">{% endfor %}<link rel="alternate" hreflang="x-default" href="{{site_url}}/az/">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="VREYC"><meta property="og:title" content="{{article.seo_title or article.title}}"><meta property="og:description" content="{{article.summary or article.title}}"><meta property="og:url" content="{{canonical}}"><meta property="og:image" content="{{root_article.image_url or site_url + '/assets/og-cover.jpg'}}"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="{{article.seo_title or article.title}}"><meta name="twitter:description" content="{{article.summary or article.title}}"><meta name="twitter:image" content="{{root_article.image_url or site_url + '/assets/og-cover.jpg'}}">
+  {% if narration and narration.status == 'ready' and narration.audio_path %}<meta itemprop="audio" content="{{site_url}}{{narration.audio_path}}">{% endif %}
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"NewsArticle","headline":"{{article.title}}","datePublished":"{{root_article.published_at}}","mainEntityOfPage":"{{canonical}}","publisher":{"@type":"Organization","name":"VREYC"}}</script>
+  <link rel="stylesheet" href="/assets/styles.css">
+</head>
+<body>
+<header class="site-header glass"><nav class="nav container"><a class="logo" href="/{{language}}/"><span>VRE</span>YC</a><div class="language-switcher">{% for lang in languages %}<a href="{{alt_links[lang]}}">{{lang|upper}}</a>{% endfor %}</div></nav></header>
+<main class="article-page">
+  <section class="article-hero">
+    {% if root_article.image_url %}<img src="{{root_article.image_url}}" alt="{{article.title}}">{% else %}<div class="image-placeholder hero-fallback">VREYC</div>{% endif %}
+    <div class="container article-hero-copy"><span class="badge">{{root_article.category or 'News'}}</span><h1>{{article.title}}</h1><p>{{article.summary}}</p><small>{{root_article.published_at|format_published_at}}</small></div>
+  </section>
+  <div class="container section article-layout">
+    <article class="glass article">
+      <div class="share-row"><span>Share</span><a class="btn small" href="https://www.facebook.com/sharer/sharer.php?u={{ share_url }}" target="_blank" rel="noopener">Facebook</a><a class="btn small" href="https://twitter.com/intent/tweet?url={{ share_url }}&text={{ article.title }}" target="_blank" rel="noopener">X</a><a class="btn small" href="https://www.linkedin.com/shareArticle?mini=true&url={{ share_url }}" target="_blank" rel="noopener">LinkedIn</a><a class="btn small" href="mailto:?subject={{ article.title }}&body={{ share_url }}">Email</a></div>
+      <section class="glass audio-news" data-audio-ready="{{ '1' if narration and narration.status == 'ready' else '0' }}"><h3>Audio narration</h3>{% if narration and narration.status == 'ready' and narration.audio_path %}<audio id="narration" preload="none" src="{{narration.audio_path}}"></audio><div class="audio-controls"><button class="btn" id="playBtn" type="button">Play</button><button class="btn" id="pauseBtn" type="button">Pause</button><input id="seek" type="range" value="0" min="0" step="1"><span id="time">0:00 / 0:00</span><select id="speed"><option>1</option><option>1.25</option><option>1.5</option><option>1.75</option><option>2</option></select>{% if narration.allow_download %}<a class="btn" href="{{narration.audio_path}}" download>Download</a>{% endif %}</div>{% else %}<p>Narration is {{ narration.status if narration else 'pending' }}. Article publishing is not blocked.</p>{% endif %}</section>
+      <div class="article-content">{{article.content}}</div>
+    </article>
+    <aside class="related glass"><p class="eyebrow">Related</p><h2>More stories</h2>{% for row in related_articles %}<a class="related-card" href="{{ row.url }}">{% if row.article.image_url %}<img src="{{ row.article.image_url }}" alt="{{ row.title }}">{% endif %}<div><span class="badge">{{ row.article.category or 'News' }}</span><strong>{{ row.title }}</strong><small>{{ row.article.published_at|format_published_at }}</small></div></a>{% else %}<p class="muted">Related articles will appear here as the newsroom grows.</p>{% endfor %}</aside>
+  </div>
+</main>
+<script>(()=>{const w=document.querySelector('.audio-news');if(!w||w.dataset.audioReady!=='1')return;const a=document.getElementById('narration'),play=document.getElementById('playBtn'),pause=document.getElementById('pauseBtn'),seek=document.getElementById('seek'),speed=document.getElementById('speed'),time=document.getElementById('time');const fmt=t=>`${Math.floor(t/60)}:${String(Math.floor(t%60)).padStart(2,'0')}`;play.onclick=()=>a.play();pause.onclick=()=>a.pause();speed.onchange=()=>a.playbackRate=parseFloat(speed.value);a.onloadedmetadata=()=>{seek.max=Math.floor(a.duration||0);time.textContent=`0:00 / ${fmt(a.duration||0)}`};a.ontimeupdate=()=>{seek.value=Math.floor(a.currentTime);time.textContent=`${fmt(a.currentTime)} / ${fmt(a.duration||0)}`};seek.oninput=()=>a.currentTime=Number(seek.value);})();</script>
+</body>
+</html>
