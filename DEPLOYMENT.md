@@ -1,4 +1,4 @@
-# VRE AI NEWS VPS DEPLOYMENT (Ubuntu)
+# VREYC VPS DEPLOYMENT (Ubuntu)
 
 This is a beginner-friendly production guide for deploying on a private Ubuntu VPS.
 
@@ -65,7 +65,7 @@ sudo systemctl reload nginx
 
 ## G. SSL with Certbot
 ```bash
-sudo certbot --nginx -d news.example.com
+sudo certbot --nginx -d vreyc.com
 ```
 - Choose HTTPS redirect when prompted.
 - Test renewal:
