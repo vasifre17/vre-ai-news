@@ -1,4 +1,4 @@
-<!doctype html><html><body><h2>Translations</h2><a href="/admin">Back</a>
+<!doctype html><html><head><title>Translations | VREYC Admin</title></head><body><h2>VREYC Admin — Translations</h2><a href="/admin">Back</a>
 <table border="1" cellpadding="6"><tr><th>ID</th><th>Title</th><th>Languages</th><th>Action</th></tr>
 {% for a in articles %}<tr><td>{{a.id}}</td><td>{{a.title}}</td><td>AZ{% for t in a.translations %}, {{t.language|upper}}{% endfor %}</td><td><form method="post" action="/admin/translations/{{a.id}}/generate"><button>Generate/Update</button></form></td></tr>{% endfor %}
 </table></body></html>

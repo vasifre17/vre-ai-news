@@ -6,7 +6,7 @@ load_dotenv()
 
 
 class Settings(BaseModel):
-    app_name: str = "VRE AI NEWS"
+    app_name: str = "VREYC"
     secret_key: str = os.getenv("SECRET_KEY", "change-me")
     admin_username: str = os.getenv("ADMIN_USERNAME", "admin")
     admin_password_hash: str = os.getenv("ADMIN_PASSWORD_HASH", "")
@@ -15,7 +15,7 @@ class Settings(BaseModel):
     publish_mode: str = os.getenv("PUBLISH_MODE", "manual")
     fetch_interval_min: int = int(os.getenv("FETCH_INTERVAL_MIN", "15"))
     pexels_api_key: str = os.getenv("PEXELS_API_KEY", "")
-    site_url: str = os.getenv("SITE_URL", "http://localhost:8000")
+    site_url: str = os.getenv("SITE_URL", "https://vreyc.com")
 
 
 settings = Settings()

@@ -1,5 +1,5 @@
 [Unit]
-Description=VRE AI NEWS FastAPI Service
+Description=VREYC FastAPI Service
 After=network.target
 
 [Service]

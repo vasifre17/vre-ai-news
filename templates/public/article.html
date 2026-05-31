@@ -1,12 +1,12 @@
-<!doctype html><html><head><title>{{article.seo_title or article.title}}</title>
+<!doctype html><html><head><title>{{article.seo_title or article.title}} | VREYC</title><meta name="description" content="{{article.summary or article.title}}"><meta name="robots" content="index,follow,max-image-preview:large">
 <link rel="canonical" href="{{ canonical }}">
 {% for lang, link in alt_links.items() %}<link rel="alternate" hreflang="{{lang}}" href="{{site_url}}{{link}}">{% endfor %}
 <link rel="alternate" hreflang="x-default" href="{{site_url}}/az/">
-<meta property="og:type" content="article"><meta property="og:title" content="{{article.seo_title or article.title}}"><meta property="og:url" content="{{canonical}}"><meta property="og:image" content="{{article.image_url or ''}}">
+<meta property="og:type" content="article"><meta property="og:site_name" content="VREYC"><meta property="og:title" content="{{article.seo_title or article.title}}"><meta property="og:description" content="{{article.summary or article.title}}"><meta property="og:url" content="{{canonical}}"><meta property="og:image" content="{{article.image_url or site_url + '/assets/og-cover.jpg'}}"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="{{article.seo_title or article.title}}"><meta name="twitter:description" content="{{article.summary or article.title}}"><meta name="twitter:image" content="{{article.image_url or site_url + '/assets/og-cover.jpg'}}">
 {% if narration and narration.status == 'ready' and narration.audio_path %}<meta itemprop="audio" content="{{site_url}}{{narration.audio_path}}">{% endif %}
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"NewsArticle","headline":"{{article.title}}","datePublished":"{{article.published_at}}","mainEntityOfPage":"{{canonical}}"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"NewsArticle","headline":"{{article.title}}","datePublished":"{{article.published_at}}","mainEntityOfPage":"{{canonical}}","publisher":{"@type":"Organization","name":"VREYC"}}</script>
 <link rel="stylesheet" href="/assets/styles.css"></head><body>
-<header class="container">{% for lang in languages %}<a href="{{alt_links[lang]}}">{{lang|upper}}</a> {% endfor %}</header>
+<header class="container"><a class="logo" href="/{{language}}/">VREYC</a> {% for lang in languages %}<a href="{{alt_links[lang]}}">{{lang|upper}}</a> {% endfor %}</header>
 <main class="container section article-layout"><article class="glass article"><h1>{{article.title}}</h1><p class="lede">{{article.summary}}</p>{% if root_article.image_url %}<img src="{{root_article.image_url}}" alt="{{article.title}}">{% endif %}<p>{{article.content}}</p><p><small>{{root_article.category}} • {{root_article.published_at|format_published_at}}</small></p>
 <section class="glass audio-news" data-audio-ready="{{ '1' if narration and narration.status == 'ready' else '0' }}"><h3>Listen to this article</h3>
 {% if narration and narration.status == 'ready' and narration.audio_path %}

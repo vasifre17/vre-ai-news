@@ -1,4 +1,4 @@
-# VRE AI NEWS CMS
+# VREYC CMS
 
 AI-powered FastAPI news CMS with scheduler, admin panel, SEO routes, templates, and publishing pipeline.
 
