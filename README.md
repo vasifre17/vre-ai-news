@@ -12,6 +12,7 @@ pip install -r requirements.txt
 2. Configure env:
 ```bash
 cp .env.example .env
+# For local development only, set ENVIRONMENT=development in .env.
 python scripts/generate_admin_hash.py
 ```
 3. Initialize DB:
@@ -27,6 +28,10 @@ uvicorn main:app --reload
 - Admin login: `http://127.0.0.1:8000/admin/login`
 
 ## Production deployment
+- Live production domain: `https://vreyc.com`
+- Set `ENVIRONMENT=production` and `SITE_URL=https://vreyc.com` in `.env`.
+- Run `python scripts/validate_production.py` before starting production.
+- Run `python scripts/production_smoke_check.py` before live launch verification.
 - Docker + PostgreSQL: use `docker compose up -d --build`
 - VPS guide: see `DEPLOYMENT.md`
 - Security baseline: see `SECURITY.md`

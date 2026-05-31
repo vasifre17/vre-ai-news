@@ -1,19 +1,21 @@
-# VREYC VPS DEPLOYMENT (Ubuntu)
+# VREYC VPS Deployment Checklist for vreyc.com (Ubuntu)
 
-This is a beginner-friendly production guide for deploying on a private Ubuntu VPS.
+This checklist prepares VREYC for a live production launch at **https://vreyc.com** without changing the existing branding.
 
-## A. Server prerequisites
-1. Ubuntu 22.04+ VPS with sudo user.
-2. Domain pointed to VPS public IP.
-3. Open ports: 22, 80, 443.
+## 1. DNS and VPS prerequisites
+- [ ] Ubuntu 22.04+ VPS is provisioned with a sudo user.
+- [ ] `vreyc.com` DNS `A` record points to the VPS public IPv4 address.
+- [ ] Ports `22`, `80`, and `443` are open in the VPS firewall/security group.
+- [ ] Cloudflare, if used, is set to **Full (strict)** SSL mode after the certificate is installed.
 
-## B. Install base packages
+## 2. Install server packages
 ```bash
 sudo apt update
 sudo apt install -y git curl ufw fail2ban python3 python3-venv python3-pip nginx certbot python3-certbot-nginx docker.io docker-compose-plugin postgresql-client
+sudo systemctl enable --now docker nginx fail2ban
 ```
 
-## C. Clone project
+## 3. Clone the project
 ```bash
 cd /opt
 sudo git clone <your-private-repo-url> vre-ai-news
@@ -21,90 +23,99 @@ sudo chown -R $USER:$USER /opt/vre-ai-news
 cd /opt/vre-ai-news
 ```
 
-## D. Configure environment
+## 4. Configure production environment
 ```bash
 cp .env.example .env
 nano .env
 ```
-Set all required values:
-- `SECRET_KEY`
-- `ADMIN_USERNAME`
-- `ADMIN_PASSWORD_HASH` (generated using `python scripts/generate_admin_hash.py`)
-- `OPENAI_API_KEY`
-- `PEXELS_API_KEY`
-- `DATABASE_URL`
-- `SITE_URL`
-- `PUBLISH_MODE`
-- `FETCH_INTERVAL_MIN`
 
-## E. Docker deployment (recommended)
-1. Update `.env` DATABASE_URL for compose network:
-   - `postgresql+psycopg2://vre_user:vre_password@db:5432/vre_news`
-2. Start stack:
+Set these required values before launch:
+- [ ] `ENVIRONMENT=production`
+- [ ] `SITE_URL=https://vreyc.com`
+- [ ] `SECRET_KEY` is a unique random value with at least 32 characters.
+- [ ] `ADMIN_USERNAME` is not the default `admin`.
+- [ ] `ADMIN_PASSWORD_HASH` is generated with `python scripts/generate_admin_hash.py`.
+- [ ] `OPENAI_API_KEY` is configured for rewriting, translation, and AI audio narration.
+- [ ] `PEXELS_API_KEY` is configured for image enrichment.
+- [ ] `POSTGRES_PASSWORD` is a strong unique password.
+- [ ] `DATABASE_URL=postgresql+psycopg2://vre_user:<POSTGRES_PASSWORD>@db:5432/vre_news` for Docker deployment.
+- [ ] `PUBLISH_MODE` is `manual` for editorial approval or `auto` for automatic publishing.
+- [ ] `FETCH_INTERVAL_MIN` is set to the desired fetch interval.
+
+Validate the production environment locally on the server:
 ```bash
+python scripts/validate_production.py
+```
+
+## 5. Docker deployment (recommended)
+```bash
+mkdir -p logs uploads static/audio
 docker compose up -d --build
-```
-3. Initialize DB once:
-```bash
 docker compose exec app python scripts/init_db.py
-```
-4. Check logs:
-```bash
 docker compose logs -f app
 ```
 
-## F. Nginx reverse proxy
-1. Copy sample config:
+## 6. Nginx reverse proxy for vreyc.com
 ```bash
 sudo cp deploy/nginx/vre-ai-news.conf /etc/nginx/sites-available/vre-ai-news
-sudo ln -s /etc/nginx/sites-available/vre-ai-news /etc/nginx/sites-enabled/vre-ai-news
+sudo ln -sf /etc/nginx/sites-available/vre-ai-news /etc/nginx/sites-enabled/vre-ai-news
 sudo nginx -t
 sudo systemctl reload nginx
 ```
-2. Replace `server_name` with your domain before reloading.
 
-## G. SSL with Certbot
+The committed Nginx config already uses `server_name vreyc.com` and proxies the FastAPI app on `127.0.0.1:8000`.
+
+## 7. SSL certificate
 ```bash
 sudo certbot --nginx -d vreyc.com
-```
-- Choose HTTPS redirect when prompted.
-- Test renewal:
-```bash
 sudo certbot renew --dry-run
 ```
 
-## H. Non-Docker (systemd) deployment option
+Choose the HTTPS redirect option when Certbot prompts for it.
+
+## 8. Launch smoke checks
+Run the local application smoke checks from the project root:
+```bash
+python scripts/production_smoke_check.py
+```
+
+Then verify the live site:
+- [ ] `https://vreyc.com/` loads the public home page.
+- [ ] `https://vreyc.com/az/`, `/en/`, `/ru/`, `/tr/`, `/zh/`, and `/es/` load multilingual home pages.
+- [ ] A published translated article shows correct `hreflang`, canonical metadata, and translated content.
+- [ ] AI narration appears on published article pages after the background narration job completes.
+- [ ] `https://vreyc.com/sitemap.xml` contains only `https://vreyc.com` URLs.
+- [ ] `https://vreyc.com/robots.txt` points to `https://vreyc.com/sitemap.xml` and disallows `/admin`.
+- [ ] `https://vreyc.com/admin/login` accepts the production admin credentials.
+- [ ] Draft, publish, edit, translation generation, and narration regeneration actions work in the admin panel.
+
+## 9. Backups
+```bash
+export DATABASE_URL='postgresql+psycopg2://vre_user:<POSTGRES_PASSWORD>@localhost:5432/vre_news'
+./scripts/backup_db.sh
+```
+
+Add a daily cron job after confirming backups restore successfully.
+
+## 10. Update flow
+```bash
+cd /opt/vre-ai-news
+git pull
+docker compose up -d --build
+docker compose exec app python scripts/init_db.py
+docker compose logs -f app
+```
+
+## 11. Non-Docker systemd option
 ```bash
 cd /opt/vre-ai-news
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+python scripts/validate_production.py
 python scripts/init_db.py
 sudo cp deploy/systemd/vre-ai-news.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now vre-ai-news
 sudo systemctl status vre-ai-news
-```
-
-## I. Cloudflare checklist
-- [ ] DNS `A` record points domain to VPS IP.
-- [ ] Proxy status orange-cloud enabled.
-- [ ] SSL/TLS mode set to **Full (strict)**.
-- [ ] Always Use HTTPS enabled.
-- [ ] Automatic HTTPS rewrites enabled.
-- [ ] WAF basic protections enabled.
-- [ ] Caching rules exclude `/admin*` pages.
-
-## J. Backups
-```bash
-export DATABASE_URL='postgresql+psycopg2://vre_user:vre_password@localhost:5432/vre_news'
-./scripts/backup_db.sh
-```
-Use cron for daily backups.
-
-## K. Update flow
-```bash
-cd /opt/vre-ai-news
-git pull
-docker compose up -d --build
 ```

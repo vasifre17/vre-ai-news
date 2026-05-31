@@ -12,6 +12,7 @@ services:
     volumes:
       - ./logs:/app/logs
       - ./uploads:/app/uploads
+      - ./static/audio:/app/static/audio
 
   db:
     image: postgres:16-alpine
@@ -20,7 +21,7 @@ services:
     environment:
       POSTGRES_DB: vre_news
       POSTGRES_USER: vre_user
-      POSTGRES_PASSWORD: vre_password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
