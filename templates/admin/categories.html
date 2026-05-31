@@ -1,0 +1,10 @@
+{% extends "admin/_base.html" %}
+{% set title = 'Categories | VREYC Admin' %}
+{% set heading = 'Category management' %}
+{% block content %}
+<section class="panel-grid two">
+  <div class="panel"><h2>Add category</h2><form method="post" class="stack"><label>Name<input name="name" required></label><label>Description<textarea name="description" rows="4"></textarea></label><label>Accent color<input name="color" type="color" value="#48a6ff"></label><button class="btn primary" type="submit">Create category</button></form></div>
+  <div class="panel ai-panel"><p class="eyebrow">Taxonomy assistant</p><h2>AI category suggestions</h2><p class="muted">Placeholder panel for clustering drafts and recommending editorial taxonomy.</p></div>
+</section>
+<section class="panel"><div class="panel-head"><h2>Existing categories</h2></div><div class="category-list">{% for c in categories %}<form class="category-row" method="post" action="/admin/categories/{{ c.id }}/edit"><input name="name" value="{{ c.name }}"><input name="description" value="{{ c.description or '' }}"><input name="color" type="color" value="{{ c.color or '#48a6ff' }}"><span class="badge">{{ counts.get(c.name, 0) }} articles</span><button class="btn small" type="submit">Save</button><button class="btn small danger" type="submit" form="delete-category-{{ c.id }}">Delete</button></form><form id="delete-category-{{ c.id }}" method="post" action="/admin/categories/{{ c.id }}/delete" onsubmit="return confirm('Delete category?')"></form>{% else %}<p class="muted">No categories yet. Add your first category above.</p>{% endfor %}</div></section>
+{% endblock %}

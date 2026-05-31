@@ -31,3 +31,7 @@ def is_authenticated(request: Request) -> bool:
         return True
     except Exception:
         return False
+
+
+def clear_session(request: Request) -> None:
+    request.session.pop("auth", None)

@@ -16,6 +16,7 @@ class Article(Base):
     summary = Column(Text)
     content = Column(Text)
     seo_title = Column(String(500))
+    meta_description = Column(Text)
     tags = Column(String(500))
     category = Column(String(100), index=True)
     image_url = Column(String(1000))
@@ -42,6 +43,7 @@ class ArticleTranslation(Base):
     summary = Column(Text)
     content = Column(Text)
     seo_title = Column(String(500))
+    meta_description = Column(Text)
     tags = Column(String(500))
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow)
@@ -81,6 +83,28 @@ class ArticleRevision(Base):
     tags = Column(String(500))
     created_at = Column(DateTime, default=datetime.utcnow)
     article = relationship("Article", back_populates="revisions")
+
+
+class Category(Base):
+    __tablename__ = "categories"
+    id = Column(Integer, primary_key=True)
+    name = Column(String(100), unique=True, index=True)
+    slug = Column(String(120), unique=True, index=True)
+    description = Column(Text)
+    color = Column(String(20), default="#48a6ff")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+
+class MediaAsset(Base):
+    __tablename__ = "media_assets"
+    id = Column(Integer, primary_key=True)
+    filename = Column(String(500))
+    path = Column(String(1000), unique=True)
+    content_type = Column(String(120))
+    size_bytes = Column(Integer, default=0)
+    alt_text = Column(String(500))
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 class Setting(Base):

@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title or 'VREYC Admin' }}</title>
+  <link rel="stylesheet" href="/assets/admin.css">
+</head>
+<body class="admin-shell">
+  <aside class="admin-sidebar">
+    <a class="admin-brand" href="/admin"><span>V</span>VREYC Admin</a>
+    <nav class="admin-nav" aria-label="Admin navigation">
+      <a href="/admin" class="{{ 'active' if request.url.path == '/admin' else '' }}">Dashboard</a>
+      <a href="/admin/articles" class="{{ 'active' if request.url.path.startswith('/admin/articles') else '' }}">Articles</a>
+      <a href="/admin/categories" class="{{ 'active' if request.url.path.startswith('/admin/categories') else '' }}">Categories</a>
+      <a href="/admin/media" class="{{ 'active' if request.url.path.startswith('/admin/media') else '' }}">Media Library</a>
+      <a href="/admin/settings" class="{{ 'active' if request.url.path.startswith('/admin/settings') else '' }}">Settings</a>
+    </nav>
+    <div class="admin-sidebar-card">
+      <strong>AI desk</strong>
+      <p>Translation, SEO and newsroom automation placeholders are ready for provider wiring.</p>
+    </div>
+  </aside>
+  <div class="admin-main">
+    <header class="admin-topbar">
+      <div>
+        <p class="eyebrow">Premium newsroom console</p>
+        <h1>{{ heading or title or 'Dashboard' }}</h1>
+      </div>
+      <div class="topbar-actions">
+        <a class="btn ghost" href="/" target="_blank">View site</a>
+        <form method="post" action="/admin/logout"><button class="btn danger" type="submit">Logout</button></form>
+      </div>
+    </header>
+    {% block content %}{% endblock %}
+  </div>
+</body>
+</html>
