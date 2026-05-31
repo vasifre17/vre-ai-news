@@ -97,6 +97,8 @@ img { display: block; max-width: 100%; }
 .footer-panel dl div { display: grid; grid-template-columns: minmax(120px, auto) 1fr; gap: .45rem; }
 .footer-panel dt { color: #dce9ff; font-weight: 800; }
 .footer-panel dd { margin: 0; }
+.footer-social-link { display: inline-flex; align-items: center; width: max-content; color: #dff0ff; font-weight: 850; border: 1px solid rgba(72, 166, 255, .28); border-radius: 999px; padding: .28rem .62rem; background: linear-gradient(135deg, rgba(72, 166, 255, .12), rgba(124, 92, 255, .1)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12); transition: color .2s ease, border-color .2s ease, background .2s ease, box-shadow .2s ease, transform .2s ease; }
+.footer-social-link:hover, .footer-social-link:focus-visible { color: #fff; border-color: rgba(72, 166, 255, .62); background: linear-gradient(135deg, rgba(72, 166, 255, .24), rgba(124, 92, 255, .22)); box-shadow: 0 10px 28px rgba(72, 166, 255, .16), inset 0 1px 0 rgba(255, 255, 255, .2); transform: translateY(-1px); }
 .article-page { padding-bottom: 1.4rem; }
 .article-hero { position: relative; display: grid; align-items: end; overflow: hidden; background: radial-gradient(circle at 16% 12%, rgba(72, 166, 255, .28), transparent 30%), radial-gradient(circle at 82% 0, rgba(124, 92, 255, .24), transparent 28%), linear-gradient(135deg, rgba(11, 29, 51, .95), rgba(2, 7, 18, .96)); border-bottom: 1px solid var(--border); }
 .article-hero:after { content: ""; position: absolute; inset: auto 0 0; height: 40%; background: linear-gradient(180deg, transparent, rgba(2, 7, 18, .5)); pointer-events: none; }
