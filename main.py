@@ -5,6 +5,7 @@ from pathlib import Path
 from uuid import uuid4
 from sqlalchemy import or_, text
 from fastapi import FastAPI, Request, Depends, Form, HTTPException, UploadFile, File
+from PIL import Image, UnidentifiedImageError
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -31,7 +32,10 @@ scheduler = BackgroundScheduler()
 ai_engine = AIEngine()
 SUPPORTED_LANGUAGES = ["az", "en", "ru", "tr", "zh", "es"]
 LANGUAGE_LABELS = {"az": "Azerbaijani", "en": "English", "ru": "Russian", "tr": "Turkish", "zh": "Chinese", "es": "Spanish"}
-UPLOAD_DIR = Path("static/uploads/media")
+UPLOAD_DIR = Path("static/uploads/images")
+UPLOAD_URL_PREFIX = "/static/uploads/images"
+ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+IMAGE_VARIANT_WIDTHS = (480, 960, 1440)
 
 DEFAULT_CATEGORIES = [
     {"name": "Politics", "description": "Policy, elections, diplomacy and public leadership.", "color": "#e11d48"},
@@ -54,7 +58,63 @@ def format_published_at(value):
     return value.strftime("%b %d, %Y") if value else ""
 
 
+def is_uploaded_file(value) -> bool:
+    return bool(getattr(value, "filename", None)) and hasattr(value, "file")
+
+
+def image_srcset(path: str | None) -> str:
+    if not path or not path.startswith(UPLOAD_URL_PREFIX):
+        return ""
+    source = Path(path.lstrip("/"))
+    parts = []
+    for width in IMAGE_VARIANT_WIDTHS:
+        variant = source.with_name(f"{source.stem}-{width}.webp")
+        if variant.exists():
+            parts.append(f"/{variant.as_posix()} {width}w")
+    return ", ".join(parts)
+
+
+def save_image_upload(file, alt_text: str = "") -> MediaAsset | None:
+    if not is_uploaded_file(file):
+        return None
+    content_type = file.content_type or ""
+    if content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(status_code=400, detail="Only JPG, PNG, WEBP and GIF images can be uploaded.")
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    original_name = Path(file.filename or "image").name
+    suffix = Path(original_name).suffix.lower() or ".jpg"
+    safe_root = uuid4().hex
+    target = UPLOAD_DIR / f"{safe_root}{suffix}"
+    with target.open("wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    try:
+        with Image.open(target) as img:
+            img.verify()
+        with Image.open(target) as img:
+            image = img.convert("RGB") if img.mode not in {"RGB", "RGBA"} else img.copy()
+            for width in IMAGE_VARIANT_WIDTHS:
+                if img.width <= width:
+                    continue
+                ratio = width / img.width
+                height = max(1, round(img.height * ratio))
+                variant = image.copy()
+                variant.thumbnail((width, height), Image.Resampling.LANCZOS)
+                variant.save(UPLOAD_DIR / f"{safe_root}-{width}.webp", "WEBP", quality=82, method=6)
+    except (UnidentifiedImageError, OSError):
+        target.unlink(missing_ok=True)
+        raise HTTPException(status_code=400, detail="Uploaded file is not a valid image.")
+    stat = target.stat()
+    return MediaAsset(
+        filename=original_name,
+        path=f"{UPLOAD_URL_PREFIX}/{target.name}",
+        content_type=content_type,
+        size_bytes=stat.st_size,
+        alt_text=alt_text,
+    )
+
+
 templates.env.filters["format_published_at"] = format_published_at
+templates.env.filters["image_srcset"] = image_srcset
 
 
 def get_db():
@@ -342,6 +402,10 @@ def new_article_page(request: Request, db=Depends(get_db), _=Depends(require_aut
 @app.post('/admin/articles/new')
 async def create_article(request: Request, db=Depends(get_db), _=Depends(require_auth)):
     form = await request.form()
+    uploaded_image = save_image_upload(form.get('hero_image'), form.get('hero_alt_text', ''))
+    if uploaded_image:
+        db.add(uploaded_image)
+        db.flush()
     title = form.get('title_az') or form.get('title') or 'Untitled article'
     article = Article(
         title=title,
@@ -351,7 +415,7 @@ async def create_article(request: Request, db=Depends(get_db), _=Depends(require
         seo_title=form.get('seo_title_az', ''),
         meta_description=form.get('meta_description_az', ''),
         tags=form.get('tags_az', ''),
-        image_url=form.get('image_url', ''),
+        image_url=uploaded_image.path if uploaded_image else form.get('image_url', ''),
         category=form.get('category', ''),
         status=form.get('status', 'draft'),
         language='az',
@@ -421,6 +485,10 @@ async def edit_article(article_id: int, request: Request, db=Depends(get_db), _=
     a = db.query(Article).get(article_id)
     if not a:
         return RedirectResponse('/admin/articles', status_code=302)
+    uploaded_image = save_image_upload(form.get('hero_image'), form.get('hero_alt_text', ''))
+    if uploaded_image:
+        db.add(uploaded_image)
+        db.flush()
     db.add(ArticleRevision(article_id=a.id, title=a.title, content=a.content, image_url=a.image_url, category=a.category, seo_title=a.seo_title, tags=a.tags))
     a.title = form.get('title_az') or form.get('title') or a.title
     a.slug = unique_article_slug(db, form.get('slug_az') or a.title, a.id)
@@ -429,7 +497,7 @@ async def edit_article(article_id: int, request: Request, db=Depends(get_db), _=
     a.seo_title = form.get('seo_title_az', '')
     a.meta_description = form.get('meta_description_az', '')
     a.tags = form.get('tags_az', '')
-    a.image_url = form.get('image_url', '')
+    a.image_url = uploaded_image.path if uploaded_image else form.get('image_url', '')
     a.category = form.get('category', '')
     old_status = a.status
     a.status = form.get('status', 'draft')
@@ -552,16 +620,10 @@ def media_page(request: Request, db=Depends(get_db), _=Depends(require_auth)):
 
 @app.post('/admin/media')
 async def upload_media(request: Request, file: UploadFile = File(...), alt_text: str = Form(''), db=Depends(get_db), _=Depends(require_auth)):
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    suffix = Path(file.filename or 'upload.bin').suffix.lower()
-    safe_name = f"{uuid4().hex}{suffix}"
-    target = UPLOAD_DIR / safe_name
-    with target.open('wb') as buffer:
-        shutil.copyfileobj(file.file, buffer)
-    stat = target.stat()
-    asset = MediaAsset(filename=file.filename or safe_name, path=f"/static/uploads/media/{safe_name}", content_type=file.content_type or 'application/octet-stream', size_bytes=stat.st_size, alt_text=alt_text)
-    db.add(asset)
-    db.commit()
+    asset = save_image_upload(file, alt_text)
+    if asset:
+        db.add(asset)
+        db.commit()
     return RedirectResponse('/admin/media', status_code=302)
 
 
@@ -572,6 +634,10 @@ def delete_media(asset_id: int, request: Request, db=Depends(get_db), _=Depends(
         local_path = Path(asset.path.lstrip('/'))
         if local_path.exists() and local_path.is_file():
             local_path.unlink()
+        for width in IMAGE_VARIANT_WIDTHS:
+            variant = local_path.with_name(f"{local_path.stem}-{width}.webp")
+            if variant.exists() and variant.is_file():
+                variant.unlink()
         db.delete(asset)
         db.commit()
     return RedirectResponse('/admin/media', status_code=302)

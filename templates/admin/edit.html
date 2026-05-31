@@ -2,7 +2,7 @@
 {% set title = ('New Article' if mode == 'new' else 'Edit Article') ~ ' | VREYC Admin' %}
 {% set heading = 'Create article' if mode == 'new' else 'Edit article' %}
 {% block content %}
-<form method="post" class="article-editor">
+<form method="post" enctype="multipart/form-data" class="article-editor">
   <section class="panel editor-main">
     <div class="panel-head wrap"><div><h2>Multilingual content</h2><p class="muted">Manage localized fields for AZ, EN, RU, TR, ZH and ES.</p></div><button class="btn primary" type="submit">Save article</button></div>
     <div class="language-editor">
@@ -27,7 +27,20 @@
     <h2>Publishing</h2>
     <label>Status<select name="status"><option value="draft" {{ 'selected' if not article or article.status == 'draft' else '' }}>Draft</option><option value="published" {{ 'selected' if article and article.status == 'published' else '' }}>Published</option></select></label>
     <label>Category<select name="category"><option value="">Uncategorized</option>{% for c in categories %}<option value="{{ c.name }}" {{ 'selected' if article and article.category == c.name else '' }}>{{ c.name }}</option>{% endfor %}</select></label>
-    <label>Hero image URL<input name="image_url" value="{{ article.image_url if article else '' }}" placeholder="/static/uploads/media/image.jpg"></label>
+    <div class="hero-upload-panel">
+      <label>Hero image URL<input id="heroImageUrl" name="image_url" value="{{ article.image_url if article else '' }}" placeholder="/static/uploads/images/image.jpg"></label>
+      <label>Upload hero image<input id="heroImageFile" name="hero_image" type="file" accept="image/jpeg,image/png,image/webp,image/gif"></label>
+      <label>Image alt text<input name="hero_alt_text" value="{{ article.title if article else '' }}" placeholder="Describe the image for accessibility"></label>
+      <div class="admin-image-preview" data-empty="VREYC">
+        {% if article and article.image_url %}
+        <img id="heroPreview" src="{{ article.image_url }}" alt="Hero image preview">
+        {% else %}
+        <div id="heroPreviewPlaceholder" class="image-placeholder compact">VREYC</div>
+        <img id="heroPreview" src="" alt="Hero image preview" hidden>
+        {% endif %}
+      </div>
+      <p class="muted">Uploading from your computer stores the image in the uploads folder and overrides the URL above.</p>
+    </div>
     <label>Homepage order<input name="homepage_order" type="number" value="{{ article.homepage_order if article else 100 }}" min="0" step="1"></label>
     <label class="check"><input type="checkbox" name="is_featured" {{ 'checked' if article and article.is_featured else '' }}> Feature on homepage slider</label>
     <label class="check"><input type="checkbox" name="is_trending" {{ 'checked' if article and article.is_trending else '' }}> Mark as trending</label>
@@ -36,4 +49,19 @@
     {% if article %}<hr><h3>Narration</h3><p class="muted">Status: {{ narration.status if narration else 'pending' }}</p><div class="actions vertical"><form method="post" action="/admin/articles/{{ article.id }}/narration/regenerate"><button class="btn small" type="submit">Regenerate</button></form><form method="post" action="/admin/articles/{{ article.id }}/narration/delete"><button class="btn small danger" type="submit">Delete narration</button></form></div>{% if narration and narration.audio_path %}<audio controls src="{{ narration.audio_path }}"></audio>{% endif %}{% endif %}
   </aside>
 </form>
+<script>
+(() => {
+  const file = document.getElementById('heroImageFile');
+  const preview = document.getElementById('heroPreview');
+  const placeholder = document.getElementById('heroPreviewPlaceholder');
+  if (!file || !preview) return;
+  file.addEventListener('change', () => {
+    const selected = file.files && file.files[0];
+    if (!selected) return;
+    preview.src = URL.createObjectURL(selected);
+    preview.hidden = false;
+    if (placeholder) placeholder.hidden = true;
+  });
+})();
+</script>
 {% endblock %}
