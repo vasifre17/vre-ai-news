@@ -10,24 +10,24 @@
   <link rel="canonical" href="{{ canonical }}">
   <meta property="og:type" content="website"><meta property="og:site_name" content="VREYC"><meta property="og:title" content="VREYC — Premium AI News Portal"><meta property="og:description" content="AI-curated world news with a professional newsroom experience."><meta property="og:url" content="{{ canonical }}"><meta property="og:image" content="{{ site_url }}/assets/og-cover.jpg">
   <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="VREYC — Premium AI News Portal"><meta name="twitter:description" content="AI-curated world news with a professional newsroom experience."><meta name="twitter:image" content="{{ site_url }}/assets/og-cover.jpg">
-  <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"VREYC","url":"{{ site_url }}/","potentialAction":{"@type":"SearchAction","target":"{{ site_url }}/search?q={query}","query-input":"required name=query"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"VREYC","url":"{{ site_url }}/","potentialAction":{"@type":"SearchAction","target":"{{ site_url }}/{{ language }}/?q={query}","query-input":"required name=query"}}</script>
 </head>
 <body>
 <header class="site-header glass">
   <nav class="nav container">
     <a class="logo" href="/{{language}}/"><span>VRE</span>YC</a>
-    <form class="search-wrap" action="/{{ language }}/"><input type="search" name="q" value="{{q}}" placeholder="Search AI-powered news"></form>
+    <form class="search-wrap" action="/{{ language }}/" role="search"><input type="search" name="q" value="{{q}}" placeholder="{{ ui.search_placeholder }}" aria-label="{{ ui.search }}"></form>
     <div class="language-switcher">{% for lang in languages %}<a href="/{{lang}}/">{{lang|upper}}</a>{% endfor %}</div>
   </nav>
-  <nav class="categories container" aria-label="News categories">{% for c in categories %}<a href="/{{ language }}/?category={{ c.name }}" style="--cat-color: {{ c.color or '#48a6ff' }}">{{c.name}}</a>{% endfor %}</nav>
+  <nav class="categories container" aria-label="{{ ui.news }}">{% for c in categories %}<a href="/{{ language }}/?category={{ c.name }}" style="--cat-color: {{ c.color or '#48a6ff' }}">{{ category_labels.get(c.name, c.name) }}</a>{% endfor %}</nav>
 </header>
 <main class="container section news-shell">
-  <section class="breaking glass"><span>Live briefing</span><p>AI-curated headlines, verified summaries and newsroom-ready context updated as stories develop.</p></section>
+  <section class="breaking glass"><span>{{ ui.live_briefing }}</span><p>{{ ui.live_briefing_text }}</p></section>
   {% if hero %}
   <section class="hero-news glass">
     <a class="hero-image" href="{{ hero.url }}">{% if hero.article.image_url %}{% set hero_srcset = hero.article.image_url|image_srcset %}<img src="{{ hero.article.image_url }}" {% if hero_srcset %}srcset="{{ hero_srcset }}" sizes="(max-width: 1050px) 100vw, 58vw"{% endif %} alt="{{ hero.title }}" loading="eager">{% else %}<div class="image-placeholder">VREYC</div>{% endif %}</a>
     <div class="hero-copy">
-      <span class="badge">{{ hero.article.category or 'Top Story' }}</span>
+      <span class="badge">{{ category_labels.get(hero.article.category, hero.article.category) if hero.article.category else ui.top_story }}</span>
       <h1><a href="{{ hero.url }}">{{ hero.title }}</a></h1>
       <p>{{ hero.summary }}</p>
       <small>{{ hero.article.published_at|format_published_at }}</small>
@@ -36,25 +36,25 @@
   {% endif %}
   <div class="portal-layout">
     <section>
-      <div class="section-title"><p class="eyebrow">Featured</p><h2>Editor's AI picks</h2></div>
-      <div class="featured-slider" aria-label="Featured article slider">
+      <div class="section-title"><p class="eyebrow">{{ ui.featured }}</p><h2>{{ ui.editor_picks }}</h2></div>
+      <div class="featured-slider" aria-label="{{ ui.featured }}">
         {% for row in featured_articles %}
         <article class="feature-card glass">
           <a href="{{ row.url }}">{% if row.article.image_url %}{% set feature_srcset = row.article.image_url|image_srcset %}<img src="{{ row.article.image_url }}" {% if feature_srcset %}srcset="{{ feature_srcset }}" sizes="(max-width: 700px) 86vw, (max-width: 1050px) 70vw, 42vw"{% endif %} alt="{{ row.title }}" loading="lazy">{% else %}<div class="image-placeholder compact">VREYC</div>{% endif %}</a>
-          <div><span class="badge">{{ row.article.category or 'News' }}</span><h3><a href="{{ row.url }}">{{ row.title }}</a></h3><p>{{ row.summary }}</p><small>{{ row.article.published_at|format_published_at }}</small></div>
+          <div><span class="badge">{{ category_labels.get(row.article.category, row.article.category) if row.article.category else ui.news }}</span><h3><a href="{{ row.url }}">{{ row.title }}</a></h3><p>{{ row.summary }}</p><small>{{ row.article.published_at|format_published_at }}</small></div>
         </article>
         {% endfor %}
       </div>
-      <div class="section-title"><p class="eyebrow">Latest</p><h2>Latest news</h2></div>
-      {% if latest_articles|length == 0 %}<div class="glass empty-state">No published articles yet. Please check back soon.</div>{% endif %}
-      <div class="latest-grid">{% for row in latest_articles %}<article class="news-card glass">{% if row.article.image_url %}{% set card_srcset = row.article.image_url|image_srcset %}<img src="{{row.article.image_url}}" {% if card_srcset %}srcset="{{ card_srcset }}" sizes="(max-width: 700px) 100vw, (max-width: 1050px) 50vw, 33vw"{% endif %} alt="{{row.title}}" loading="lazy">{% else %}<div class="image-placeholder compact">VREYC</div>{% endif %}<div class="card-body"><span class="badge">{{row.article.category or 'News'}}</span><h3><a href="{{row.url}}">{{row.title}}</a></h3><p>{{row.summary}}</p><small>{{row.article.published_at|format_published_at}}</small></div></article>{% endfor %}</div>
+      <div class="section-title"><p class="eyebrow">{{ ui.latest }}</p><h2>{{ ui.latest_news }}</h2></div>
+      {% if latest_articles|length == 0 %}<div class="glass empty-state">{{ ui.no_articles }}</div>{% endif %}
+      <div class="latest-grid">{% for row in latest_articles %}<article class="news-card glass">{% if row.article.image_url %}{% set card_srcset = row.article.image_url|image_srcset %}<img src="{{row.article.image_url}}" {% if card_srcset %}srcset="{{ card_srcset }}" sizes="(max-width: 700px) 100vw, (max-width: 1050px) 50vw, 33vw"{% endif %} alt="{{row.title}}" loading="lazy">{% else %}<div class="image-placeholder compact">VREYC</div>{% endif %}<div class="card-body"><span class="badge">{{ category_labels.get(row.article.category, row.article.category) if row.article.category else ui.news }}</span><h3><a href="{{row.url}}">{{row.title}}</a></h3><p>{{row.summary}}</p><small>{{row.article.published_at|format_published_at}}</small></div></article>{% endfor %}</div>
     </section>
     <aside class="trending-sidebar glass">
-      <p class="eyebrow">Trending</p><h2>Most watched</h2>
-      <div class="trending-list">{% for row in trending_articles %}<a href="{{ row.url }}"><span>{{ loop.index }}</span><div><strong>{{ row.title }}</strong><small>{{ row.article.category or 'News' }} • {{ row.article.published_at|format_published_at }}</small></div></a>{% endfor %}</div>
+      <p class="eyebrow">{{ ui.trending }}</p><h2>{{ ui.most_watched }}</h2>
+      <div class="trending-list">{% for row in trending_articles %}<a href="{{ row.url }}"><span>{{ loop.index }}</span><div><strong>{{ row.title }}</strong><small>{{ category_labels.get(row.article.category, row.article.category) if row.article.category else ui.news }} • {{ row.article.published_at|format_published_at }}</small></div></a>{% endfor %}</div>
     </aside>
   </div>
 </main>
-<footer class="footer container"><strong>VREYC</strong><span>Premium AI news intelligence</span><div>{% for lang in languages %}<a href="/{{lang}}/">{{lang|upper}}</a> {% endfor %}</div></footer>
+<footer class="footer container"><strong>VREYC</strong><span>{{ ui.footer_tagline }}</span><div>{% for lang in languages %}<a href="/{{lang}}/">{{lang|upper}}</a> {% endfor %}</div></footer>
 </body>
 </html>

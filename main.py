@@ -37,6 +37,183 @@ UPLOAD_URL_PREFIX = "/static/uploads/images"
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 IMAGE_VARIANT_WIDTHS = (480, 960, 1440)
 
+
+PUBLIC_LABELS = {
+    "az": {
+        "latest": "Son",
+        "latest_news": "Son xəbərlər",
+        "most_watched": "Ən çox baxılanlar",
+        "related": "Oxşar xəbərlər",
+        "more_stories": "Daha çox xəbər",
+        "search": "Axtar",
+        "search_placeholder": "Axtar",
+        "news": "Xəbər",
+        "top_story": "Əsas xəbər",
+        "featured": "Seçilmiş",
+        "editor_picks": "Redaktorun AI seçimləri",
+        "trending": "Trend",
+        "live_briefing": "Canlı icmal",
+        "live_briefing_text": "AI tərəfindən seçilmiş başlıqlar, təsdiqlənmiş xülasələr və hadisələr inkişaf etdikcə yenilənən redaksiya konteksti.",
+        "audio_narration": "Audio səsləndirmə",
+        "share": "Paylaş",
+        "play": "Oxut",
+        "pause": "Fasilə",
+        "download": "Yüklə",
+        "narration_pending": "Səsləndirmə hazırlanır. Məqalənin dərc edilməsi bloklanmır.",
+        "no_articles": "Hələ dərc edilmiş məqalə yoxdur. Tezliklə yenidən yoxlayın.",
+        "related_empty": "Redaksiya böyüdükcə oxşar xəbərlər burada görünəcək.",
+        "footer_tagline": "Yüksək səviyyəli AI xəbər analitikası",
+        "email": "E-poçt",
+    },
+    "en": {
+        "latest": "Latest",
+        "latest_news": "Latest news",
+        "most_watched": "Most watched",
+        "related": "Related",
+        "more_stories": "More stories",
+        "search": "Search",
+        "search_placeholder": "Search",
+        "news": "News",
+        "top_story": "Top Story",
+        "featured": "Featured",
+        "editor_picks": "Editor's AI picks",
+        "trending": "Trending",
+        "live_briefing": "Live briefing",
+        "live_briefing_text": "AI-curated headlines, verified summaries and newsroom-ready context updated as stories develop.",
+        "audio_narration": "Audio narration",
+        "share": "Share",
+        "play": "Play",
+        "pause": "Pause",
+        "download": "Download",
+        "narration_pending": "Narration is being prepared. Article publishing is not blocked.",
+        "no_articles": "No published articles yet. Please check back soon.",
+        "related_empty": "Related articles will appear here as the newsroom grows.",
+        "footer_tagline": "Premium AI news intelligence",
+        "email": "Email",
+    },
+    "ru": {
+        "latest": "Последнее",
+        "latest_news": "Последние новости",
+        "most_watched": "Самые просматриваемые",
+        "related": "Похожие новости",
+        "more_stories": "Больше материалов",
+        "search": "Поиск",
+        "search_placeholder": "Поиск",
+        "news": "Новость",
+        "top_story": "Главная новость",
+        "featured": "Избранное",
+        "editor_picks": "Выбор AI-редакции",
+        "trending": "В тренде",
+        "live_briefing": "Прямой брифинг",
+        "live_briefing_text": "Подобранные AI заголовки, проверенные резюме и редакционный контекст обновляются по мере развития событий.",
+        "audio_narration": "Аудиоозвучка",
+        "share": "Поделиться",
+        "play": "Воспроизвести",
+        "pause": "Пауза",
+        "download": "Скачать",
+        "narration_pending": "Озвучка готовится. Публикация статьи не блокируется.",
+        "no_articles": "Опубликованных статей пока нет. Загляните позже.",
+        "related_empty": "Похожие статьи появятся здесь по мере роста редакции.",
+        "footer_tagline": "Премиальная AI-аналитика новостей",
+        "email": "Эл. почта",
+    },
+    "tr": {
+        "latest": "Son",
+        "latest_news": "Son haberler",
+        "most_watched": "En çok izlenenler",
+        "related": "İlgili haberler",
+        "more_stories": "Daha fazla haber",
+        "search": "Ara",
+        "search_placeholder": "Ara",
+        "news": "Haber",
+        "top_story": "Manşet",
+        "featured": "Öne çıkan",
+        "editor_picks": "Editörün AI seçimleri",
+        "trending": "Trend",
+        "live_briefing": "Canlı brifing",
+        "live_briefing_text": "AI tarafından seçilen başlıklar, doğrulanmış özetler ve haber geliştikçe güncellenen editoryal bağlam.",
+        "audio_narration": "Sesli anlatım",
+        "share": "Paylaş",
+        "play": "Oynat",
+        "pause": "Duraklat",
+        "download": "İndir",
+        "narration_pending": "Sesli anlatım hazırlanıyor. Makale yayını engellenmez.",
+        "no_articles": "Henüz yayımlanmış makale yok. Lütfen yakında tekrar kontrol edin.",
+        "related_empty": "Editoryal içerik büyüdükçe ilgili haberler burada görünecek.",
+        "footer_tagline": "Premium AI haber istihbaratı",
+        "email": "E-posta",
+    },
+    "zh": {
+        "latest": "最新",
+        "latest_news": "最新新闻",
+        "most_watched": "最多观看",
+        "related": "相关新闻",
+        "more_stories": "更多报道",
+        "search": "搜索",
+        "search_placeholder": "搜索",
+        "news": "新闻",
+        "top_story": "头条",
+        "featured": "精选",
+        "editor_picks": "AI 编辑精选",
+        "trending": "热门",
+        "live_briefing": "实时简报",
+        "live_briefing_text": "AI 精选标题、已验证摘要和适合 newsroom 的背景会随事件发展更新。",
+        "audio_narration": "音频播报",
+        "share": "分享",
+        "play": "播放",
+        "pause": "暂停",
+        "download": "下载",
+        "narration_pending": "音频播报正在准备中。文章发布不会受阻。",
+        "no_articles": "暂无已发布文章。请稍后再查看。",
+        "related_empty": "随着 newsroom 内容增长，相关新闻将显示在这里。",
+        "footer_tagline": "高端 AI 新闻情报",
+        "email": "电子邮件",
+    },
+    "es": {
+        "latest": "Último",
+        "latest_news": "Últimas noticias",
+        "most_watched": "Más vistas",
+        "related": "Relacionadas",
+        "more_stories": "Más historias",
+        "search": "Buscar",
+        "search_placeholder": "Buscar",
+        "news": "Noticia",
+        "top_story": "Noticia principal",
+        "featured": "Destacadas",
+        "editor_picks": "Selección AI del editor",
+        "trending": "Tendencias",
+        "live_briefing": "Resumen en vivo",
+        "live_briefing_text": "Titulares seleccionados por AI, resúmenes verificados y contexto editorial actualizado a medida que evolucionan las historias.",
+        "audio_narration": "Narración de audio",
+        "share": "Compartir",
+        "play": "Reproducir",
+        "pause": "Pausa",
+        "download": "Descargar",
+        "narration_pending": "La narración se está preparando. La publicación del artículo no se bloquea.",
+        "no_articles": "Aún no hay artículos publicados. Vuelve pronto.",
+        "related_empty": "Los artículos relacionados aparecerán aquí a medida que crezca la redacción.",
+        "footer_tagline": "Inteligencia premium de noticias con AI",
+        "email": "Correo",
+    },
+}
+
+CATEGORY_LABELS = {
+    "az": {"Politics": "Siyasət", "World": "Dünya", "Economy": "İqtisadiyyat", "Technology": "Texnologiya", "Business": "Biznes", "Sports": "İdman", "Health": "Sağlamlıq", "Agriculture": "Kənd təsərrüfatı"},
+    "en": {"Politics": "Politics", "World": "World", "Economy": "Economy", "Technology": "Technology", "Business": "Business", "Sports": "Sports", "Health": "Health", "Agriculture": "Agriculture"},
+    "ru": {"Politics": "Политика", "World": "Мир", "Economy": "Экономика", "Technology": "Технологии", "Business": "Бизнес", "Sports": "Спорт", "Health": "Здоровье", "Agriculture": "Сельское хозяйство"},
+    "tr": {"Politics": "Siyaset", "World": "Dünya", "Economy": "Ekonomi", "Technology": "Teknoloji", "Business": "İş dünyası", "Sports": "Spor", "Health": "Sağlık", "Agriculture": "Tarım"},
+    "zh": {"Politics": "政治", "World": "世界", "Economy": "经济", "Technology": "科技", "Business": "商业", "Sports": "体育", "Health": "健康", "Agriculture": "农业"},
+    "es": {"Politics": "Política", "World": "Mundo", "Economy": "Economía", "Technology": "Tecnología", "Business": "Negocios", "Sports": "Deportes", "Health": "Salud", "Agriculture": "Agricultura"},
+}
+
+
+def public_labels(language: str) -> dict[str, str]:
+    return PUBLIC_LABELS.get(language, PUBLIC_LABELS["az"])
+
+
+def public_category_labels(language: str) -> dict[str, str]:
+    return CATEGORY_LABELS.get(language, CATEGORY_LABELS["az"])
+
 DEFAULT_CATEGORIES = [
     {"name": "Politics", "description": "Policy, elections, diplomacy and public leadership.", "color": "#e11d48"},
     {"name": "World", "description": "Global affairs, conflicts, climate and society.", "color": "#2563eb"},
@@ -287,7 +464,7 @@ def home(request: Request, language: str = "az", q: str = "", category: str = ""
     hero = featured_cards[0] if featured_cards else (article_cards[0] if article_cards else None)
     latest_cards = [row for row in article_cards if not hero or row["article"].id != hero["article"].id]
     categories = category_navigation(db)
-    return templates.TemplateResponse("public/home.html", {"request": request, "articles": article_cards, "latest_articles": latest_cards, "featured_articles": featured_cards, "trending_articles": trending_cards, "hero": hero, "categories": categories, "q": q, "category": category, "site_url": settings.site_url, "canonical": canonical_url(request, f'{language}/'), "language": language, "languages": SUPPORTED_LANGUAGES})
+    return templates.TemplateResponse("public/home.html", {"request": request, "articles": article_cards, "latest_articles": latest_cards, "featured_articles": featured_cards, "trending_articles": trending_cards, "hero": hero, "categories": categories, "q": q, "category": category, "site_url": settings.site_url, "canonical": canonical_url(request, f'{language}/'), "language": language, "languages": SUPPORTED_LANGUAGES, "ui": public_labels(language), "category_labels": public_category_labels(language)})
 
 
 @app.get("/article/{slug}", response_class=HTMLResponse)
@@ -311,7 +488,7 @@ def article_by_slug(slug: str, request: Request, language: str = "az", db=Depend
     if len(related) < 3:
         related = related + db.query(Article).filter(Article.status == "published", Article.id != article.id, Article.category != article.category).order_by(Article.published_at.desc(), Article.created_at.desc()).limit(3 - len(related)).all()
     canonical = canonical_url(request, f"{language}/article/{view.slug or article.slug or article.id}")
-    return templates.TemplateResponse("public/article.html", {"request": request, "article": view, "root_article": article, "narration": narration, "related_articles": [article_card(a, language) for a in related], "share_url": canonical, "site_url": settings.site_url, "canonical": canonical, "language": language, "languages": SUPPORTED_LANGUAGES, "alt_links": alt_links})
+    return templates.TemplateResponse("public/article.html", {"request": request, "article": view, "root_article": article, "narration": narration, "related_articles": [article_card(a, language) for a in related], "share_url": canonical, "site_url": settings.site_url, "canonical": canonical, "language": language, "languages": SUPPORTED_LANGUAGES, "alt_links": alt_links, "ui": public_labels(language), "category_labels": public_category_labels(language)})
 
 
 @app.get('/search', response_class=HTMLResponse)
