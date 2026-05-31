@@ -33,6 +33,17 @@ SUPPORTED_LANGUAGES = ["az", "en", "ru", "tr", "zh", "es"]
 LANGUAGE_LABELS = {"az": "Azerbaijani", "en": "English", "ru": "Russian", "tr": "Turkish", "zh": "Chinese", "es": "Spanish"}
 UPLOAD_DIR = Path("static/uploads/media")
 
+DEFAULT_CATEGORIES = [
+    {"name": "Politics", "description": "Policy, elections, diplomacy and public leadership.", "color": "#e11d48"},
+    {"name": "World", "description": "Global affairs, conflicts, climate and society.", "color": "#2563eb"},
+    {"name": "Economy", "description": "Markets, macroeconomics, labor and public finance.", "color": "#16a34a"},
+    {"name": "Technology", "description": "AI, platforms, cybersecurity, science and innovation.", "color": "#7c3aed"},
+    {"name": "Business", "description": "Companies, startups, leadership and industry strategy.", "color": "#f97316"},
+    {"name": "Sports", "description": "Scores, tournaments, athletes and sports business.", "color": "#06b6d4"},
+    {"name": "Health", "description": "Medicine, wellbeing, research and public health.", "color": "#db2777"},
+    {"name": "Agriculture", "description": "Food systems, farming technology and rural economies.", "color": "#65a30d"},
+]
+
 
 def slugify(text: str) -> str:
     base = re.sub(r"[^a-z0-9]+", "-", (text or "").strip().lower()).strip("-")
@@ -113,6 +124,32 @@ def ensure_slugs(db):
     db.commit()
 
 
+
+def ensure_categories(db):
+    existing = {c.name.lower(): c for c in db.query(Category).all()}
+    for item in DEFAULT_CATEGORIES:
+        if item["name"].lower() not in existing:
+            db.add(Category(name=item["name"], slug=slugify(item["name"]), description=item["description"], color=item["color"]))
+    db.commit()
+
+
+def category_navigation(db):
+    rows = db.query(Category).order_by(Category.name.asc()).all()
+    by_name = {c.name: c for c in rows}
+    ordered = []
+    for item in DEFAULT_CATEGORIES:
+        ordered.append(by_name.get(item["name"]) or Category(name=item["name"], slug=slugify(item["name"]), description=item["description"], color=item["color"]))
+    extras = [c for c in rows if c.name not in {item["name"] for item in DEFAULT_CATEGORIES}]
+    return ordered + extras
+
+
+def article_card(article: Article, language: str) -> dict:
+    tr = get_translation(article, language)
+    title = tr.title if tr and tr.title else article.title
+    summary = tr.summary if tr and tr.summary else article.summary
+    slug = tr.slug if tr and tr.slug else (article.slug or str(article.id))
+    return {"article": article, "t": tr, "title": title, "summary": summary, "url": article_url(language, slug)}
+
 def get_settings_map(db) -> dict[str, str]:
     return {row.key: row.value for row in db.query(Setting).all()}
 
@@ -134,16 +171,14 @@ def article_form_context(db, article: Article | None = None) -> dict:
     return {"categories": categories, "languages": SUPPORTED_LANGUAGES, "language_labels": LANGUAGE_LABELS, "translations": translations}
 
 
-@app.on_event("startup")
-def startup() -> None:
-    settings.validate_production_or_raise()
-    init_db()
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    db = SessionLocal()
+def apply_schema_migrations(db) -> None:
     for statement in [
         "ALTER TABLE articles ADD COLUMN slug VARCHAR(500)",
-        "ALTER TABLE articles ADD COLUMN narration_enabled BOOLEAN DEFAULT 1",
+        "ALTER TABLE articles ADD COLUMN narration_enabled BOOLEAN DEFAULT true",
         "ALTER TABLE articles ADD COLUMN meta_description TEXT",
+        "ALTER TABLE articles ADD COLUMN is_featured BOOLEAN DEFAULT false",
+        "ALTER TABLE articles ADD COLUMN is_trending BOOLEAN DEFAULT false",
+        "ALTER TABLE articles ADD COLUMN homepage_order INTEGER DEFAULT 100",
         "ALTER TABLE article_translations ADD COLUMN slug VARCHAR(500)",
         "ALTER TABLE article_translations ADD COLUMN meta_description TEXT",
     ]:
@@ -152,6 +187,16 @@ def startup() -> None:
             db.commit()
         except Exception:
             db.rollback()
+
+
+@app.on_event("startup")
+def startup() -> None:
+    settings.validate_production_or_raise()
+    init_db()
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    db = SessionLocal()
+    apply_schema_migrations(db)
+    ensure_categories(db)
     ensure_slugs(db)
     db.close()
     scheduler.add_job(run_fetch_pipeline, "interval", minutes=max(13, min(17, settings.fetch_interval_min)), id="fetch_job", replace_existing=True)
@@ -163,18 +208,26 @@ def startup() -> None:
 @app.get("/{language}/", response_class=HTMLResponse)
 def home(request: Request, language: str = "az", q: str = "", category: str = "", db=Depends(get_db)):
     language = language if language in SUPPORTED_LANGUAGES else "az"
+    ensure_categories(db)
     query = db.query(Article).filter(Article.status == "published")
     if q:
         query = query.filter((Article.title.ilike(f"%{q}%")) | (Article.summary.ilike(f"%{q}%")))
     if category:
         query = query.filter(Article.category == category)
-    articles = query.order_by(Article.published_at.desc(), Article.created_at.desc()).limit(30).all()
-    categories = [c[0] for c in db.query(Article.category).filter(Article.status == "published").distinct().all() if c[0]]
-    article_cards = []
-    for a in articles:
-        tr = get_translation(a, language)
-        article_cards.append({"article": a, "t": tr, "url": article_url(language, tr.slug if tr else (a.slug or str(a.id)))})
-    return templates.TemplateResponse("public/home.html", {"request": request, "articles": article_cards, "categories": categories, "q": q, "category": category, "site_url": settings.site_url, "canonical": canonical_url(request, f'{language}/'), "language": language, "languages": SUPPORTED_LANGUAGES})
+    articles = query.order_by(Article.homepage_order.asc(), Article.published_at.desc(), Article.created_at.desc()).limit(30).all()
+    featured = db.query(Article).filter(Article.status == "published", Article.is_featured == True).order_by(Article.homepage_order.asc(), Article.published_at.desc()).limit(6).all()
+    if not featured:
+        featured = articles[:6]
+    trending = db.query(Article).filter(Article.status == "published", Article.is_trending == True).order_by(Article.homepage_order.asc(), Article.published_at.desc()).limit(8).all()
+    if not trending:
+        trending = articles[:8]
+    article_cards = [article_card(a, language) for a in articles]
+    featured_cards = [article_card(a, language) for a in featured]
+    trending_cards = [article_card(a, language) for a in trending]
+    hero = featured_cards[0] if featured_cards else (article_cards[0] if article_cards else None)
+    latest_cards = [row for row in article_cards if not hero or row["article"].id != hero["article"].id]
+    categories = category_navigation(db)
+    return templates.TemplateResponse("public/home.html", {"request": request, "articles": article_cards, "latest_articles": latest_cards, "featured_articles": featured_cards, "trending_articles": trending_cards, "hero": hero, "categories": categories, "q": q, "category": category, "site_url": settings.site_url, "canonical": canonical_url(request, f'{language}/'), "language": language, "languages": SUPPORTED_LANGUAGES})
 
 
 @app.get("/article/{slug}", response_class=HTMLResponse)
@@ -194,7 +247,11 @@ def article_by_slug(slug: str, request: Request, language: str = "az", db=Depend
     view = tr if tr else article
     narration = db.query(ArticleNarration).filter(ArticleNarration.article_id == article.id, ArticleNarration.language == language).first()
     alt_links = {lang: article_url(lang, (get_translation(article, lang).slug if get_translation(article, lang) else (article.slug or str(article.id)))) for lang in SUPPORTED_LANGUAGES}
-    return templates.TemplateResponse("public/article.html", {"request": request, "article": view, "root_article": article, "narration": narration, "site_url": settings.site_url, "canonical": canonical_url(request, f"{language}/article/{view.slug or article.slug or article.id}"), "language": language, "languages": SUPPORTED_LANGUAGES, "alt_links": alt_links})
+    related = db.query(Article).filter(Article.status == "published", Article.id != article.id, Article.category == article.category).order_by(Article.published_at.desc(), Article.created_at.desc()).limit(3).all()
+    if len(related) < 3:
+        related = related + db.query(Article).filter(Article.status == "published", Article.id != article.id, Article.category != article.category).order_by(Article.published_at.desc(), Article.created_at.desc()).limit(3 - len(related)).all()
+    canonical = canonical_url(request, f"{language}/article/{view.slug or article.slug or article.id}")
+    return templates.TemplateResponse("public/article.html", {"request": request, "article": view, "root_article": article, "narration": narration, "related_articles": [article_card(a, language) for a in related], "share_url": canonical, "site_url": settings.site_url, "canonical": canonical, "language": language, "languages": SUPPORTED_LANGUAGES, "alt_links": alt_links})
 
 
 @app.get('/search', response_class=HTMLResponse)
@@ -299,6 +356,9 @@ async def create_article(request: Request, db=Depends(get_db), _=Depends(require
         status=form.get('status', 'draft'),
         language='az',
         narration_enabled=form.get('narration_enabled') == 'on',
+        is_featured=form.get('is_featured') == 'on',
+        is_trending=form.get('is_trending') == 'on',
+        homepage_order=int(form.get('homepage_order') or 100),
         published_at=datetime.utcnow() if form.get('status') == 'published' else None,
     )
     db.add(article)
@@ -374,6 +434,9 @@ async def edit_article(article_id: int, request: Request, db=Depends(get_db), _=
     old_status = a.status
     a.status = form.get('status', 'draft')
     a.narration_enabled = form.get('narration_enabled') == 'on'
+    a.is_featured = form.get('is_featured') == 'on'
+    a.is_trending = form.get('is_trending') == 'on'
+    a.homepage_order = int(form.get('homepage_order') or 100)
     a.updated_at = datetime.utcnow()
     if a.status == 'published' and (old_status != 'published' or not a.published_at):
         a.published_at = datetime.utcnow()
@@ -399,6 +462,36 @@ async def edit_article(article_id: int, request: Request, db=Depends(get_db), _=
             row.updated_at = datetime.utcnow()
     db.commit()
     return RedirectResponse(f'/admin/articles/{a.id}/edit?saved=1', status_code=302)
+
+
+@app.post('/admin/articles/{article_id}/feature')
+def toggle_featured(article_id: int, request: Request, db=Depends(get_db), _=Depends(require_auth)):
+    article = db.query(Article).get(article_id)
+    if article:
+        article.is_featured = not bool(article.is_featured)
+        article.updated_at = datetime.utcnow()
+        db.commit()
+    return RedirectResponse('/admin/articles', status_code=302)
+
+
+@app.post('/admin/articles/{article_id}/trending')
+def toggle_trending(article_id: int, request: Request, db=Depends(get_db), _=Depends(require_auth)):
+    article = db.query(Article).get(article_id)
+    if article:
+        article.is_trending = not bool(article.is_trending)
+        article.updated_at = datetime.utcnow()
+        db.commit()
+    return RedirectResponse('/admin/articles', status_code=302)
+
+
+@app.post('/admin/articles/{article_id}/order')
+def update_homepage_order(article_id: int, request: Request, homepage_order: int = Form(100), db=Depends(get_db), _=Depends(require_auth)):
+    article = db.query(Article).get(article_id)
+    if article:
+        article.homepage_order = homepage_order
+        article.updated_at = datetime.utcnow()
+        db.commit()
+    return RedirectResponse('/admin/articles', status_code=302)
 
 
 @app.post('/admin/articles/{article_id}/delete')
