@@ -14,10 +14,10 @@
   <nav class="nav container"><a class="logo" href="/{{language}}/"><span>VRE</span>YC</a><div class="language-switcher">{% for lang in languages %}<a href="{{alt_links[lang]}}">{{lang|upper}}</a>{% endfor %}</div></nav>
   <nav class="categories container" aria-label="{{ ui.news }}">
     <div class="primary-categories">{% for c in categories %}<a href="/{{ language }}/?category={{ c.name }}" style="--cat-color: {{ c.color or '#48a6ff' }}">{{ category_labels.get(c.name, c.name) }}</a>{% endfor %}</div>
-    {% if secondary_categories %}<details class="category-menu">
-      <summary aria-label="{{ ui.news }}"><span></span><span></span><span></span></summary>
-      <div class="category-dropdown">{% for c in secondary_categories %}<a href="/{{ language }}/?category={{ c.name }}" style="--cat-color: {{ c.color or '#48a6ff' }}">{{ category_labels.get(c.name, c.name) }}</a>{% endfor %}</div>
-    </details>{% endif %}
+    {% if secondary_categories %}<div class="category-menu">
+      <button class="category-menu-button" type="button" aria-label="{{ ui.more_categories }}" aria-expanded="false" aria-controls="category-dropdown-{{ language }}"><span></span><span></span><span></span></button>
+      <div class="category-dropdown" id="category-dropdown-{{ language }}">{% for c in secondary_categories %}<a href="/{{ language }}/?category={{ c.name }}" style="--cat-color: {{ c.color or '#48a6ff' }}">{{ category_labels.get(c.name, c.name) }}</a>{% endfor %}</div>
+    </div>{% endif %}
   </nav>
 </header>
 <main class="article-page">
@@ -60,5 +60,6 @@
   </section>
 </footer>
 <script>(()=>{const w=document.querySelector('.audio-news');if(!w||w.dataset.audioReady!=='1')return;const a=document.getElementById('narration'),play=document.getElementById('playBtn'),pause=document.getElementById('pauseBtn'),seek=document.getElementById('seek'),speed=document.getElementById('speed'),time=document.getElementById('time');const fmt=t=>`${Math.floor(t/60)}:${String(Math.floor(t%60)).padStart(2,'0')}`;play.onclick=()=>a.play();pause.onclick=()=>a.pause();speed.onchange=()=>a.playbackRate=parseFloat(speed.value);a.onloadedmetadata=()=>{seek.max=Math.floor(a.duration||0);time.textContent=`0:00 / ${fmt(a.duration||0)}`};a.ontimeupdate=()=>{seek.value=Math.floor(a.currentTime);time.textContent=`${fmt(a.currentTime)} / ${fmt(a.duration||0)}`};seek.oninput=()=>{a.currentTime=Number(seek.value)}})();</script>
+<script src="/assets/app.js" defer></script>
 </body>
 </html>
