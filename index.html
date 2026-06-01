@@ -48,9 +48,14 @@
         <button class="btn primary">Subscribe</button>
       </div>
     </nav>
-    <div class="ticker" aria-label="Breaking news ticker"><span>BREAKING</span><marquee behavior="scroll" direction="left">AI chipmakers rally as global demand accelerates • New climate treaty signed by 38 nations • Markets react to overnight central bank signals • Space-tech startup announces reusable orbital platform</marquee></div>
-    <nav class="categories container">
-      <a href="#">World</a><a href="#">Politics</a><a href="#">Business</a><a href="#">Tech</a><a href="#">Science</a><a href="#">Finance</a><a href="#">AI</a><a href="#">Startups</a>
+    <nav class="categories container" aria-label="Xəbər">
+      <div class="primary-categories">
+        <a href="#" style="--cat-color: #e11d48">Siyasət</a><a href="#" style="--cat-color: #2563eb">Dünya</a><a href="#" style="--cat-color: #16a34a">İqtisadiyyat</a><a href="#" style="--cat-color: #7c3aed">Texnologiya</a><a href="#" style="--cat-color: #f97316">Biznes</a><a href="#" style="--cat-color: #06b6d4">İdman</a><a href="#" style="--cat-color: #db2777">Sağlamlıq</a>
+      </div>
+      <div class="category-menu">
+        <button class="category-menu-button" type="button" aria-label="Daha çox kateqoriya" aria-haspopup="true" aria-expanded="false" aria-controls="category-dropdown-static"><span aria-hidden="true">☰</span></button>
+        <div class="category-dropdown" id="category-dropdown-static" hidden><a href="#" style="--cat-color: #0ea5e9">Ölkə</a><a href="#" style="--cat-color: #ef4444">Hadisə</a><a href="#" style="--cat-color: #14b8a6">Elm və Təhsil</a><a href="#" style="--cat-color: #d946ef">Şou Biznes</a></div>
+      </div>
     </nav>
   </header>
 
