@@ -3,7 +3,7 @@ set -euo pipefail
 
 BACKUP_DIR="${BACKUP_DIR:-./backups}"
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
-IMAGE_UPLOAD_BACKUP_DIR="${IMAGE_UPLOAD_BACKUP_DIR:-${IMAGE_UPLOAD_HOST_DIR:-/opt/vre-ai-news/uploads/images}}"
+IMAGE_UPLOAD_BACKUP_DIR="/opt/vre-ai-news/uploads/images"
 mkdir -p "$BACKUP_DIR"
 
 if [[ -z "${DATABASE_URL:-}" ]]; then
@@ -24,9 +24,6 @@ else
   echo "PostgreSQL backup created: $BACKUP_DIR/vre_news_${TIMESTAMP}.sql"
 fi
 
-if [[ -d "$IMAGE_UPLOAD_BACKUP_DIR" ]]; then
-  tar -C "$(dirname "$IMAGE_UPLOAD_BACKUP_DIR")" -czf "$BACKUP_DIR/vre_news_uploads_${TIMESTAMP}.tar.gz" "$(basename "$IMAGE_UPLOAD_BACKUP_DIR")"
-  echo "Image uploads backup created: $BACKUP_DIR/vre_news_uploads_${TIMESTAMP}.tar.gz"
-else
-  echo "Image upload directory not found, skipping image backup: $IMAGE_UPLOAD_BACKUP_DIR"
-fi
+mkdir -p "$IMAGE_UPLOAD_BACKUP_DIR"
+tar -C "$(dirname "$IMAGE_UPLOAD_BACKUP_DIR")" -czf "$BACKUP_DIR/vre_news_uploads_${TIMESTAMP}.tar.gz" "$(basename "$IMAGE_UPLOAD_BACKUP_DIR")"
+echo "Image uploads backup created: $BACKUP_DIR/vre_news_uploads_${TIMESTAMP}.tar.gz"

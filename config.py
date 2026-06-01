@@ -29,8 +29,11 @@ class Settings(BaseModel):
     fetch_interval_min: int = int(os.getenv("FETCH_INTERVAL_MIN", "15"))
     pexels_api_key: str = os.getenv("PEXELS_API_KEY", "")
     site_url: str = os.getenv("SITE_URL", PRODUCTION_SITE_URL).rstrip("/")
-    image_upload_dir: str = os.getenv("IMAGE_UPLOAD_DIR", "static/uploads/images")
-    image_upload_url_prefix: str = os.getenv("IMAGE_UPLOAD_URL_PREFIX", "/static/uploads/images").rstrip("/")
+    # Uploaded article images must live outside the application tree so Docker rebuilds,
+    # restarts, and git operations cannot remove them. Keep the public URL prefix stable
+    # for existing article records.
+    image_upload_dir: str = "/opt/vre-ai-news/uploads/images"
+    image_upload_url_prefix: str = "/static/uploads/images"
 
     @property
     def is_production(self) -> bool:

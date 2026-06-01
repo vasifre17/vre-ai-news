@@ -23,8 +23,6 @@ from ai.pipeline import AIEngine
 
 app = FastAPI(title=settings.app_name)
 app.add_middleware(SessionMiddleware, secret_key=settings.secret_key)
-app.mount("/static", StaticFiles(directory="static"), name="static")
-app.mount("/assets", StaticFiles(directory="assets"), name="assets")
 templates = Jinja2Templates(directory="templates")
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
@@ -34,10 +32,21 @@ SUPPORTED_LANGUAGES = ["az", "en", "ru", "tr", "zh", "es"]
 LANGUAGE_LABELS = {"az": "Azerbaijani", "en": "English", "ru": "Russian", "tr": "Turkish", "zh": "Chinese", "es": "Spanish"}
 UPLOAD_DIR = Path(settings.image_upload_dir)
 UPLOAD_URL_PREFIX = settings.image_upload_url_prefix
-LEGACY_UPLOAD_DIRS = (Path("uploads"), Path("static/uploads/images"))
+LEGACY_UPLOAD_DIRS = (Path("uploads"), Path("static/uploads/images"), Path("/app/static/uploads/images"))
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 IMAGE_VARIANT_WIDTHS = (480, 960, 1440)
+
+
+def ensure_upload_dir() -> None:
+    """Create the persistent host upload directory before serving or saving images."""
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+
+ensure_upload_dir()
+app.mount(UPLOAD_URL_PREFIX, StaticFiles(directory=UPLOAD_DIR), name="uploaded_images")
+app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/assets", StaticFiles(directory="assets"), name="assets")
 
 
 PUBLIC_LABELS = {
@@ -294,7 +303,10 @@ def public_image_url(path: str | None) -> str:
         return ""
     value = path.strip()
     upload_dir = str(UPLOAD_DIR)
+    legacy_upload_dirs = tuple(str(path) for path in LEGACY_UPLOAD_DIRS)
     if value == upload_dir or value.startswith(f"{upload_dir}/"):
+        return f"{UPLOAD_URL_PREFIX}/{Path(value).name}"
+    if any(value == legacy_dir or value.startswith(f"{legacy_dir}/") for legacy_dir in legacy_upload_dirs):
         return f"{UPLOAD_URL_PREFIX}/{Path(value).name}"
     if value.startswith(("http://", "https://")):
         return value
@@ -373,7 +385,7 @@ def save_image_upload(file, alt_text: str = "") -> MediaAsset | None:
     content_type = file.content_type or ""
     if content_type not in ALLOWED_IMAGE_TYPES:
         raise HTTPException(status_code=400, detail="Only JPG, PNG, WEBP and GIF images can be uploaded.")
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    ensure_upload_dir()
     original_name = Path(file.filename or "image").name
     suffix = Path(original_name).suffix.lower() or ".jpg"
     safe_root = uuid4().hex
@@ -570,7 +582,7 @@ def apply_schema_migrations(db) -> None:
 def startup() -> None:
     settings.validate_production_or_raise()
     init_db()
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    ensure_upload_dir()
     preserve_legacy_uploads()
     db = SessionLocal()
     apply_schema_migrations(db)
