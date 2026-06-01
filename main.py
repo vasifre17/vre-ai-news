@@ -246,12 +246,12 @@ PUBLIC_LABELS = {
 }
 
 CATEGORY_LABELS = {
-    "az": {"Politics": "Siyasət", "World": "Dünya", "Economy": "İqtisadiyyat", "Technology": "Texnologiya", "Business": "Biznes", "Sports": "İdman", "Health": "Sağlamlıq", "Agriculture": "Kənd təsərrüfatı"},
-    "en": {"Politics": "Politics", "World": "World", "Economy": "Economy", "Technology": "Technology", "Business": "Business", "Sports": "Sports", "Health": "Health", "Agriculture": "Agriculture"},
-    "ru": {"Politics": "Политика", "World": "Мир", "Economy": "Экономика", "Technology": "Технологии", "Business": "Бизнес", "Sports": "Спорт", "Health": "Здоровье", "Agriculture": "Сельское хозяйство"},
-    "tr": {"Politics": "Siyaset", "World": "Dünya", "Economy": "Ekonomi", "Technology": "Teknoloji", "Business": "İş dünyası", "Sports": "Spor", "Health": "Sağlık", "Agriculture": "Tarım"},
-    "zh": {"Politics": "政治", "World": "世界", "Economy": "经济", "Technology": "科技", "Business": "商业", "Sports": "体育", "Health": "健康", "Agriculture": "农业"},
-    "es": {"Politics": "Política", "World": "Mundo", "Economy": "Economía", "Technology": "Tecnología", "Business": "Negocios", "Sports": "Deportes", "Health": "Salud", "Agriculture": "Agricultura"},
+    "az": {"Politics": "Siyasət", "World": "Dünya", "Economy": "İqtisadiyyat", "Technology": "Texnologiya", "Business": "Biznes", "Sports": "İdman", "Health": "Sağlamlıq", "Country": "Ölkə", "Incident": "Hadisə", "Science and Education": "Elm və Təhsil", "Show Business": "Şou Biznes", "Agriculture": "Kənd təsərrüfatı"},
+    "en": {"Politics": "Politics", "World": "World", "Economy": "Economy", "Technology": "Technology", "Business": "Business", "Sports": "Sports", "Health": "Health", "Country": "Country", "Incident": "Incident", "Science and Education": "Science & Education", "Show Business": "Show Business", "Agriculture": "Agriculture"},
+    "ru": {"Politics": "Политика", "World": "Мир", "Economy": "Экономика", "Technology": "Технологии", "Business": "Бизнес", "Sports": "Спорт", "Health": "Здоровье", "Country": "Страна", "Incident": "Происшествия", "Science and Education": "Наука и образование", "Show Business": "Шоу-бизнес", "Agriculture": "Сельское хозяйство"},
+    "tr": {"Politics": "Siyaset", "World": "Dünya", "Economy": "Ekonomi", "Technology": "Teknoloji", "Business": "İş dünyası", "Sports": "Spor", "Health": "Sağlık", "Country": "Ülke", "Incident": "Olay", "Science and Education": "Bilim ve Eğitim", "Show Business": "Şov Biznes", "Agriculture": "Tarım"},
+    "zh": {"Politics": "政治", "World": "世界", "Economy": "经济", "Technology": "科技", "Business": "商业", "Sports": "体育", "Health": "健康", "Country": "国内", "Incident": "事件", "Science and Education": "科学与教育", "Show Business": "娱乐圈", "Agriculture": "农业"},
+    "es": {"Politics": "Política", "World": "Mundo", "Economy": "Economía", "Technology": "Tecnología", "Business": "Negocios", "Sports": "Deportes", "Health": "Salud", "Country": "País", "Incident": "Sucesos", "Science and Education": "Ciencia y educación", "Show Business": "Espectáculos", "Agriculture": "Agricultura"},
 }
 
 
@@ -262,6 +262,9 @@ def public_labels(language: str) -> dict[str, str]:
 def public_category_labels(language: str) -> dict[str, str]:
     return CATEGORY_LABELS.get(language, CATEGORY_LABELS["az"])
 
+PRIMARY_CATEGORY_NAMES = ["Politics", "World", "Economy", "Technology", "Business", "Sports", "Health"]
+SECONDARY_CATEGORY_NAMES = ["Country", "Incident", "Science and Education", "Show Business"]
+
 DEFAULT_CATEGORIES = [
     {"name": "Politics", "description": "Policy, elections, diplomacy and public leadership.", "color": "#e11d48"},
     {"name": "World", "description": "Global affairs, conflicts, climate and society.", "color": "#2563eb"},
@@ -270,7 +273,10 @@ DEFAULT_CATEGORIES = [
     {"name": "Business", "description": "Companies, startups, leadership and industry strategy.", "color": "#f97316"},
     {"name": "Sports", "description": "Scores, tournaments, athletes and sports business.", "color": "#06b6d4"},
     {"name": "Health", "description": "Medicine, wellbeing, research and public health.", "color": "#db2777"},
-    {"name": "Agriculture", "description": "Food systems, farming technology and rural economies.", "color": "#65a30d"},
+    {"name": "Country", "description": "Local and national news from Azerbaijan and the region.", "color": "#0ea5e9"},
+    {"name": "Incident", "description": "Breaking incidents, public safety and developing events.", "color": "#ef4444"},
+    {"name": "Science and Education", "description": "Science, schools, universities and education policy.", "color": "#14b8a6"},
+    {"name": "Show Business", "description": "Entertainment, celebrities, culture and show business.", "color": "#d946ef"},
 ]
 
 
@@ -441,6 +447,15 @@ def category_navigation(db):
     return ordered + extras
 
 
+def public_category_navigation(db) -> dict[str, list[Category]]:
+    categories = category_navigation(db)
+    by_name = {c.name: c for c in categories}
+    return {
+        "primary": [by_name[name] for name in PRIMARY_CATEGORY_NAMES if name in by_name],
+        "secondary": [by_name[name] for name in SECONDARY_CATEGORY_NAMES if name in by_name],
+    }
+
+
 def article_card(article: Article, language: str) -> dict:
     tr = get_translation(article, language)
     title = tr.title if tr and tr.title else article.title
@@ -524,8 +539,8 @@ def home(request: Request, language: str = "az", q: str = "", category: str = ""
     trending_cards = [article_card(a, language) for a in trending]
     hero = featured_cards[0] if featured_cards else (article_cards[0] if article_cards else None)
     latest_cards = [row for row in article_cards if not hero or row["article"].id != hero["article"].id]
-    categories = category_navigation(db)
-    return templates.TemplateResponse("public/home.html", {"request": request, "articles": article_cards, "latest_articles": latest_cards, "featured_articles": featured_cards, "trending_articles": trending_cards, "hero": hero, "categories": categories, "q": q, "category": category, "site_url": settings.site_url, "canonical": canonical_url(request, f'{language}/'), "language": language, "languages": SUPPORTED_LANGUAGES, "ui": public_labels(language), "category_labels": public_category_labels(language)})
+    categories = public_category_navigation(db)
+    return templates.TemplateResponse("public/home.html", {"request": request, "articles": article_cards, "latest_articles": latest_cards, "featured_articles": featured_cards, "trending_articles": trending_cards, "hero": hero, "categories": categories["primary"], "secondary_categories": categories["secondary"], "q": q, "category": category, "site_url": settings.site_url, "canonical": canonical_url(request, f'{language}/'), "language": language, "languages": SUPPORTED_LANGUAGES, "ui": public_labels(language), "category_labels": public_category_labels(language)})
 
 
 @app.get("/article/{slug}", response_class=HTMLResponse)
@@ -549,7 +564,8 @@ def article_by_slug(slug: str, request: Request, language: str = "az", db=Depend
     if len(related) < 3:
         related = related + db.query(Article).filter(Article.status == "published", Article.id != article.id, Article.category != article.category).order_by(Article.published_at.desc(), Article.created_at.desc()).limit(3 - len(related)).all()
     canonical = canonical_url(request, f"{language}/article/{view.slug or article.slug or article.id}")
-    return templates.TemplateResponse("public/article.html", {"request": request, "article": view, "root_article": article, "narration": narration, "related_articles": [article_card(a, language) for a in related], "share_url": canonical, "site_url": settings.site_url, "canonical": canonical, "language": language, "languages": SUPPORTED_LANGUAGES, "alt_links": alt_links, "ui": public_labels(language), "category_labels": public_category_labels(language)})
+    navigation = public_category_navigation(db)
+    return templates.TemplateResponse("public/article.html", {"request": request, "article": view, "root_article": article, "narration": narration, "related_articles": [article_card(a, language) for a in related], "categories": navigation["primary"], "secondary_categories": navigation["secondary"], "share_url": canonical, "site_url": settings.site_url, "canonical": canonical, "language": language, "languages": SUPPORTED_LANGUAGES, "alt_links": alt_links, "ui": public_labels(language), "category_labels": public_category_labels(language)})
 
 
 @app.get('/search', response_class=HTMLResponse)

@@ -10,7 +10,16 @@
   <link rel="stylesheet" href="/assets/styles.css">
 </head>
 <body>
-<header class="site-header glass"><nav class="nav container"><a class="logo" href="/{{language}}/"><span>VRE</span>YC</a><div class="language-switcher">{% for lang in languages %}<a href="{{alt_links[lang]}}">{{lang|upper}}</a>{% endfor %}</div></nav></header>
+<header class="site-header glass">
+  <nav class="nav container"><a class="logo" href="/{{language}}/"><span>VRE</span>YC</a><div class="language-switcher">{% for lang in languages %}<a href="{{alt_links[lang]}}">{{lang|upper}}</a>{% endfor %}</div></nav>
+  <nav class="categories container" aria-label="{{ ui.news }}">
+    <div class="primary-categories">{% for c in categories %}<a href="/{{ language }}/?category={{ c.name }}" style="--cat-color: {{ c.color or '#48a6ff' }}">{{ category_labels.get(c.name, c.name) }}</a>{% endfor %}</div>
+    {% if secondary_categories %}<details class="category-menu">
+      <summary aria-label="{{ ui.news }}"><span></span><span></span><span></span></summary>
+      <div class="category-dropdown">{% for c in secondary_categories %}<a href="/{{ language }}/?category={{ c.name }}" style="--cat-color: {{ c.color or '#48a6ff' }}">{{ category_labels.get(c.name, c.name) }}</a>{% endfor %}</div>
+    </details>{% endif %}
+  </nav>
+</header>
 <main class="article-page">
   <section class="article-hero">
     <div class="container article-hero-copy"><span class="badge">{{ category_labels.get(root_article.category, root_article.category) if root_article.category else ui.news }}</span><h1>{{article.title}}</h1><p>{{article.summary}}</p><small>{{root_article.published_at|format_published_at}}</small></div>
