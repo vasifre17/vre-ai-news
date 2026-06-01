@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>VREYC — Premium AI News Portal</title>
-  <meta name="description" content="VREYC delivers real-time AI-curated global news across politics, world affairs, economy, technology, business, sports, health and agriculture.">
+  <meta name="description" content="VREYC delivers real-time AI-curated global news across politics, world affairs, economy, technology, business, sports and health.">
   <meta name="robots" content="index,follow,max-image-preview:large">
   <link rel="stylesheet" href="/assets/styles.css">
   <link rel="canonical" href="{{ canonical }}">
@@ -19,7 +19,13 @@
     <form class="search-wrap" action="/{{ language }}/" role="search"><input type="search" name="q" value="{{q}}" placeholder="{{ ui.search_placeholder }}" aria-label="{{ ui.search }}"></form>
     <div class="language-switcher">{% for lang in languages %}<a href="/{{lang}}/">{{lang|upper}}</a>{% endfor %}</div>
   </nav>
-  <nav class="categories container" aria-label="{{ ui.news }}">{% for c in categories %}<a href="/{{ language }}/?category={{ c.name }}" style="--cat-color: {{ c.color or '#48a6ff' }}">{{ category_labels.get(c.name, c.name) }}</a>{% endfor %}</nav>
+  <nav class="categories container" aria-label="{{ ui.news }}">
+    <div class="primary-categories">{% for c in categories %}<a href="/{{ language }}/?category={{ c.name }}" style="--cat-color: {{ c.color or '#48a6ff' }}">{{ category_labels.get(c.name, c.name) }}</a>{% endfor %}</div>
+    {% if secondary_categories %}<details class="category-menu">
+      <summary aria-label="{{ ui.news }}"><span></span><span></span><span></span></summary>
+      <div class="category-dropdown">{% for c in secondary_categories %}<a href="/{{ language }}/?category={{ c.name }}" style="--cat-color: {{ c.color or '#48a6ff' }}">{{ category_labels.get(c.name, c.name) }}</a>{% endfor %}</div>
+    </details>{% endif %}
+  </nav>
 </header>
 <main class="container section news-shell">
   <section class="breaking glass"><span>{{ ui.live_briefing }}</span><p>{{ ui.live_briefing_text }}</p></section>
