@@ -46,6 +46,7 @@ def seed_data() -> None:
             category="World",
             language="az",
             status="published",
+            image_url="/static/uploads/images/missing-smoke.jpg",
             published_at=datetime.now(UTC),
         )
         db.add(article)
@@ -77,11 +78,13 @@ def main() -> int:
     en_home.raise_for_status()
     assert_contains(en_home.text, "Azerbaijan news", "English translated headline")
     assert_contains(en_home.text, "https://vreyc.com/en/", "English canonical URL")
+    assert_contains(en_home.text, "image-placeholder", "VREYC placeholder for missing uploaded image")
 
     article = client.get("/en/article/azerbaijan-news-en")
     article.raise_for_status()
     assert_contains(article.text, "Azerbaijan news SEO", "translated SEO title")
     assert_contains(article.text, "https://vreyc.com/en/article/azerbaijan-news-en", "article canonical URL")
+    assert_contains(article.text, "https://vreyc.com/assets/og-cover.jpg", "fallback social image for missing upload")
     assert_contains(article.text, "/static/audio/smoke-en.mp3", "English narration audio")
     assert_contains(article.text, 'hreflang="az"', "alternate language metadata")
 
@@ -106,7 +109,7 @@ def main() -> int:
     dashboard.raise_for_status()
     assert_contains(dashboard.text, "VREYC Admin Dashboard", "admin dashboard")
 
-    print("Production smoke checks passed: multilingual, AI audio narration, SEO, sitemap, robots, and admin auth.")
+    print("Production smoke checks passed: multilingual, image fallback, AI audio narration, SEO, sitemap, robots, and admin auth.")
     return 0
 
 

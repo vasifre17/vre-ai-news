@@ -14,8 +14,7 @@ services:
       - "8000:8000"
     volumes:
       - ./logs:/app/logs
-      - /opt/vre-ai-news/static/uploads/images:/app/static/uploads/images
-      - ./uploads:/app/uploads
+      - /opt/vre-ai-news/uploads/images:/app/static/uploads/images
       - ./static/audio:/app/static/audio
 
   db:

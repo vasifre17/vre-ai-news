@@ -30,7 +30,7 @@
 <main class="container section news-shell">
   {% if hero %}
   <section class="hero-news glass">
-    <a class="hero-image" href="{{ hero.url }}">{% if hero.article.image_url %}{% set hero_srcset = hero.article.image_url|image_srcset %}<img src="{{ hero.article.image_url|public_image_url }}" {% if hero_srcset %}srcset="{{ hero_srcset }}" sizes="(max-width: 1050px) 100vw, 58vw"{% endif %} alt="{{ hero.title }}" loading="eager">{% else %}<div class="image-placeholder">VREYC</div>{% endif %}</a>
+    <a class="hero-image" href="{{ hero.url }}">{% if hero.image_exists %}{% set hero_srcset = hero.article.image_url|image_srcset %}<img src="{{ hero.article.image_url|public_image_url }}" {% if hero_srcset %}srcset="{{ hero_srcset }}" sizes="(max-width: 1050px) 100vw, 58vw"{% endif %} alt="{{ hero.title }}" loading="eager">{% else %}<div class="image-placeholder">VREYC</div>{% endif %}</a>
     <div class="hero-copy">
       <span class="badge">{{ category_labels.get(hero.article.category, hero.article.category) if hero.article.category else ui.top_story }}</span>
       <h1><a href="{{ hero.url }}">{{ hero.title }}</a></h1>
@@ -45,14 +45,14 @@
       <div class="featured-slider" aria-label="{{ ui.featured }}">
         {% for row in featured_articles %}
         <article class="feature-card glass">
-          <a href="{{ row.url }}">{% if row.article.image_url %}{% set feature_srcset = row.article.image_url|image_srcset %}<img src="{{ row.article.image_url|public_image_url }}" {% if feature_srcset %}srcset="{{ feature_srcset }}" sizes="(max-width: 700px) 86vw, (max-width: 1050px) 70vw, 42vw"{% endif %} alt="{{ row.title }}" loading="lazy">{% else %}<div class="image-placeholder compact">VREYC</div>{% endif %}</a>
+          <a href="{{ row.url }}">{% if row.image_exists %}{% set feature_srcset = row.article.image_url|image_srcset %}<img src="{{ row.article.image_url|public_image_url }}" {% if feature_srcset %}srcset="{{ feature_srcset }}" sizes="(max-width: 700px) 86vw, (max-width: 1050px) 70vw, 42vw"{% endif %} alt="{{ row.title }}" loading="lazy">{% else %}<div class="image-placeholder compact">VREYC</div>{% endif %}</a>
           <div><span class="badge">{{ category_labels.get(row.article.category, row.article.category) if row.article.category else ui.news }}</span><h3><a href="{{ row.url }}">{{ row.title }}</a></h3><p>{{ row.summary }}</p><small>{{ row.article.published_at|format_published_at }}</small></div>
         </article>
         {% endfor %}
       </div>
       <div class="section-title"><p class="eyebrow">{{ ui.latest }}</p><h2>{{ ui.latest_news }}</h2></div>
       {% if latest_articles|length == 0 %}<div class="glass empty-state">{{ ui.no_articles }}</div>{% endif %}
-      <div class="latest-grid">{% for row in latest_articles %}<article class="news-card glass">{% if row.article.image_url %}{% set card_srcset = row.article.image_url|image_srcset %}<img src="{{row.article.image_url|public_image_url}}" {% if card_srcset %}srcset="{{ card_srcset }}" sizes="(max-width: 700px) 100vw, (max-width: 1050px) 50vw, 33vw"{% endif %} alt="{{row.title}}" loading="lazy">{% else %}<div class="image-placeholder compact">VREYC</div>{% endif %}<div class="card-body"><span class="badge">{{ category_labels.get(row.article.category, row.article.category) if row.article.category else ui.news }}</span><h3><a href="{{row.url}}">{{row.title}}</a></h3><p>{{row.summary}}</p><small>{{row.article.published_at|format_published_at}}</small></div></article>{% endfor %}</div>
+      <div class="latest-grid">{% for row in latest_articles %}<article class="news-card glass">{% if row.image_exists %}{% set card_srcset = row.article.image_url|image_srcset %}<img src="{{row.article.image_url|public_image_url}}" {% if card_srcset %}srcset="{{ card_srcset }}" sizes="(max-width: 700px) 100vw, (max-width: 1050px) 50vw, 33vw"{% endif %} alt="{{row.title}}" loading="lazy">{% else %}<div class="image-placeholder compact">VREYC</div>{% endif %}<div class="card-body"><span class="badge">{{ category_labels.get(row.article.category, row.article.category) if row.article.category else ui.news }}</span><h3><a href="{{row.url}}">{{row.title}}</a></h3><p>{{row.summary}}</p><small>{{row.article.published_at|format_published_at}}</small></div></article>{% endfor %}</div>
     </section>
     <aside class="trending-sidebar glass">
       <p class="eyebrow">{{ ui.trending }}</p><h2>{{ ui.most_watched }}</h2>

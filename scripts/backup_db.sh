@@ -3,7 +3,7 @@ set -euo pipefail
 
 BACKUP_DIR="${BACKUP_DIR:-./backups}"
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
-IMAGE_UPLOAD_BACKUP_DIR="${IMAGE_UPLOAD_BACKUP_DIR:-${IMAGE_UPLOAD_HOST_DIR:-/opt/vre-ai-news/static/uploads/images}}"
+IMAGE_UPLOAD_BACKUP_DIR="${IMAGE_UPLOAD_BACKUP_DIR:-${IMAGE_UPLOAD_HOST_DIR:-/opt/vre-ai-news/uploads/images}}"
 mkdir -p "$BACKUP_DIR"
 
 if [[ -z "${DATABASE_URL:-}" ]]; then

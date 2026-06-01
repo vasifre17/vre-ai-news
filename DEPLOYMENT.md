@@ -41,7 +41,7 @@ Set these required values before launch:
 - [ ] `DATABASE_URL=postgresql+psycopg2://vre_user:<POSTGRES_PASSWORD>@db:5432/vre_news` for Docker deployment.
 - [ ] `PUBLISH_MODE` is `manual` for editorial approval or `auto` for automatic publishing.
 - [ ] `FETCH_INTERVAL_MIN` is set to the desired fetch interval.
-- [ ] `IMAGE_UPLOAD_DIR=/app/static/uploads/images` and `IMAGE_UPLOAD_URL_PREFIX=/static/uploads/images` are set for Docker deployments.
+- [ ] `IMAGE_UPLOAD_DIR=/app/static/uploads/images` and `IMAGE_UPLOAD_URL_PREFIX=/static/uploads/images` are set for Docker deployments; Docker Compose bind-mounts host `/opt/vre-ai-news/uploads/images` there so existing `/static/uploads/images/...` article paths stay valid.
 
 Validate the production environment locally on the server:
 ```bash
@@ -50,11 +50,20 @@ python scripts/validate_production.py
 
 ## 5. Docker deployment (recommended)
 ```bash
-mkdir -p logs uploads static/audio /opt/vre-ai-news/static/uploads/images
+mkdir -p logs static/audio /opt/vre-ai-news/uploads/images
 docker compose up -d --build
 docker compose exec app python scripts/init_db.py
 docker compose logs -f app
 ```
+
+Persistence check after rebuild:
+```bash
+test -d /opt/vre-ai-news/uploads/images
+docker compose down
+docker compose up -d --build
+test -d /opt/vre-ai-news/uploads/images
+```
+Do not use `docker compose down -v` for routine deploys because it removes Docker-managed volumes; uploaded images remain protected in the host bind mount at `/opt/vre-ai-news/uploads/images`.
 
 ## 6. Nginx reverse proxy for vreyc.com
 ```bash
@@ -96,16 +105,25 @@ export DATABASE_URL='postgresql+psycopg2://vre_user:<POSTGRES_PASSWORD>@localhos
 ./scripts/backup_db.sh
 ```
 
-By default this also archives `/opt/vre-ai-news/static/uploads/images`, the persistent host directory mounted into the app container for article images. Override with `IMAGE_UPLOAD_BACKUP_DIR` only if you intentionally use a different host path. Add a daily cron job after confirming backups restore successfully.
+By default this also archives `/opt/vre-ai-news/uploads/images`, the persistent host directory mounted into the app container for article images. Override with `IMAGE_UPLOAD_BACKUP_DIR` only if you intentionally use a different host path. Add a daily cron job after confirming backups restore successfully.
 
 ## 10. Update flow
 ```bash
 cd /opt/vre-ai-news
 git pull
-mkdir -p /opt/vre-ai-news/static/uploads/images
+mkdir -p /opt/vre-ai-news/uploads/images
+docker compose down
 docker compose up -d --build
 docker compose exec app python scripts/init_db.py
 docker compose logs -f app
+```
+
+Persistence check after rebuild:
+```bash
+test -d /opt/vre-ai-news/uploads/images
+docker compose down
+docker compose up -d --build
+test -d /opt/vre-ai-news/uploads/images
 ```
 
 ## 11. Non-Docker systemd option

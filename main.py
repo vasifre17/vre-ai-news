@@ -35,6 +35,7 @@ LANGUAGE_LABELS = {"az": "Azerbaijani", "en": "English", "ru": "Russian", "tr": 
 UPLOAD_DIR = Path(settings.image_upload_dir)
 UPLOAD_URL_PREFIX = settings.image_upload_url_prefix
 LEGACY_UPLOAD_DIRS = (Path("uploads"), Path("static/uploads/images"))
+IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 IMAGE_VARIANT_WIDTHS = (480, 960, 1440)
 
@@ -306,11 +307,37 @@ def public_image_url(path: str | None) -> str:
     return value
 
 
-def image_srcset(path: str | None) -> str:
+def local_uploaded_image_path(path: str | None) -> Path | None:
     public_path = public_image_url(path)
     if not public_path.startswith(f"{UPLOAD_URL_PREFIX}/"):
+        return None
+    return UPLOAD_DIR / Path(public_path).name
+
+
+def uploaded_image_exists(path: str | None) -> bool:
+    public_path = public_image_url(path)
+    if not public_path:
+        return False
+    if public_path.startswith(("http://", "https://")):
+        return True
+    if public_path.startswith(f"{UPLOAD_URL_PREFIX}/"):
+        local_path = local_uploaded_image_path(public_path)
+        return bool(local_path and local_path.is_file())
+    if public_path.startswith("/static/"):
+        local_path = Path(public_path.lstrip("/"))
+        return local_path.is_file()
+    if public_path.startswith("/assets/"):
+        local_path = Path(public_path.lstrip("/"))
+        return local_path.is_file()
+    return True
+
+
+def image_srcset(path: str | None) -> str:
+    if not uploaded_image_exists(path):
         return ""
-    source = UPLOAD_DIR / Path(public_path).name
+    source = local_uploaded_image_path(path)
+    if not source:
+        return ""
     parts = []
     for width in IMAGE_VARIANT_WIDTHS:
         variant = source.with_name(f"{source.stem}-{width}.webp")
@@ -333,7 +360,7 @@ def preserve_legacy_uploads() -> None:
         for source in legacy_dir.iterdir():
             if not source.is_file():
                 continue
-            if source.suffix.lower() not in {".jpg", ".jpeg", ".png", ".webp", ".gif"}:
+            if source.suffix.lower() not in IMAGE_SUFFIXES:
                 continue
             target = UPLOAD_DIR / source.name
             if not target.exists():
@@ -382,6 +409,7 @@ def save_image_upload(file, alt_text: str = "") -> MediaAsset | None:
 templates.env.filters["format_published_at"] = format_published_at
 templates.env.filters["image_srcset"] = image_srcset
 templates.env.filters["public_image_url"] = public_image_url
+templates.env.filters["uploaded_image_exists"] = uploaded_image_exists
 
 
 def get_db():
@@ -484,7 +512,7 @@ def article_card(article: Article, language: str) -> dict:
     title = tr.title if tr and tr.title else article.title
     summary = tr.summary if tr and tr.summary else article.summary
     slug = tr.slug if tr and tr.slug else (article.slug or str(article.id))
-    return {"article": article, "t": tr, "title": title, "summary": summary, "url": article_url(language, slug)}
+    return {"article": article, "t": tr, "title": title, "summary": summary, "url": article_url(language, slug), "image_exists": uploaded_image_exists(article.image_url)}
 
 def get_settings_map(db) -> dict[str, str]:
     return {row.key: row.value for row in db.query(Setting).all()}
@@ -506,6 +534,19 @@ def article_form_context(db, article: Article | None = None) -> dict:
     translations = {lang: get_translation(article, lang) for lang in SUPPORTED_LANGUAGES} if article else {lang: None for lang in SUPPORTED_LANGUAGES}
     return {"categories": categories, "languages": SUPPORTED_LANGUAGES, "language_labels": LANGUAGE_LABELS, "translations": translations}
 
+
+
+def validate_image_references(db) -> list[str]:
+    """Return missing local image paths without mutating records or deleting uploads."""
+    missing: list[str] = []
+    rows = list(db.query(Article).filter(Article.image_url.isnot(None), Article.image_url != "").all())
+    rows.extend(db.query(MediaAsset).filter(MediaAsset.path.isnot(None), MediaAsset.path != "").all())
+    for row in rows:
+        path = getattr(row, "image_url", None) or getattr(row, "path", None)
+        public_path = public_image_url(path)
+        if public_path.startswith(f"{UPLOAD_URL_PREFIX}/") and not uploaded_image_exists(public_path):
+            missing.append(public_path)
+    return sorted(set(missing))
 
 def apply_schema_migrations(db) -> None:
     for statement in [
@@ -535,6 +576,9 @@ def startup() -> None:
     apply_schema_migrations(db)
     ensure_categories(db)
     ensure_slugs(db)
+    missing_images = validate_image_references(db)
+    if missing_images:
+        print(f"WARNING: {len(missing_images)} uploaded image reference(s) are missing from {UPLOAD_DIR}; VREYC placeholders will be shown: {missing_images}")
     db.close()
     scheduler.add_job(run_fetch_pipeline, "interval", minutes=max(13, min(17, settings.fetch_interval_min)), id="fetch_job", replace_existing=True)
     scheduler.add_job(generate_pending_narrations, "interval", seconds=45, id="narration_job", replace_existing=True)
@@ -589,7 +633,7 @@ def article_by_slug(slug: str, request: Request, language: str = "az", db=Depend
         related = related + db.query(Article).filter(Article.status == "published", Article.id != article.id, Article.category != article.category).order_by(Article.published_at.desc(), Article.created_at.desc()).limit(3 - len(related)).all()
     canonical = canonical_url(request, f"{language}/article/{view.slug or article.slug or article.id}")
     navigation = public_category_navigation(db)
-    return templates.TemplateResponse("public/article.html", {"request": request, "article": view, "root_article": article, "narration": narration, "related_articles": [article_card(a, language) for a in related], "categories": navigation["primary"], "secondary_categories": navigation["secondary"], "share_url": canonical, "site_url": settings.site_url, "canonical": canonical, "language": language, "languages": SUPPORTED_LANGUAGES, "alt_links": alt_links, "ui": public_labels(language), "category_labels": public_category_labels(language)})
+    return templates.TemplateResponse("public/article.html", {"request": request, "article": view, "root_article": article, "image_exists": uploaded_image_exists(article.image_url), "narration": narration, "related_articles": [article_card(a, language) for a in related], "categories": navigation["primary"], "secondary_categories": navigation["secondary"], "share_url": canonical, "site_url": settings.site_url, "canonical": canonical, "language": language, "languages": SUPPORTED_LANGUAGES, "alt_links": alt_links, "ui": public_labels(language), "category_labels": public_category_labels(language)})
 
 
 @app.get('/search', response_class=HTMLResponse)
@@ -909,7 +953,7 @@ async def upload_media(request: Request, file: UploadFile = File(...), alt_text:
 def delete_media(asset_id: int, request: Request, db=Depends(get_db), _=Depends(require_auth)):
     asset = db.query(MediaAsset).get(asset_id)
     if asset:
-        local_path = Path(asset.path.lstrip('/'))
+        local_path = local_uploaded_image_path(asset.path) or Path(asset.path.lstrip('/'))
         if local_path.exists() and local_path.is_file():
             local_path.unlink()
         for width in IMAGE_VARIANT_WIDTHS:

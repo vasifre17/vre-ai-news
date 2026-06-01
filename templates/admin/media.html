@@ -3,7 +3,7 @@
 {% set heading = 'Media upload library' %}
 {% block content %}
 <section class="panel">
-  <div class="panel-head wrap"><div><h2>Upload images</h2><p class="muted">Upload JPG, PNG, WEBP or GIF assets for article hero media. Files are stored in the uploads folder with responsive WEBP sizes.</p></div></div>
+  <div class="panel-head wrap"><div><h2>Upload images</h2><p class="muted">Upload JPG, PNG, WEBP or GIF assets for article hero media. Files are stored in the persistent uploads mount with responsive WEBP sizes.</p></div></div>
   <form method="post" enctype="multipart/form-data" class="upload-box">
     <input name="file" type="file" accept="image/jpeg,image/png,image/webp,image/gif" required>
     <input name="alt_text" placeholder="Alt text / caption">
@@ -13,8 +13,8 @@
 <section class="media-grid">
   {% for asset in assets %}
   <article class="media-card">
-    <div class="media-preview">{% if asset.content_type and asset.content_type.startswith('image') %}{% set media_srcset = asset.path|image_srcset %}<img src="{{ asset.path|public_image_url }}" {% if media_srcset %}srcset="{{ media_srcset }}" sizes="260px"{% endif %} alt="{{ asset.alt_text or asset.filename }}">{% else %}<span>{{ asset.content_type or 'file' }}</span>{% endif %}</div>
-    <div><strong>{{ asset.filename }}</strong><code>{{ asset.path }}</code><p>{{ asset.alt_text or 'No alt text' }}</p><small>{{ (asset.size_bytes or 0) // 1024 }} KB</small></div>
+    <div class="media-preview">{% if asset.content_type and asset.content_type.startswith('image') and asset.path|uploaded_image_exists %}{% set media_srcset = asset.path|image_srcset %}<img src="{{ asset.path|public_image_url }}" {% if media_srcset %}srcset="{{ media_srcset }}" sizes="260px"{% endif %} alt="{{ asset.alt_text or asset.filename }}">{% elif asset.content_type and asset.content_type.startswith('image') %}<div class="image-placeholder compact">VREYC</div>{% else %}<span>{{ asset.content_type or 'file' }}</span>{% endif %}</div>
+    <div><strong>{{ asset.filename }}</strong><code>{{ asset.path }}</code><p>{{ asset.alt_text or 'No alt text' }}</p><small>{{ (asset.size_bytes or 0) // 1024 }} KB{% if asset.content_type and asset.content_type.startswith('image') and not asset.path|uploaded_image_exists %} · missing file{% endif %}</small></div>
     <div class="actions"><button class="btn small copy-path" type="button" data-path="{{ asset.path }}">Copy URL</button></div>
     <form method="post" action="/admin/media/{{ asset.id }}/delete" onsubmit="return confirm('Delete media asset?')"><button class="btn small danger">Delete</button></form>
   </article>
