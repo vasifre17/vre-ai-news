@@ -14,16 +14,23 @@ categoryMenus.forEach((menu) => {
   const button = menu.querySelector('.category-menu-button');
   if (!button) return;
 
+  const dropdown = menu.querySelector('.category-dropdown');
+  if (dropdown) dropdown.hidden = true;
+
   button.addEventListener('click', (event) => {
     event.stopPropagation();
-    const isOpen = menu.classList.toggle('is-open');
+    const isOpen = !menu.classList.contains('is-open');
+    menu.classList.toggle('is-open', isOpen);
     button.setAttribute('aria-expanded', String(isOpen));
+    if (dropdown) dropdown.hidden = !isOpen;
 
     categoryMenus.forEach((otherMenu) => {
       if (otherMenu === menu) return;
       otherMenu.classList.remove('is-open');
       const otherButton = otherMenu.querySelector('.category-menu-button');
+      const otherDropdown = otherMenu.querySelector('.category-dropdown');
       if (otherButton) otherButton.setAttribute('aria-expanded', 'false');
+      if (otherDropdown) otherDropdown.hidden = true;
     });
   });
 });
@@ -33,7 +40,9 @@ document.addEventListener('click', (event) => {
     if (menu.contains(event.target)) return;
     menu.classList.remove('is-open');
     const button = menu.querySelector('.category-menu-button');
+    const dropdown = menu.querySelector('.category-dropdown');
     if (button) button.setAttribute('aria-expanded', 'false');
+    if (dropdown) dropdown.hidden = true;
   });
 });
 
@@ -42,7 +51,9 @@ document.addEventListener('keydown', (event) => {
   categoryMenus.forEach((menu) => {
     menu.classList.remove('is-open');
     const button = menu.querySelector('.category-menu-button');
+    const dropdown = menu.querySelector('.category-dropdown');
     if (button) button.setAttribute('aria-expanded', 'false');
+    if (dropdown) dropdown.hidden = true;
   });
 });
 
@@ -61,41 +72,3 @@ document.querySelectorAll('img').forEach((image) => {
     image.replaceWith(buildVreycPlaceholder(compact));
   });
 });
-
-const marketWidget = document.querySelector('[data-market-widget]');
-if (marketWidget) {
-  const endpoint = marketWidget.dataset.marketEndpoint;
-  const track = marketWidget.querySelector('[data-market-track]');
-  const status = marketWidget.querySelector('[data-market-status]');
-  const updateCards = (items = []) => {
-    items.forEach((item) => {
-      const card = track?.querySelector(`[data-symbol="${item.symbol}"]`);
-      if (!card) return;
-      const value = card.querySelector('[data-market-value]');
-      const change = card.querySelector('[data-market-change]');
-      if (value) value.textContent = item.value;
-      if (change) {
-        change.textContent = item.change;
-        change.classList.toggle('is-negative', String(item.change || '').trim().startsWith('-'));
-      }
-    });
-  };
-  const refreshMarkets = async () => {
-    if (!endpoint) return;
-    try {
-      const response = await fetch(endpoint, { headers: { Accept: 'application/json' }, cache: 'no-store' });
-      if (!response.ok) throw new Error(`Market refresh failed: ${response.status}`);
-      const payload = await response.json();
-      updateCards(payload.items || []);
-      if (status) {
-        const sourceText = payload.source === 'provider' ? 'Live provider data' : 'Safe fallback data';
-        status.textContent = `${sourceText} • ${new Date(payload.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-      }
-    } catch (error) {
-      if (status) status.textContent = 'Safe fallback data • offline refresh ready';
-    }
-  };
-
-  refreshMarkets();
-  window.setInterval(refreshMarkets, 5 * 60 * 1000);
-}

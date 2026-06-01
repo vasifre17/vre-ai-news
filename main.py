@@ -1,5 +1,4 @@
-from datetime import datetime, timezone
-import os
+from datetime import datetime
 import re
 import shutil
 from pathlib import Path
@@ -7,7 +6,7 @@ from uuid import uuid4
 from sqlalchemy import or_, text
 from fastapi import FastAPI, Request, Depends, Form, HTTPException, UploadFile, File
 from PIL import Image, UnidentifiedImageError
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
@@ -54,8 +53,6 @@ PUBLIC_LABELS = {
         "featured": "Seçilmiş",
         "editor_picks": "Redaktorun AI seçimləri",
         "trending": "Trend",
-        "live_briefing": "Canlı icmal",
-        "live_briefing_text": "AI tərəfindən seçilmiş başlıqlar, təsdiqlənmiş xülasələr və hadisələr inkişaf etdikcə yenilənən redaksiya konteksti.",
         "audio_narration": "Audio səsləndirmə",
         "share": "Paylaş",
         "play": "Oxut",
@@ -75,8 +72,6 @@ PUBLIC_LABELS = {
         "founder_ceo": "VREYC-in təsisçisi və baş direktoru Vasif Cəbrayıllıdır.",
         "email": "E-poçt",
         "more_categories": "Daha çox kateqoriya",
-        "live_markets": "Canlı bazar göstəriciləri",
-        "live_markets_fallback": "Təhlükəsiz ehtiyat məlumatlar, 5 dəqiqədən bir yenilənir",
     },
     "en": {
         "latest": "Latest",
@@ -91,8 +86,6 @@ PUBLIC_LABELS = {
         "featured": "Featured",
         "editor_picks": "Editor's AI picks",
         "trending": "Trending",
-        "live_briefing": "Live briefing",
-        "live_briefing_text": "AI-curated headlines, verified summaries and newsroom-ready context updated as stories develop.",
         "audio_narration": "Audio narration",
         "share": "Share",
         "play": "Play",
@@ -112,8 +105,6 @@ PUBLIC_LABELS = {
         "founder_ceo": "VREYC founder and chief executive is Vasif Jabrayilli.",
         "email": "Email",
         "more_categories": "More categories",
-        "live_markets": "Live market pulse",
-        "live_markets_fallback": "Safe fallback data, refreshes every 5 minutes",
     },
     "ru": {
         "latest": "Последнее",
@@ -128,8 +119,6 @@ PUBLIC_LABELS = {
         "featured": "Избранное",
         "editor_picks": "Выбор AI-редакции",
         "trending": "В тренде",
-        "live_briefing": "Прямой брифинг",
-        "live_briefing_text": "Подобранные AI заголовки, проверенные резюме и редакционный контекст обновляются по мере развития событий.",
         "audio_narration": "Аудиоозвучка",
         "share": "Поделиться",
         "play": "Воспроизвести",
@@ -149,8 +138,6 @@ PUBLIC_LABELS = {
         "founder_ceo": "VREYC founder and chief executive is Vasif Jabrayilli.",
         "email": "Эл. почта",
         "more_categories": "Больше категорий",
-        "live_markets": "Рыночные показатели онлайн",
-        "live_markets_fallback": "Безопасные резервные данные, обновление каждые 5 минут",
     },
     "tr": {
         "latest": "Son",
@@ -165,8 +152,6 @@ PUBLIC_LABELS = {
         "featured": "Öne çıkan",
         "editor_picks": "Editörün AI seçimleri",
         "trending": "Trend",
-        "live_briefing": "Canlı brifing",
-        "live_briefing_text": "AI tarafından seçilen başlıklar, doğrulanmış özetler ve haber geliştikçe güncellenen editoryal bağlam.",
         "audio_narration": "Sesli anlatım",
         "share": "Paylaş",
         "play": "Oynat",
@@ -186,8 +171,6 @@ PUBLIC_LABELS = {
         "founder_ceo": "VREYC founder and chief executive is Vasif Jabrayilli.",
         "email": "E-posta",
         "more_categories": "Daha fazla kategori",
-        "live_markets": "Canlı piyasa göstergeleri",
-        "live_markets_fallback": "Güvenli yedek veriler, her 5 dakikada yenilenir",
     },
     "zh": {
         "latest": "最新",
@@ -202,8 +185,6 @@ PUBLIC_LABELS = {
         "featured": "精选",
         "editor_picks": "AI 编辑精选",
         "trending": "热门",
-        "live_briefing": "实时简报",
-        "live_briefing_text": "AI 精选标题、已验证摘要和适合 newsroom 的背景会随事件发展更新。",
         "audio_narration": "音频播报",
         "share": "分享",
         "play": "播放",
@@ -223,8 +204,6 @@ PUBLIC_LABELS = {
         "founder_ceo": "VREYC founder and chief executive is Vasif Jabrayilli.",
         "email": "电子邮件",
         "more_categories": "更多分类",
-        "live_markets": "实时市场脉搏",
-        "live_markets_fallback": "安全备用数据，每 5 分钟刷新",
     },
     "es": {
         "latest": "Último",
@@ -239,8 +218,6 @@ PUBLIC_LABELS = {
         "featured": "Destacadas",
         "editor_picks": "Selección AI del editor",
         "trending": "Tendencias",
-        "live_briefing": "Resumen en vivo",
-        "live_briefing_text": "Titulares seleccionados por AI, resúmenes verificados y contexto editorial actualizado a medida que evolucionan las historias.",
         "audio_narration": "Narración de audio",
         "share": "Compartir",
         "play": "Reproducir",
@@ -260,8 +237,6 @@ PUBLIC_LABELS = {
         "founder_ceo": "VREYC founder and chief executive is Vasif Jabrayilli.",
         "email": "Correo",
         "more_categories": "Más categorías",
-        "live_markets": "Pulso de mercados en vivo",
-        "live_markets_fallback": "Datos seguros de respaldo, se actualizan cada 5 minutos",
     },
 }
 
@@ -298,37 +273,6 @@ DEFAULT_CATEGORIES = [
     {"name": "Science and Education", "description": "Science, schools, universities and education policy.", "color": "#14b8a6"},
     {"name": "Show Business", "description": "Entertainment, celebrities, culture and show business.", "color": "#d946ef"},
 ]
-
-MARKET_WIDGETS = [
-    {"symbol": "USD_AZN", "label": "USD/AZN", "value": "1.7000", "change": "0.00%"},
-    {"symbol": "EUR_AZN", "label": "EUR/AZN", "value": "1.84", "change": "+0.10%"},
-    {"symbol": "TRY_AZN", "label": "TRY/AZN", "value": "0.052", "change": "-0.08%"},
-    {"symbol": "RUB_AZN", "label": "RUB/AZN", "value": "0.019", "change": "+0.04%"},
-    {"symbol": "BTC_USD", "label": "BTC/USD", "value": "$68,450", "change": "+1.24%"},
-    {"symbol": "ETH_USD", "label": "ETH/USD", "value": "$3,620", "change": "+0.82%"},
-    {"symbol": "BRENT", "label": "Brent Oil", "value": "$82.40", "change": "+0.31%"},
-    {"symbol": "GOLD", "label": "Gold", "value": "$2,345", "change": "+0.18%"},
-]
-
-LIVE_MARKETS_REFRESH_SECONDS = 300
-
-
-def market_widgets_payload() -> dict:
-    """Return live-market card data with a future API integration seam.
-
-    Configure LIVE_MARKETS_API_KEY and replace the provider block below with a
-    real quotes client when a market-data vendor is selected. Until then, the
-    endpoint returns deterministic, safe fallback values so the homepage never
-    depends on an unavailable third-party API.
-    """
-    provider_ready = bool(os.getenv("LIVE_MARKETS_API_KEY"))
-    return {
-        "source": "fallback",
-        "providerConfigured": provider_ready,
-        "refreshSeconds": LIVE_MARKETS_REFRESH_SECONDS,
-        "updatedAt": datetime.now(timezone.utc).isoformat(),
-        "items": MARKET_WIDGETS,
-    }
 
 
 def slugify(text: str) -> str:
@@ -620,12 +564,7 @@ def home(request: Request, language: str = "az", q: str = "", category: str = ""
     hero = featured_cards[0] if featured_cards else (article_cards[0] if article_cards else None)
     latest_cards = [row for row in article_cards if not hero or row["article"].id != hero["article"].id]
     categories = public_category_navigation(db)
-    return templates.TemplateResponse("public/home.html", {"request": request, "articles": article_cards, "latest_articles": latest_cards, "featured_articles": featured_cards, "trending_articles": trending_cards, "hero": hero, "categories": categories["primary"], "secondary_categories": categories["secondary"], "market_widgets": MARKET_WIDGETS, "q": q, "category": category, "site_url": settings.site_url, "canonical": canonical_url(request, f'{language}/'), "language": language, "languages": SUPPORTED_LANGUAGES, "ui": public_labels(language), "category_labels": public_category_labels(language)})
-
-
-@app.get("/api/markets/live")
-def live_markets():
-    return JSONResponse(market_widgets_payload())
+    return templates.TemplateResponse("public/home.html", {"request": request, "articles": article_cards, "latest_articles": latest_cards, "featured_articles": featured_cards, "trending_articles": trending_cards, "hero": hero, "categories": categories["primary"], "secondary_categories": categories["secondary"], "q": q, "category": category, "site_url": settings.site_url, "canonical": canonical_url(request, f'{language}/'), "language": language, "languages": SUPPORTED_LANGUAGES, "ui": public_labels(language), "category_labels": public_category_labels(language)})
 
 
 @app.get("/article/{slug}", response_class=HTMLResponse)

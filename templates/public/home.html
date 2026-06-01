@@ -22,28 +22,12 @@
   <nav class="categories container" aria-label="{{ ui.news }}">
     <div class="primary-categories">{% for c in categories %}<a href="/{{ language }}/?category={{ c.name }}" style="--cat-color: {{ c.color or '#48a6ff' }}">{{ category_labels.get(c.name, c.name) }}</a>{% endfor %}</div>
     {% if secondary_categories %}<div class="category-menu">
-      <button class="category-menu-button" type="button" aria-label="{{ ui.more_categories }}" aria-expanded="false" aria-controls="category-dropdown-{{ language }}"><span aria-hidden="true">☰</span></button>
-      <div class="category-dropdown" id="category-dropdown-{{ language }}">{% for c in secondary_categories %}<a href="/{{ language }}/?category={{ c.name }}" style="--cat-color: {{ c.color or '#48a6ff' }}">{{ category_labels.get(c.name, c.name) }}</a>{% endfor %}</div>
+      <button class="category-menu-button" type="button" aria-label="{{ ui.more_categories }}" aria-haspopup="true" aria-expanded="false" aria-controls="category-dropdown-{{ language }}"><span aria-hidden="true">☰</span></button>
+      <div class="category-dropdown" id="category-dropdown-{{ language }}" hidden>{% for c in secondary_categories %}<a href="/{{ language }}/?category={{ c.name }}" style="--cat-color: {{ c.color or '#48a6ff' }}">{{ category_labels.get(c.name, c.name) }}</a>{% endfor %}</div>
     </div>{% endif %}
   </nav>
 </header>
 <main class="container section news-shell">
-  <section class="live-market-ticker glass" data-market-widget data-market-endpoint="/api/markets/live" aria-label="{{ ui.live_markets }}">
-    <div class="ticker-heading">
-      <span>{{ ui.live_markets }}</span>
-      <small data-market-status>{{ ui.live_markets_fallback }}</small>
-    </div>
-    <div class="ticker-track" data-market-track>
-      {% for item in market_widgets %}
-      <article class="market-card" data-symbol="{{ item.symbol }}">
-        <span>{{ item.label }}</span>
-        <strong data-market-value>{{ item.value }}</strong>
-        <small data-market-change>{{ item.change }}</small>
-      </article>
-      {% endfor %}
-    </div>
-  </section>
-  <section class="breaking glass"><span>{{ ui.live_briefing }}</span><p>{{ ui.live_briefing_text }}</p></section>
   {% if hero %}
   <section class="hero-news glass">
     <a class="hero-image" href="{{ hero.url }}">{% if hero.article.image_url %}{% set hero_srcset = hero.article.image_url|image_srcset %}<img src="{{ hero.article.image_url|public_image_url }}" {% if hero_srcset %}srcset="{{ hero_srcset }}" sizes="(max-width: 1050px) 100vw, 58vw"{% endif %} alt="{{ hero.title }}" loading="eager">{% else %}<div class="image-placeholder">VREYC</div>{% endif %}</a>
