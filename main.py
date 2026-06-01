@@ -32,8 +32,9 @@ scheduler = BackgroundScheduler()
 ai_engine = AIEngine()
 SUPPORTED_LANGUAGES = ["az", "en", "ru", "tr", "zh", "es"]
 LANGUAGE_LABELS = {"az": "Azerbaijani", "en": "English", "ru": "Russian", "tr": "Turkish", "zh": "Chinese", "es": "Spanish"}
-UPLOAD_DIR = Path("static/uploads/images")
-UPLOAD_URL_PREFIX = "/static/uploads/images"
+UPLOAD_DIR = Path(settings.image_upload_dir)
+UPLOAD_URL_PREFIX = settings.image_upload_url_prefix
+LEGACY_UPLOAD_DIRS = (Path("uploads"), Path("static/uploads/images"))
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 IMAGE_VARIANT_WIDTHS = (480, 960, 1440)
 
@@ -297,7 +298,14 @@ def public_image_url(path: str | None) -> str:
     if not path:
         return ""
     value = path.strip()
-    if value.startswith(("http://", "https://", "/")):
+    upload_dir = str(UPLOAD_DIR)
+    if value == upload_dir or value.startswith(f"{upload_dir}/"):
+        return f"{UPLOAD_URL_PREFIX}/{Path(value).name}"
+    if value.startswith(("http://", "https://")):
+        return value
+    if value.startswith(f"{UPLOAD_URL_PREFIX}/"):
+        return value
+    if value.startswith("/"):
         return value
     if value.startswith(("static/", "assets/")):
         return f"/{value}"
@@ -306,15 +314,36 @@ def public_image_url(path: str | None) -> str:
 
 def image_srcset(path: str | None) -> str:
     public_path = public_image_url(path)
-    if not public_path.startswith(UPLOAD_URL_PREFIX):
+    if not public_path.startswith(f"{UPLOAD_URL_PREFIX}/"):
         return ""
-    source = Path(public_path.lstrip("/"))
+    source = UPLOAD_DIR / Path(public_path).name
     parts = []
     for width in IMAGE_VARIANT_WIDTHS:
         variant = source.with_name(f"{source.stem}-{width}.webp")
         if variant.exists():
-            parts.append(f"/{variant.as_posix()} {width}w")
+            parts.append(f"{UPLOAD_URL_PREFIX}/{variant.name} {width}w")
     return ", ".join(parts)
+
+
+def preserve_legacy_uploads() -> None:
+    """Copy any images found in old local upload locations into the persistent upload mount."""
+    resolved_upload_dir = UPLOAD_DIR.resolve()
+    for legacy_dir in LEGACY_UPLOAD_DIRS:
+        if not legacy_dir.exists() or not legacy_dir.is_dir():
+            continue
+        try:
+            if legacy_dir.resolve() == resolved_upload_dir:
+                continue
+        except OSError:
+            continue
+        for source in legacy_dir.iterdir():
+            if not source.is_file():
+                continue
+            if source.suffix.lower() not in {".jpg", ".jpeg", ".png", ".webp", ".gif"}:
+                continue
+            target = UPLOAD_DIR / source.name
+            if not target.exists():
+                shutil.copy2(source, target)
 
 
 def save_image_upload(file, alt_text: str = "") -> MediaAsset | None:
@@ -507,6 +536,7 @@ def startup() -> None:
     settings.validate_production_or_raise()
     init_db()
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    preserve_legacy_uploads()
     db = SessionLocal()
     apply_schema_migrations(db)
     ensure_categories(db)

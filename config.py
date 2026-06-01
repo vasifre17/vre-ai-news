@@ -29,6 +29,8 @@ class Settings(BaseModel):
     fetch_interval_min: int = int(os.getenv("FETCH_INTERVAL_MIN", "15"))
     pexels_api_key: str = os.getenv("PEXELS_API_KEY", "")
     site_url: str = os.getenv("SITE_URL", PRODUCTION_SITE_URL).rstrip("/")
+    image_upload_dir: str = os.getenv("IMAGE_UPLOAD_DIR", "static/uploads/images")
+    image_upload_url_prefix: str = os.getenv("IMAGE_UPLOAD_URL_PREFIX", "/static/uploads/images").rstrip("/")
 
     @property
     def is_production(self) -> bool:

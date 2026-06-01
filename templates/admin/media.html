@@ -13,7 +13,7 @@
 <section class="media-grid">
   {% for asset in assets %}
   <article class="media-card">
-    <div class="media-preview">{% if asset.content_type and asset.content_type.startswith('image') %}{% set media_srcset = asset.path|image_srcset %}<img src="{{ asset.path }}" {% if media_srcset %}srcset="{{ media_srcset }}" sizes="260px"{% endif %} alt="{{ asset.alt_text or asset.filename }}">{% else %}<span>{{ asset.content_type or 'file' }}</span>{% endif %}</div>
+    <div class="media-preview">{% if asset.content_type and asset.content_type.startswith('image') %}{% set media_srcset = asset.path|image_srcset %}<img src="{{ asset.path|public_image_url }}" {% if media_srcset %}srcset="{{ media_srcset }}" sizes="260px"{% endif %} alt="{{ asset.alt_text or asset.filename }}">{% else %}<span>{{ asset.content_type or 'file' }}</span>{% endif %}</div>
     <div><strong>{{ asset.filename }}</strong><code>{{ asset.path }}</code><p>{{ asset.alt_text or 'No alt text' }}</p><small>{{ (asset.size_bytes or 0) // 1024 }} KB</small></div>
     <div class="actions"><button class="btn small copy-path" type="button" data-path="{{ asset.path }}">Copy URL</button></div>
     <form method="post" action="/admin/media/{{ asset.id }}/delete" onsubmit="return confirm('Delete media asset?')"><button class="btn small danger">Delete</button></form>
