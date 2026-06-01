@@ -33,7 +33,7 @@
       <label>Image alt text<input name="hero_alt_text" value="{{ article.title if article else '' }}" placeholder="Describe the image for accessibility"></label>
       <div class="admin-image-preview" data-empty="VREYC">
         {% if article and article.image_url %}
-        <img id="heroPreview" src="{{ article.image_url }}" alt="Hero image preview">
+        <img id="heroPreview" src="{{ article.image_url|public_image_url }}" alt="Hero image preview">
         {% else %}
         <div id="heroPreviewPlaceholder" class="image-placeholder compact">VREYC</div>
         <img id="heroPreview" src="" alt="Hero image preview" hidden>

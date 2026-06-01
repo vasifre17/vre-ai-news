@@ -41,6 +41,7 @@ Set these required values before launch:
 - [ ] `DATABASE_URL=postgresql+psycopg2://vre_user:<POSTGRES_PASSWORD>@db:5432/vre_news` for Docker deployment.
 - [ ] `PUBLISH_MODE` is `manual` for editorial approval or `auto` for automatic publishing.
 - [ ] `FETCH_INTERVAL_MIN` is set to the desired fetch interval.
+- [ ] `IMAGE_UPLOAD_DIR=/app/static/uploads/images` and `IMAGE_UPLOAD_URL_PREFIX=/static/uploads/images` are set for Docker deployments.
 
 Validate the production environment locally on the server:
 ```bash
@@ -49,7 +50,7 @@ python scripts/validate_production.py
 
 ## 5. Docker deployment (recommended)
 ```bash
-mkdir -p logs uploads static/audio
+mkdir -p logs uploads static/audio /opt/vre-ai-news/static/uploads/images
 docker compose up -d --build
 docker compose exec app python scripts/init_db.py
 docker compose logs -f app
@@ -95,12 +96,13 @@ export DATABASE_URL='postgresql+psycopg2://vre_user:<POSTGRES_PASSWORD>@localhos
 ./scripts/backup_db.sh
 ```
 
-Add a daily cron job after confirming backups restore successfully.
+By default this also archives `/opt/vre-ai-news/static/uploads/images`, the persistent host directory mounted into the app container for article images. Override with `IMAGE_UPLOAD_BACKUP_DIR` only if you intentionally use a different host path. Add a daily cron job after confirming backups restore successfully.
 
 ## 10. Update flow
 ```bash
 cd /opt/vre-ai-news
 git pull
+mkdir -p /opt/vre-ai-news/static/uploads/images
 docker compose up -d --build
 docker compose exec app python scripts/init_db.py
 docker compose logs -f app

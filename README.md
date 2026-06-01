@@ -32,7 +32,7 @@ uvicorn main:app --reload
 - Set `ENVIRONMENT=production` and `SITE_URL=https://vreyc.com` in `.env`.
 - Run `python scripts/validate_production.py` before starting production.
 - Run `python scripts/production_smoke_check.py` before live launch verification.
-- Docker + PostgreSQL: use `docker compose up -d --build`
+- Docker + PostgreSQL: use `docker compose up -d --build`; uploaded article images persist in `/opt/vre-ai-news/static/uploads/images` mounted to `/app/static/uploads/images`.
 - VPS guide: see `DEPLOYMENT.md`
 - Security baseline: see `SECURITY.md`
 
