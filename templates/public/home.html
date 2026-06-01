@@ -21,10 +21,10 @@
   </nav>
   <nav class="categories container" aria-label="{{ ui.news }}">
     <div class="primary-categories">{% for c in categories %}<a href="/{{ language }}/?category={{ c.name }}" style="--cat-color: {{ c.color or '#48a6ff' }}">{{ category_labels.get(c.name, c.name) }}</a>{% endfor %}</div>
-    {% if secondary_categories %}<details class="category-menu">
-      <summary aria-label="{{ ui.news }}"><span></span><span></span><span></span></summary>
-      <div class="category-dropdown">{% for c in secondary_categories %}<a href="/{{ language }}/?category={{ c.name }}" style="--cat-color: {{ c.color or '#48a6ff' }}">{{ category_labels.get(c.name, c.name) }}</a>{% endfor %}</div>
-    </details>{% endif %}
+    {% if secondary_categories %}<div class="category-menu">
+      <button class="category-menu-button" type="button" aria-label="{{ ui.more_categories }}" aria-expanded="false" aria-controls="category-dropdown-{{ language }}"><span></span><span></span><span></span></button>
+      <div class="category-dropdown" id="category-dropdown-{{ language }}">{% for c in secondary_categories %}<a href="/{{ language }}/?category={{ c.name }}" style="--cat-color: {{ c.color or '#48a6ff' }}">{{ category_labels.get(c.name, c.name) }}</a>{% endfor %}</div>
+    </div>{% endif %}
   </nav>
 </header>
 <main class="container section news-shell">
@@ -84,5 +84,6 @@
     </dl>
   </section>
 </footer>
+<script src="/assets/app.js" defer></script>
 </body>
 </html>

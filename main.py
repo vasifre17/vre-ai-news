@@ -73,6 +73,7 @@ PUBLIC_LABELS = {
         "tiktok": "TikTok",
         "founder_ceo": "VREYC-in təsisçisi və baş direktoru Vasif Cəbrayıllıdır.",
         "email": "E-poçt",
+        "more_categories": "Daha çox kateqoriya",
     },
     "en": {
         "latest": "Latest",
@@ -107,6 +108,7 @@ PUBLIC_LABELS = {
         "tiktok": "TikTok",
         "founder_ceo": "VREYC founder and chief executive is Vasif Jabrayilli.",
         "email": "Email",
+        "more_categories": "More categories",
     },
     "ru": {
         "latest": "Последнее",
@@ -141,6 +143,7 @@ PUBLIC_LABELS = {
         "tiktok": "TikTok",
         "founder_ceo": "VREYC founder and chief executive is Vasif Jabrayilli.",
         "email": "Эл. почта",
+        "more_categories": "Больше категорий",
     },
     "tr": {
         "latest": "Son",
@@ -175,6 +178,7 @@ PUBLIC_LABELS = {
         "tiktok": "TikTok",
         "founder_ceo": "VREYC founder and chief executive is Vasif Jabrayilli.",
         "email": "E-posta",
+        "more_categories": "Daha fazla kategori",
     },
     "zh": {
         "latest": "最新",
@@ -209,6 +213,7 @@ PUBLIC_LABELS = {
         "tiktok": "TikTok",
         "founder_ceo": "VREYC founder and chief executive is Vasif Jabrayilli.",
         "email": "电子邮件",
+        "more_categories": "更多分类",
     },
     "es": {
         "latest": "Último",
@@ -243,6 +248,7 @@ PUBLIC_LABELS = {
         "tiktok": "TikTok",
         "founder_ceo": "VREYC founder and chief executive is Vasif Jabrayilli.",
         "email": "Correo",
+        "more_categories": "Más categorías",
     },
 }
 
