@@ -14,7 +14,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-RUN mkdir -p /app/logs /app/uploads /app/static/uploads/images
+RUN mkdir -p /app/logs /app/uploads /opt/vre-ai-news/uploads/images
 
 EXPOSE 8000
 

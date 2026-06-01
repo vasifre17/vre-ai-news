@@ -32,7 +32,7 @@ uvicorn main:app --reload
 - Set `ENVIRONMENT=production` and `SITE_URL=https://vreyc.com` in `.env`.
 - Run `python scripts/validate_production.py` before starting production.
 - Run `python scripts/production_smoke_check.py` before live launch verification.
-- Docker + PostgreSQL: use `docker compose up -d --build`; uploaded article images persist in `/opt/vre-ai-news/uploads/images` mounted to `/app/static/uploads/images`.
+- Docker + PostgreSQL: use `docker compose up -d --build`; uploaded article images persist directly in `/opt/vre-ai-news/uploads/images`.
 - Rebuilds, startups, migrations, and normal deploys do not delete uploads; missing local image files render the built-in VREYC placeholder while existing `/static/uploads/images/...` paths remain valid.
 - VPS guide: see `DEPLOYMENT.md`
 - Security baseline: see `SECURITY.md`

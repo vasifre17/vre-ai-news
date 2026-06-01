@@ -7,14 +7,11 @@ services:
       - .env
     depends_on:
       - db
-    environment:
-      IMAGE_UPLOAD_DIR: /app/static/uploads/images
-      IMAGE_UPLOAD_URL_PREFIX: /static/uploads/images
     ports:
       - "8000:8000"
     volumes:
       - ./logs:/app/logs
-      - /opt/vre-ai-news/uploads/images:/app/static/uploads/images
+      - /opt/vre-ai-news/uploads/images:/opt/vre-ai-news/uploads/images
       - ./static/audio:/app/static/audio
 
   db:

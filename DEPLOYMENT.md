@@ -41,7 +41,7 @@ Set these required values before launch:
 - [ ] `DATABASE_URL=postgresql+psycopg2://vre_user:<POSTGRES_PASSWORD>@db:5432/vre_news` for Docker deployment.
 - [ ] `PUBLISH_MODE` is `manual` for editorial approval or `auto` for automatic publishing.
 - [ ] `FETCH_INTERVAL_MIN` is set to the desired fetch interval.
-- [ ] `IMAGE_UPLOAD_DIR=/app/static/uploads/images` and `IMAGE_UPLOAD_URL_PREFIX=/static/uploads/images` are set for Docker deployments; Docker Compose bind-mounts host `/opt/vre-ai-news/uploads/images` there so existing `/static/uploads/images/...` article paths stay valid.
+- [ ] article uploads use the fixed host path `/opt/vre-ai-news/uploads/images`; Docker Compose bind-mounts that same path into the container, and the app serves it at `/static/uploads/images/...` so existing article paths stay valid.
 
 Validate the production environment locally on the server:
 ```bash
@@ -105,7 +105,7 @@ export DATABASE_URL='postgresql+psycopg2://vre_user:<POSTGRES_PASSWORD>@localhos
 ./scripts/backup_db.sh
 ```
 
-By default this also archives `/opt/vre-ai-news/uploads/images`, the persistent host directory mounted into the app container for article images. Override with `IMAGE_UPLOAD_BACKUP_DIR` only if you intentionally use a different host path. Add a daily cron job after confirming backups restore successfully.
+This also archives `/opt/vre-ai-news/uploads/images`, the persistent host directory used by the app for article images. Add a daily cron job after confirming backups restore successfully.
 
 ## 10. Update flow
 ```bash
