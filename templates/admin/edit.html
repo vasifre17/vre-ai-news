@@ -47,9 +47,8 @@
     </div>
     <label>Homepage order<input name="homepage_order" type="number" value="{{ article.homepage_order if article else 100 }}" min="0" step="1"></label>
     <label class="check"><input type="checkbox" name="is_featured" {{ 'checked' if article and article.is_featured else '' }}> Feature on homepage slider</label>
-    <label class="check"><input type="checkbox" name="is_trending" {{ 'checked' if article and article.is_trending else '' }}> Mark as trending</label>
     <label class="check"><input type="checkbox" name="narration_enabled" {{ 'checked' if not article or article.narration_enabled else '' }}> Enable audio narration</label>
-    <div class="side-actions"><button class="btn primary full" type="submit">Save changes</button><a class="btn full" href="/admin/articles">Back to articles</a></div>
+    <div class="side-actions"><button class="btn primary full" type="submit">Save changes</button>{% if article %}<a class="btn full" href="/admin/articles/{{ article.id }}/analytics">View analytics</a>{% endif %}<a class="btn full" href="/admin/articles">Back to articles</a></div>
     {% if article %}<button class="btn full" type="submit" formaction="/admin/articles/{{ article.id }}/translations/generate" formmethod="post">Generate missing translations</button>{% endif %}
     {% if article %}<hr><h3>Narration</h3><p class="muted">Status: {{ narration.status if narration else 'pending' }}</p><div class="actions vertical"><form method="post" action="/admin/articles/{{ article.id }}/narration/regenerate"><button class="btn small" type="submit">Regenerate</button></form><form method="post" action="/admin/articles/{{ article.id }}/narration/delete"><button class="btn small danger" type="submit">Delete narration</button></form></div>{% if narration and narration.audio_path %}<audio controls src="{{ narration.audio_path }}"></audio>{% endif %}{% endif %}
   </aside>

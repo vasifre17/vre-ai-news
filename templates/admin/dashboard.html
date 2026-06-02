@@ -2,12 +2,26 @@
 {% set title = 'Dashboard | VREYC Admin' %}
 {% set heading = 'Command center' %}
 {% block content %}
+<section class="stats-grid dashboard-stats analytics-stats">
+  <article class="stat-card"><span>Total views</span><strong>{{ analytics_totals.total }}</strong><small>Unique article visits stored in database</small></article>
+  <article class="stat-card"><span>Views today</span><strong>{{ analytics_totals.today }}</strong><small>Since UTC midnight</small></article>
+  <article class="stat-card"><span>Views last 7 days</span><strong>{{ analytics_totals.week }}</strong><small>Rolling weekly traffic</small></article>
+  <article class="stat-card"><span>Views last 30 days</span><strong>{{ analytics_totals.month }}</strong><small>Rolling monthly traffic</small></article>
+  <article class="stat-card"><span>Top category</span><strong>{{ top_category.category if top_category else '—' }}</strong><small>{{ top_category.views if top_category else 0 }} view{{ '' if top_category and top_category.views == 1 else 's' }}</small></article>
+</section>
+
 <section class="stats-grid dashboard-stats">
   <article class="stat-card"><span>Total articles</span><strong>{{ total_articles }}</strong><small>Complete editorial archive</small></article>
   <article class="stat-card"><span>Published articles</span><strong>{{ published }}</strong><small>Live on the public site</small></article>
   <article class="stat-card"><span>Draft articles</span><strong>{{ drafts }}</strong><small>Awaiting editorial review</small></article>
   <article class="stat-card"><span>Total categories</span><strong>{{ categories }}</strong><small>Taxonomy sections</small></article>
   <article class="stat-card"><span>Total images</span><strong>{{ media_count }}</strong><small>Uploaded media assets</small></article>
+</section>
+
+<section class="panel-grid three analytics-charts">
+  <div class="panel"><h2>Daily traffic</h2><canvas data-chart="daily" height="170"></canvas></div>
+  <div class="panel"><h2>Weekly traffic</h2><canvas data-chart="weekly" height="170"></canvas></div>
+  <div class="panel"><h2>Monthly traffic</h2><canvas data-chart="monthly" height="170"></canvas></div>
 </section>
 
 <section class="panel-grid two">
@@ -18,12 +32,40 @@
     <div class="workflow-row"><span>Published inventory</span><strong>{{ published }} live</strong></div>
   </div>
   <div class="panel">
-    <h2>AI production tools</h2>
-    {% if not ai_translation_status.configured %}<div class="alert danger">{{ ai_translation_status.message }}</div>{% endif %}
-    <p class="muted">Translations and narration stay available while article management gains CMS-style reporting.</p>
-    <div class="tool-list">
-      <span>Automatic AZ → EN/RU/TR/ZH/ES translation</span><span>SEO field translation</span><span>Image-safe generation</span><span>Audio narration review</span>
-    </div>
+    <h2>Category analytics</h2>
+    <div class="table-wrap"><table><thead><tr><th>Category</th><th>Views</th></tr></thead><tbody>
+      {% for row in category_analytics %}<tr><td>{{ row.category }}</td><td><strong>{{ row.views }}</strong></td></tr>{% else %}<tr><td colspan="2">No category views recorded yet.</td></tr>{% endfor %}
+    </tbody></table></div>
+  </div>
+</section>
+
+<section class="panel-grid two">
+  <div class="panel">
+    <div class="panel-head"><h2>Most viewed today</h2><a href="/admin/articles?sort=most_viewed">Open articles</a></div>
+    <div class="table-wrap"><table><thead><tr><th>Title</th><th>Views</th><th>Analytics</th></tr></thead><tbody>
+      {% for article, views in top_articles.today %}<tr><td><a href="/admin/articles/{{ article.id }}/edit">{{ article.title or 'Untitled' }}</a><small>{{ article.slug }}</small></td><td><strong>{{ views }}</strong></td><td><a href="/admin/articles/{{ article.id }}/analytics">Details</a></td></tr>{% else %}<tr><td colspan="3">No views today.</td></tr>{% endfor %}
+    </tbody></table></div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><h2>Most viewed week</h2><a href="/admin/articles?sort=most_viewed">Open articles</a></div>
+    <div class="table-wrap"><table><thead><tr><th>Title</th><th>Views</th><th>Analytics</th></tr></thead><tbody>
+      {% for article, views in top_articles.week %}<tr><td><a href="/admin/articles/{{ article.id }}/edit">{{ article.title or 'Untitled' }}</a><small>{{ article.slug }}</small></td><td><strong>{{ views }}</strong></td><td><a href="/admin/articles/{{ article.id }}/analytics">Details</a></td></tr>{% else %}<tr><td colspan="3">No views this week.</td></tr>{% endfor %}
+    </tbody></table></div>
+  </div>
+</section>
+
+<section class="panel-grid two">
+  <div class="panel">
+    <div class="panel-head"><h2>Most viewed month</h2><a href="/admin/articles?sort=most_viewed">Open articles</a></div>
+    <div class="table-wrap"><table><thead><tr><th>Title</th><th>Views</th><th>Analytics</th></tr></thead><tbody>
+      {% for article, views in top_articles.month %}<tr><td><a href="/admin/articles/{{ article.id }}/edit">{{ article.title or 'Untitled' }}</a><small>{{ article.slug }}</small></td><td><strong>{{ views }}</strong></td><td><a href="/admin/articles/{{ article.id }}/analytics">Details</a></td></tr>{% else %}<tr><td colspan="3">No views this month.</td></tr>{% endfor %}
+    </tbody></table></div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><h2>Most viewed all time</h2><a href="/admin/articles?sort=most_viewed">Open report</a></div>
+    <div class="table-wrap"><table><thead><tr><th>Title</th><th>Views</th><th>Analytics</th></tr></thead><tbody>
+      {% for article, views in top_articles.all_time %}<tr><td><a href="/admin/articles/{{ article.id }}/edit">{{ article.title or 'Untitled' }}</a><small>{{ article.slug }}</small></td><td><strong>{{ views }}</strong></td><td><a href="/admin/articles/{{ article.id }}/analytics">Details</a></td></tr>{% else %}<tr><td colspan="3">No article views recorded yet.</td></tr>{% endfor %}
+    </tbody></table></div>
   </div>
 </section>
 
@@ -31,21 +73,49 @@
   <div class="panel">
     <div class="panel-head"><h2>Latest 10 articles</h2><a href="/admin/articles?sort=newest">Manage all</a></div>
     <div class="table-wrap"><table><thead><tr><th>Title</th><th>Status</th><th>Views</th><th>Created</th></tr></thead><tbody>
-      {% for article in latest_articles %}<tr><td><a href="/admin/articles/{{ article.id }}/edit">{{ article.title or 'Untitled' }}</a><small>{{ article.slug }}</small></td><td><span class="badge {{ article.status }}">{{ article.status }}</span></td><td>{{ article.view_count or 0 }}</td><td>{{ article.created_at|format_published_at }}</td></tr>{% else %}<tr><td colspan="4">No articles yet.</td></tr>{% endfor %}
+      {% for article in latest_articles %}<tr><td><a href="/admin/articles/{{ article.id }}/edit">{{ article.title or 'Untitled' }}</a><small>{{ article.slug }}</small></td><td><span class="badge {{ article.status }}">{{ article.status }}</span></td><td>{{ latest_view_counts.get(article.id, 0) }}</td><td>{{ article.created_at|format_published_at }}</td></tr>{% else %}<tr><td colspan="4">No articles yet.</td></tr>{% endfor %}
     </tbody></table></div>
   </div>
   <div class="panel">
-    <div class="panel-head"><h2>Most viewed articles</h2><a href="/admin/articles?sort=most_viewed">Open report</a></div>
-    <div class="table-wrap"><table><thead><tr><th>Title</th><th>Status</th><th>Views</th><th>Updated</th></tr></thead><tbody>
-      {% for article in most_viewed_articles %}<tr><td><a href="/admin/articles/{{ article.id }}/edit">{{ article.title or 'Untitled' }}</a><small>{{ article.slug }}</small></td><td><span class="badge {{ article.status }}">{{ article.status }}</span></td><td><strong>{{ article.view_count or 0 }}</strong></td><td>{{ article.updated_at|format_published_at }}</td></tr>{% else %}<tr><td colspan="4">No article views recorded yet.</td></tr>{% endfor %}
-    </tbody></table></div>
+    <h2>System activity</h2>
+    <div class="activity-list">
+      {% for log in logs %}<div><strong>{{ log.level }}</strong><p>{{ log.message }}</p><small>{{ log.created_at|format_published_at }}</small></div>{% else %}<p class="muted">No pipeline logs yet.</p>{% endfor %}
+    </div>
   </div>
 </section>
 
-<section class="panel">
-  <h2>System activity</h2>
-  <div class="activity-list">
-    {% for log in logs %}<div><strong>{{ log.level }}</strong><p>{{ log.message }}</p><small>{{ log.created_at|format_published_at }}</small></div>{% else %}<p class="muted">No pipeline logs yet.</p>{% endfor %}
-  </div>
-</section>
+<script type="application/json" id="trafficChartData">{{ chart_data|tojson }}</script>
+<script>
+(() => {
+  const data = JSON.parse(document.getElementById('trafficChartData').textContent);
+  document.querySelectorAll('canvas[data-chart]').forEach((canvas) => {
+    const rows = data[canvas.dataset.chart] || [];
+    const ctx = canvas.getContext('2d');
+    const width = canvas.clientWidth || 320;
+    const height = Number(canvas.getAttribute('height')) || 170;
+    const ratio = window.devicePixelRatio || 1;
+    canvas.width = width * ratio;
+    canvas.height = height * ratio;
+    ctx.scale(ratio, ratio);
+    ctx.clearRect(0, 0, width, height);
+    const max = Math.max(1, ...rows.map((row) => row.views));
+    const gap = 6;
+    const barWidth = Math.max(4, (width - gap * (rows.length + 1)) / Math.max(1, rows.length));
+    ctx.fillStyle = 'rgba(72,166,255,.18)';
+    ctx.fillRect(0, 0, width, height);
+    rows.forEach((row, index) => {
+      const barHeight = Math.max(3, (row.views / max) * (height - 34));
+      const x = gap + index * (barWidth + gap);
+      const y = height - barHeight - 22;
+      ctx.fillStyle = 'rgba(72,166,255,.85)';
+      ctx.fillRect(x, y, barWidth, barHeight);
+      if (rows.length <= 7 || index % 5 === 0) {
+        ctx.fillStyle = '#9fb6c9';
+        ctx.font = '10px Inter, sans-serif';
+        ctx.fillText(row.label, x, height - 7);
+      }
+    });
+  });
+})();
+</script>
 {% endblock %}

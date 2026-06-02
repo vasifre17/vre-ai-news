@@ -6,7 +6,8 @@ import re
 import shutil
 from pathlib import Path
 from uuid import uuid4
-from sqlalchemy import or_, text
+from sqlalchemy import func, or_, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 from fastapi import FastAPI, Request, Depends, Form, HTTPException, UploadFile, File
 from PIL import Image, UnidentifiedImageError
@@ -20,7 +21,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from config import settings
 from database.session import SessionLocal, init_db
-from database.models import Article, ArticleRevision, FetchLog, Setting, ArticleNarration, ArticleTranslation, Category, MediaAsset
+from database.models import Article, ArticleRevision, ArticleView, FetchLog, Setting, ArticleNarration, ArticleTranslation, Category, MediaAsset
 from cms.auth.security import is_authenticated, set_session, clear_session, verify_password
 from scheduler.jobs import run_fetch_pipeline, queue_narration, generate_pending_narrations
 from ai.translation_service import (
@@ -808,6 +809,132 @@ def admin_article_categories(db) -> list[str]:
     return sorted(set(category_rows + article_rows))
 
 
+
+
+def analytics_period_start(days: int | None = None) -> datetime | None:
+    """Return a UTC midnight boundary for dashboard analytics windows."""
+    if days is None:
+        return None
+    today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    return today - timedelta(days=days - 1)
+
+
+def request_ip(request: Request) -> str:
+    forwarded = (request.headers.get("x-forwarded-for") or "").split(",")[0].strip()
+    real_ip = (request.headers.get("x-real-ip") or "").strip()
+    client_host = request.client.host if request.client else ""
+    return forwarded or real_ip or client_host or "unknown"
+
+
+def analytics_session_id(request: Request) -> str:
+    session_id = request.session.get("analytics_session_id")
+    if not session_id:
+        session_id = uuid4().hex
+        request.session["analytics_session_id"] = session_id
+    return session_id
+
+
+def visitor_key_for(request: Request) -> tuple[str, str, str]:
+    session_id = analytics_session_id(request)
+    ip_address = request_ip(request)
+    return f"{ip_address}:{session_id}", session_id, ip_address
+
+
+def record_article_view(db, article: Article, request: Request, language: str) -> ArticleView | None:
+    """Store one real unique article visit per IP/session/article/day."""
+    now = datetime.utcnow()
+    visitor_key, session_id, ip_address = visitor_key_for(request)
+    referrer = request.headers.get("referer") or request.headers.get("referrer")
+    user_agent = request.headers.get("user-agent")
+    view = ArticleView(
+        article_id=article.id,
+        visitor_key=visitor_key[:128],
+        session_id=session_id[:64],
+        ip_address=ip_address[:64],
+        user_agent=(user_agent or "")[:500] or None,
+        referrer=(referrer or "")[:1000] or None,
+        language=language,
+        visit_date=now.date(),
+        created_at=now,
+    )
+    db.add(view)
+    try:
+        db.flush()
+        article.view_count = db.query(func.count(ArticleView.id)).filter(ArticleView.article_id == article.id).scalar() or 0
+        db.commit()
+        db.refresh(article)
+        return view
+    except IntegrityError:
+        db.rollback()
+        return db.query(ArticleView).filter(
+            ArticleView.article_id == article.id,
+            ArticleView.visitor_key == visitor_key[:128],
+            ArticleView.visit_date == now.date(),
+        ).first()
+
+
+def total_views_since(db, start: datetime | None = None) -> int:
+    query = db.query(func.count(ArticleView.id))
+    if start:
+        query = query.filter(ArticleView.created_at >= start)
+    return query.scalar() or 0
+
+
+def top_articles_since(db, start: datetime | None = None, limit: int = 10):
+    view_query = db.query(ArticleView.article_id.label("article_id"), func.count(ArticleView.id).label("views"))
+    if start is not None:
+        view_query = view_query.filter(ArticleView.created_at >= start)
+    view_counts = view_query.group_by(ArticleView.article_id).subquery()
+    return db.query(Article, view_counts.c.views).join(view_counts, view_counts.c.article_id == Article.id).order_by(view_counts.c.views.desc(), Article.published_at.desc(), Article.created_at.desc()).limit(limit).all()
+
+
+
+def trending_articles(db, limit: int = 8):
+    weekly = top_articles_since(db, analytics_period_start(7), limit)
+    article_ids = [article.id for article, _views in weekly]
+    articles = [article for article, _views in weekly]
+    if len(articles) < limit:
+        fallback = db.query(Article).options(selectinload(Article.translations)).filter(Article.status == "published", ~Article.id.in_(article_ids or [0])).order_by(Article.published_at.desc(), Article.created_at.desc()).limit(limit - len(articles)).all()
+        articles.extend(fallback)
+    return articles
+
+def category_analytics(db, start: datetime | None = None):
+    query = db.query(func.coalesce(Article.category, "Uncategorized").label("category"), func.count(ArticleView.id).label("views")).join(ArticleView, ArticleView.article_id == Article.id)
+    if start:
+        query = query.filter(ArticleView.created_at >= start)
+    rows = query.group_by(func.coalesce(Article.category, "Uncategorized")).order_by(text("views DESC")).all()
+    return rows
+
+
+def daily_traffic_series(db, days: int) -> list[dict[str, int | str]]:
+    start = analytics_period_start(days)
+    rows = db.query(ArticleView.visit_date, func.count(ArticleView.id)).filter(ArticleView.created_at >= start).group_by(ArticleView.visit_date).all()
+    totals = {row[0]: row[1] for row in rows}
+    return [
+        {"label": (start + timedelta(days=offset)).strftime("%b %d"), "views": int(totals.get((start + timedelta(days=offset)).date(), 0))}
+        for offset in range(days)
+    ]
+
+
+
+def daily_traffic_series_for_article(db, article_id: int, days: int) -> list[dict[str, int | str]]:
+    start = analytics_period_start(days)
+    rows = db.query(ArticleView.visit_date, func.count(ArticleView.id)).filter(ArticleView.article_id == article_id, ArticleView.created_at >= start).group_by(ArticleView.visit_date).all()
+    totals = {row[0]: row[1] for row in rows}
+    return [
+        {"label": (start + timedelta(days=offset)).strftime("%b %d"), "views": int(totals.get((start + timedelta(days=offset)).date(), 0))}
+        for offset in range(days)
+    ]
+
+def article_analytics_summary(db, article_id: int) -> dict:
+    last_visit = db.query(ArticleView).filter(ArticleView.article_id == article_id).order_by(ArticleView.created_at.desc()).first()
+    first_referrer = db.query(ArticleView.referrer).filter(ArticleView.article_id == article_id, ArticleView.referrer.isnot(None), ArticleView.referrer != "").order_by(ArticleView.created_at.desc()).first()
+    return {
+        "views": db.query(func.count(ArticleView.id)).filter(ArticleView.article_id == article_id).scalar() or 0,
+        "last_visit": last_visit,
+        "last_referrer": first_referrer[0] if first_referrer else None,
+    }
+
 def filtered_admin_article_query(db, search: str = "", status: str = "all", category: str = "", language: str = "", date_from: str = "", date_to: str = ""):
     query = db.query(Article).options(selectinload(Article.translations))
     if status in {"draft", "published"}:
@@ -850,7 +977,8 @@ def apply_admin_article_sort(query, sort: str):
     if sort == "oldest":
         return query.order_by(Article.created_at.asc(), Article.id.asc())
     if sort == "most_viewed":
-        return query.order_by(Article.view_count.desc(), Article.published_at.desc(), Article.created_at.desc())
+        view_counts = query.session.query(ArticleView.article_id.label("article_id"), func.count(ArticleView.id).label("views")).group_by(ArticleView.article_id).subquery()
+        return query.outerjoin(view_counts, view_counts.c.article_id == Article.id).order_by(func.coalesce(view_counts.c.views, 0).desc(), Article.published_at.desc(), Article.created_at.desc())
     if sort == "recently_updated":
         return query.order_by(Article.updated_at.desc(), Article.created_at.desc())
     return query.order_by(Article.published_at.desc(), Article.created_at.desc(), Article.id.desc())
@@ -882,6 +1010,7 @@ def apply_schema_migrations(db) -> None:
     # SQLAlchemy model if older databases were initialized before multilingual
     # article storage existed, then add any newly introduced nullable columns.
     ArticleTranslation.__table__.create(bind=db.get_bind(), checkfirst=True)
+    ArticleView.__table__.create(bind=db.get_bind(), checkfirst=True)
     for statement in [
         "ALTER TABLE articles ADD COLUMN slug VARCHAR(500)",
         "ALTER TABLE articles ADD COLUMN narration_enabled BOOLEAN DEFAULT true",
@@ -906,6 +1035,10 @@ def apply_schema_migrations(db) -> None:
         "CREATE INDEX IF NOT EXISTS ix_article_translations_slug ON article_translations (slug)",
         "CREATE UNIQUE INDEX IF NOT EXISTS ix_article_translations_article_language ON article_translations (article_id, language)",
         "CREATE INDEX IF NOT EXISTS ix_article_translations_language_slug ON article_translations (language, slug)",
+        "CREATE INDEX IF NOT EXISTS ix_article_views_article_id ON article_views (article_id)",
+        "CREATE INDEX IF NOT EXISTS ix_article_views_created_at ON article_views (created_at)",
+        "CREATE INDEX IF NOT EXISTS ix_article_views_visit_date ON article_views (visit_date)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS ix_article_views_unique_visit ON article_views (article_id, visitor_key, visit_date)",
     ]:
         try:
             db.execute(text(statement))
@@ -951,7 +1084,7 @@ def home(request: Request, language: str = "az", q: str = "", category: str = ""
     featured = db.query(Article).options(selectinload(Article.translations)).filter(Article.status == "published", Article.is_featured == True).order_by(Article.homepage_order.asc(), Article.published_at.desc()).limit(6).all()
     if not featured:
         featured = articles[:6]
-    trending = db.query(Article).options(selectinload(Article.translations)).filter(Article.status == "published").order_by(Article.view_count.desc(), Article.published_at.desc(), Article.created_at.desc()).limit(8).all()
+    trending = trending_articles(db, 8)
     category_labels = public_category_labels(language)
     article_cards = [article_card(a, language, category_labels) for a in articles]
     featured_cards = [article_card(a, language, category_labels) for a in featured]
@@ -975,9 +1108,7 @@ def render_article_page(slug: str, request: Request, language: str = "az", db=De
     article = find_published_article_by_slug(db, slug, language)
     if not article:
         raise HTTPException(404)
-    article.view_count = (article.view_count or 0) + 1
-    article.updated_at = article.updated_at or datetime.utcnow()
-    db.commit()
+    record_article_view(db, article, request, language)
     view = localized_article_view(article, language)
     narration = db.query(ArticleNarration).filter(ArticleNarration.article_id == article.id, ArticleNarration.language == language).first()
     alt_links = {lang: article_url(lang, localized_slug(article, lang)) for lang in SUPPORTED_LANGUAGES}
@@ -1144,8 +1275,50 @@ def admin_dashboard(request: Request, db=Depends(get_db), _=Depends(require_auth
     media_count = db.query(MediaAsset).count()
     logs = db.query(FetchLog).order_by(FetchLog.created_at.desc()).limit(8).all()
     latest_articles = db.query(Article).order_by(Article.created_at.desc(), Article.id.desc()).limit(10).all()
-    most_viewed_articles = db.query(Article).order_by(Article.view_count.desc(), Article.published_at.desc(), Article.created_at.desc()).limit(10).all()
-    return templates.TemplateResponse('admin/dashboard.html', {'request': request, 'drafts': drafts, 'published': published, 'total_articles': total_articles, 'categories': categories, 'media_count': media_count, 'logs': logs, 'recent_articles': latest_articles, 'latest_articles': latest_articles, 'most_viewed_articles': most_viewed_articles, "languages": SUPPORTED_LANGUAGES, "ai_translation_status": ai_translation_status()})
+    latest_article_ids = [article.id for article in latest_articles] or [0]
+    latest_view_counts = {article_id: views for article_id, views in db.query(ArticleView.article_id, func.count(ArticleView.id)).filter(ArticleView.article_id.in_(latest_article_ids)).group_by(ArticleView.article_id).all()}
+    today_start = analytics_period_start(1)
+    week_start = analytics_period_start(7)
+    month_start = analytics_period_start(30)
+    analytics_totals = {
+        "total": total_views_since(db),
+        "today": total_views_since(db, today_start),
+        "week": total_views_since(db, week_start),
+        "month": total_views_since(db, month_start),
+    }
+    top_articles = {
+        "today": top_articles_since(db, today_start, 10),
+        "week": top_articles_since(db, week_start, 10),
+        "month": top_articles_since(db, month_start, 10),
+        "all_time": top_articles_since(db, None, 10),
+    }
+    category_rows = category_analytics(db)
+    top_category = category_rows[0] if category_rows else None
+    chart_data = {
+        "daily": daily_traffic_series(db, 1),
+        "weekly": daily_traffic_series(db, 7),
+        "monthly": daily_traffic_series(db, 30),
+    }
+    return templates.TemplateResponse('admin/dashboard.html', {
+        'request': request,
+        'drafts': drafts,
+        'published': published,
+        'total_articles': total_articles,
+        'categories': categories,
+        'media_count': media_count,
+        'logs': logs,
+        'recent_articles': latest_articles,
+        'latest_articles': latest_articles,
+        'latest_view_counts': latest_view_counts,
+        'most_viewed_articles': top_articles["all_time"],
+        'analytics_totals': analytics_totals,
+        'top_articles': top_articles,
+        'category_analytics': category_rows,
+        'top_category': top_category,
+        'chart_data': chart_data,
+        "languages": SUPPORTED_LANGUAGES,
+        "ai_translation_status": ai_translation_status(),
+    })
 
 
 @app.get('/admin/articles', response_class=HTMLResponse)
@@ -1170,12 +1343,14 @@ def admin_articles(
     total_pages = max(1, (total + per_page - 1) // per_page)
     page = min(page, total_pages)
     articles = apply_admin_article_sort(query, sort).offset((page - 1) * per_page).limit(per_page).all()
-    narration_map = {n.article_id: n for n in db.query(ArticleNarration).filter(ArticleNarration.article_id.in_([a.id for a in articles] or [0])).all()}
+    article_ids = [a.id for a in articles] or [0]
+    narration_map = {n.article_id: n for n in db.query(ArticleNarration).filter(ArticleNarration.article_id.in_(article_ids)).all()}
+    view_count_map = {article_id: views for article_id, views in db.query(ArticleView.article_id, func.count(ArticleView.id)).filter(ArticleView.article_id.in_(article_ids)).group_by(ArticleView.article_id).all()}
     translation_missing_map = {a.id: missing_translation_languages(a) for a in articles}
     seo_score_map = {a.id: article_seo_audit(a, 'az')['score'] for a in articles}
     categories = admin_article_categories(db)
     filters = {"q": q, "status": status, "category": category, "language": language, "date_from": date_from, "date_to": date_to, "sort": sort, "page": page, "per_page": per_page}
-    return templates.TemplateResponse("admin/articles.html", {"request": request, "articles": articles, "status": status, "narration_map": narration_map, "translation_missing_map": translation_missing_map, "seo_score_map": seo_score_map, "languages": SUPPORTED_LANGUAGES, "language_labels": LANGUAGE_LABELS, "categories": categories, "filters": filters, "total": total, "total_pages": total_pages, "page": page, "per_page": per_page, "ai_translation_status": ai_translation_status()})
+    return templates.TemplateResponse("admin/articles.html", {"request": request, "articles": articles, "status": status, "narration_map": narration_map, "view_count_map": view_count_map, "translation_missing_map": translation_missing_map, "seo_score_map": seo_score_map, "languages": SUPPORTED_LANGUAGES, "language_labels": LANGUAGE_LABELS, "categories": categories, "filters": filters, "total": total, "total_pages": total_pages, "page": page, "per_page": per_page, "ai_translation_status": ai_translation_status()})
 
 
 
@@ -1214,6 +1389,34 @@ async def bulk_articles(request: Request, db=Depends(get_db), _=Depends(require_
                 article.updated_at = now
     db.commit()
     return RedirectResponse(redirect_url, status_code=302)
+
+
+@app.get('/admin/articles/{article_id}/analytics', response_class=HTMLResponse)
+def article_analytics_page(article_id: int, request: Request, db=Depends(get_db), _=Depends(require_auth)):
+    article = db.query(Article).get(article_id)
+    if not article:
+        raise HTTPException(404)
+    summary = article_analytics_summary(db, article_id)
+    today_start = analytics_period_start(1)
+    week_start = analytics_period_start(7)
+    month_start = analytics_period_start(30)
+    period_totals = {
+        "today": db.query(func.count(ArticleView.id)).filter(ArticleView.article_id == article_id, ArticleView.created_at >= today_start).scalar() or 0,
+        "week": db.query(func.count(ArticleView.id)).filter(ArticleView.article_id == article_id, ArticleView.created_at >= week_start).scalar() or 0,
+        "month": db.query(func.count(ArticleView.id)).filter(ArticleView.article_id == article_id, ArticleView.created_at >= month_start).scalar() or 0,
+    }
+    recent_visits = db.query(ArticleView).filter(ArticleView.article_id == article_id).order_by(ArticleView.created_at.desc()).limit(50).all()
+    chart_data = daily_traffic_series_for_article(db, article_id, 30)
+    return templates.TemplateResponse('admin/article_analytics.html', {
+        'request': request,
+        'article': article,
+        'summary': summary,
+        'period_totals': period_totals,
+        'recent_visits': recent_visits,
+        'chart_data': chart_data,
+        'languages': SUPPORTED_LANGUAGES,
+        'ai_translation_status': ai_translation_status(),
+    })
 
 
 @app.get('/admin/articles/new', response_class=HTMLResponse)

@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, UniqueConstraint, Date
 from sqlalchemy.orm import declarative_base, relationship
 
 Base = declarative_base()
@@ -33,6 +33,25 @@ class Article(Base):
     revisions = relationship("ArticleRevision", back_populates="article", cascade="all, delete-orphan")
     narrations = relationship("ArticleNarration", back_populates="article", cascade="all, delete-orphan")
     translations = relationship("ArticleTranslation", back_populates="article", cascade="all, delete-orphan")
+    views = relationship("ArticleView", back_populates="article", cascade="all, delete-orphan")
+
+
+class ArticleView(Base):
+    __tablename__ = "article_views"
+    __table_args__ = (UniqueConstraint("article_id", "visitor_key", "visit_date", name="uq_article_view_unique_visit"),)
+
+    id = Column(Integer, primary_key=True)
+    article_id = Column(Integer, ForeignKey("articles.id", ondelete="CASCADE"), index=True, nullable=False)
+    visitor_key = Column(String(128), index=True, nullable=False)
+    session_id = Column(String(64), index=True, nullable=True)
+    ip_address = Column(String(64), index=True, nullable=True)
+    user_agent = Column(String(500), nullable=True)
+    referrer = Column(String(1000), nullable=True)
+    language = Column(String(20), default="az", index=True)
+    visit_date = Column(Date, index=True, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+    article = relationship("Article", back_populates="views")
 
 
 class ArticleTranslation(Base):

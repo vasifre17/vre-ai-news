@@ -1,0 +1,75 @@
+{% extends "admin/_base.html" %}
+{% set title = 'Article Analytics | VREYC Admin' %}
+{% set heading = 'Article analytics' %}
+{% block content %}
+<section class="panel">
+  <div class="panel-head wrap">
+    <div>
+      <h2>{{ article.title or 'Untitled article' }}</h2>
+      <p class="muted">{{ article.slug }} · Published {{ article.published_at|format_published_at if article.published_at else 'not published yet' }}</p>
+    </div>
+    <div class="actions"><a class="btn" href="/admin/articles/{{ article.id }}/edit">Edit article</a><a class="btn" href="/admin/articles">Back to articles</a></div>
+  </div>
+</section>
+
+<section class="stats-grid dashboard-stats analytics-stats">
+  <article class="stat-card"><span>Views</span><strong>{{ summary.views }}</strong><small>Unique IP/session visits</small></article>
+  <article class="stat-card"><span>Views today</span><strong>{{ period_totals.today }}</strong><small>Since UTC midnight</small></article>
+  <article class="stat-card"><span>Views last 7 days</span><strong>{{ period_totals.week }}</strong><small>Weekly performance</small></article>
+  <article class="stat-card"><span>Views last 30 days</span><strong>{{ period_totals.month }}</strong><small>Monthly performance</small></article>
+  <article class="stat-card"><span>Last visit</span><strong>{{ summary.last_visit.created_at|format_published_at if summary.last_visit else '—' }}</strong><small>{{ summary.last_visit.ip_address if summary.last_visit else 'No visits yet' }}</small></article>
+</section>
+
+<section class="panel-grid two">
+  <div class="panel">
+    <h2>Visit details</h2>
+    <div class="workflow-row"><span>Publish date</span><strong>{{ article.published_at|format_published_at if article.published_at else 'Draft' }}</strong></div>
+    <div class="workflow-row"><span>Last visit</span><strong>{{ summary.last_visit.created_at|format_published_at if summary.last_visit else '—' }}</strong></div>
+    <div class="workflow-row"><span>Referrer</span><strong>{{ summary.last_referrer or 'No referrer captured' }}</strong></div>
+  </div>
+  <div class="panel">
+    <h2>Last 30 days</h2>
+    <canvas data-article-chart height="190"></canvas>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Recent visits</h2>
+  <div class="table-wrap"><table><thead><tr><th>Visited</th><th>Language</th><th>IP</th><th>Session</th><th>Referrer</th></tr></thead><tbody>
+    {% for visit in recent_visits %}<tr><td>{{ visit.created_at|format_published_at }}</td><td>{{ visit.language|upper }}</td><td>{{ visit.ip_address or '—' }}</td><td><code>{{ visit.session_id or '—' }}</code></td><td>{{ visit.referrer or 'Direct / unavailable' }}</td></tr>{% else %}<tr><td colspan="5">No visits recorded for this article yet.</td></tr>{% endfor %}
+  </tbody></table></div>
+</section>
+
+<script type="application/json" id="articleChartData">{{ chart_data|tojson }}</script>
+<script>
+(() => {
+  const canvas = document.querySelector('canvas[data-article-chart]');
+  if (!canvas) return;
+  const rows = JSON.parse(document.getElementById('articleChartData').textContent);
+  const ctx = canvas.getContext('2d');
+  const width = canvas.clientWidth || 420;
+  const height = Number(canvas.getAttribute('height')) || 190;
+  const ratio = window.devicePixelRatio || 1;
+  canvas.width = width * ratio;
+  canvas.height = height * ratio;
+  ctx.scale(ratio, ratio);
+  const max = Math.max(1, ...rows.map((row) => row.views));
+  const gap = 5;
+  const barWidth = Math.max(4, (width - gap * (rows.length + 1)) / Math.max(1, rows.length));
+  ctx.fillStyle = 'rgba(72,166,255,.18)';
+  ctx.fillRect(0, 0, width, height);
+  rows.forEach((row, index) => {
+    const barHeight = Math.max(3, (row.views / max) * (height - 34));
+    const x = gap + index * (barWidth + gap);
+    const y = height - barHeight - 22;
+    ctx.fillStyle = 'rgba(72,166,255,.85)';
+    ctx.fillRect(x, y, barWidth, barHeight);
+    if (index % 5 === 0) {
+      ctx.fillStyle = '#9fb6c9';
+      ctx.font = '10px Inter, sans-serif';
+      ctx.fillText(row.label, x, height - 7);
+    }
+  });
+})();
+</script>
+{% endblock %}
