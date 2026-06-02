@@ -2,5 +2,20 @@
 {% set title = 'Translations | VREYC Admin' %}
 {% set heading = 'AI translations' %}
 {% block content %}
-<section class="panel"><div class="panel-head"><div><h2>Generate multilingual article fields</h2><p class="muted">Use AI to populate EN, RU, TR, ZH and ES from the AZ source.</p></div></div><div class="table-wrap"><table><thead><tr><th>ID</th><th>Title</th><th>Languages</th><th>Action</th></tr></thead><tbody>{% for a in articles %}<tr><td>{{ a.id }}</td><td>{{ a.title }}</td><td>AZ{% for t in a.translations %}, {{ t.language|upper }}{% endfor %}</td><td><form method="post" action="/admin/translations/{{ a.id }}/generate"><button class="btn small primary">Generate/Update</button></form></td></tr>{% else %}<tr><td colspan="4">No published articles yet.</td></tr>{% endfor %}</tbody></table></div></section>
+<section class="panel">
+  <div class="panel-head wrap">
+    <div>
+      <h2>Generate missing multilingual article fields</h2>
+      <p class="muted">AZ is the primary article language. AI generates missing EN, RU, TR, ZH and ES rows in article_translations without duplicating articles.</p>
+    </div>
+    <form method="post" action="/admin/translations/generate-missing">
+      <button class="btn primary" type="submit">Generate translations for all missing articles</button>
+    </form>
+  </div>
+  {% if not ai_translation_status.configured %}<div class="alert danger">{{ ai_translation_status.message }}</div>{% endif %}
+  {% if request.query_params.get('queued') == 'bulk' %}<div class="alert">Bulk translation generation was queued in the background.</div>{% endif %}
+  {% if request.query_params.get('queued') == 'article' %}<div class="alert">Article translation generation was queued in the background.</div>{% endif %}
+  {% if request.query_params.get('warning') == 'ai_not_configured' %}<div class="alert danger">AI translation provider is not configured.</div>{% endif %}
+  <div class="table-wrap"><table><thead><tr><th>ID</th><th>Title</th><th>Existing languages</th><th>Missing</th><th>Action</th></tr></thead><tbody>{% for a in articles %}<tr><td>{{ a.id }}</td><td><strong>{{ a.title }}</strong><small>{{ a.status }}</small></td><td>AZ{% for t in a.translations %}, {{ t.language|upper }}{% endfor %}</td><td>{% set missing = translation_missing_map.get(a.id, []) %}{% if missing %}{{ missing|join(', ')|upper }}{% else %}<span class="badge published">Complete</span>{% endif %}</td><td><form method="post" action="/admin/translations/{{ a.id }}/generate"><button class="btn small primary" type="submit">Generate missing translations</button></form></td></tr>{% else %}<tr><td colspan="5">No articles yet.</td></tr>{% endfor %}</tbody></table></div>
+</section>
 {% endblock %}

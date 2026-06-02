@@ -1,12 +1,14 @@
 import json
 from typing import Dict
 from openai import OpenAI
-from config import settings
+from config import PLACEHOLDER_VALUES, settings
 
 
 class AIEngine:
     def __init__(self) -> None:
-        self.client = OpenAI(api_key=settings.openai_api_key) if settings.openai_api_key else None
+        key = (settings.openai_api_key or "").strip()
+        configured = bool(key and key != "test_key" and key not in PLACEHOLDER_VALUES and key.startswith("sk-"))
+        self.client = OpenAI(api_key=key) if configured else None
 
     def process_article(self, title: str, content: str) -> Dict[str, str]:
         if not self.client:
@@ -55,10 +57,12 @@ class AIEngine:
                 "content": article.get("content", ""),
                 "seo_title": article.get("seo_title", article.get("title", "")),
                 "tags": article.get("tags", "news"),
+                "meta_description": article.get("meta_description", ""),
             }
         prompt = (
             "Translate the provided Azerbaijani news article to target language. "
-            "Return JSON keys: title,summary,content,seo_title,tags. Keep journalistic tone."
+            "Return JSON keys: title,summary,content,seo_title,meta_description,tags. Keep journalistic tone. "
+            "Preserve HTML structure in content if present. Translate tags as a comma-separated list."
         )
         resp = self.client.chat.completions.create(
             model="gpt-4o-mini",

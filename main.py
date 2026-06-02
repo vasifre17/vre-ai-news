@@ -21,7 +21,14 @@ from database.session import SessionLocal, init_db
 from database.models import Article, ArticleRevision, FetchLog, Setting, ArticleNarration, ArticleTranslation, Category, MediaAsset
 from cms.auth.security import is_authenticated, set_session, clear_session, verify_password
 from scheduler.jobs import run_fetch_pipeline, queue_narration, generate_pending_narrations
-from ai.pipeline import AIEngine
+from ai.translation_service import (
+    AI_TRANSLATION_WARNING,
+    ai_translation_status,
+    generate_all_missing_translations,
+    generate_missing_translations,
+    is_ai_translation_configured,
+    missing_translation_languages,
+)
 
 app = FastAPI(title=settings.app_name)
 app.add_middleware(SessionMiddleware, secret_key=settings.secret_key)
@@ -29,7 +36,6 @@ templates = Jinja2Templates(directory="templates")
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 scheduler = BackgroundScheduler()
-ai_engine = AIEngine()
 SUPPORTED_LANGUAGES = ["az", "en", "ru", "tr", "zh", "es"]
 LANGUAGE_LABELS = {"az": "Azerbaijani", "en": "English", "ru": "Russian", "tr": "Turkish", "zh": "Chinese", "es": "Spanish"}
 UPLOAD_DIR = Path(settings.image_upload_dir)
@@ -631,7 +637,7 @@ def article_form_context(db, article: Article | None = None) -> dict:
         names = [c[0] for c in db.query(Article.category).filter(Article.category.isnot(None)).distinct().all() if c[0]]
         categories = [Category(name=name, slug=slugify(name), description="") for name in names]
     translations = {lang: get_translation(article, lang) for lang in SUPPORTED_LANGUAGES} if article else {lang: None for lang in SUPPORTED_LANGUAGES}
-    return {"categories": categories, "languages": SUPPORTED_LANGUAGES, "language_labels": LANGUAGE_LABELS, "translations": translations}
+    return {"categories": categories, "languages": SUPPORTED_LANGUAGES, "language_labels": LANGUAGE_LABELS, "translations": translations, "ai_translation_status": ai_translation_status()}
 
 
 
@@ -771,7 +777,7 @@ def sitemap(db=Depends(get_db)):
     base_url = settings.site_url.rstrip("/")
     urls = [f"<url><loc>{base_url}/</loc></url>"]
     urls.extend(f"<url><loc>{base_url}/{lang}/</loc></url>" for lang in SUPPORTED_LANGUAGES)
-    for a in db.query(Article).filter(Article.status == 'published').all():
+    for a in db.query(Article).options(selectinload(Article.translations)).filter(Article.status == 'published').all():
         urls.append(f"<url><loc>{base_url}{article_url('az', a.slug or a.id)}</loc></url>")
         for lang in SUPPORTED_LANGUAGES:
             if lang == "az":
@@ -823,7 +829,7 @@ def admin_dashboard(request: Request, db=Depends(get_db), _=Depends(require_auth
     media_count = db.query(MediaAsset).count()
     logs = db.query(FetchLog).order_by(FetchLog.created_at.desc()).limit(8).all()
     recent_articles = db.query(Article).order_by(Article.updated_at.desc(), Article.created_at.desc()).limit(6).all()
-    return templates.TemplateResponse('admin/dashboard.html', {'request': request, 'drafts': drafts, 'published': published, 'total_articles': total_articles, 'categories': categories, 'media_count': media_count, 'logs': logs, 'recent_articles': recent_articles, "languages": SUPPORTED_LANGUAGES})
+    return templates.TemplateResponse('admin/dashboard.html', {'request': request, 'drafts': drafts, 'published': published, 'total_articles': total_articles, 'categories': categories, 'media_count': media_count, 'logs': logs, 'recent_articles': recent_articles, "languages": SUPPORTED_LANGUAGES, "ai_translation_status": ai_translation_status()})
 
 
 @app.get('/admin/articles', response_class=HTMLResponse)
@@ -833,7 +839,8 @@ def admin_articles(request: Request, status: str = "all", db=Depends(get_db), _=
         query = query.filter(Article.status == status)
     articles = query.order_by(Article.updated_at.desc(), Article.created_at.desc()).all()
     narration_map = {n.article_id: n for n in db.query(ArticleNarration).filter(ArticleNarration.article_id.in_([a.id for a in articles] or [0])).all()}
-    return templates.TemplateResponse("admin/articles.html", {"request": request, "articles": articles, "status": status, "narration_map": narration_map, "languages": SUPPORTED_LANGUAGES})
+    translation_missing_map = {a.id: missing_translation_languages(a) for a in articles}
+    return templates.TemplateResponse("admin/articles.html", {"request": request, "articles": articles, "status": status, "narration_map": narration_map, "translation_missing_map": translation_missing_map, "languages": SUPPORTED_LANGUAGES, "ai_translation_status": ai_translation_status()})
 
 
 @app.get('/admin/articles/new', response_class=HTMLResponse)
@@ -885,6 +892,8 @@ async def create_article(request: Request, db=Depends(get_db), _=Depends(require
             row.tags = form.get(f'tags_{lang}', '')
             db.add(row)
     db.commit()
+    if is_ai_translation_configured():
+        scheduler.add_job(generate_missing_translations, args=[article.id], id=f"article_translation_{article.id}_{datetime.utcnow().timestamp()}", replace_existing=False)
     return RedirectResponse('/admin/articles', status_code=302)
 
 
@@ -898,6 +907,8 @@ def publish_article(article_id: int, request: Request, db=Depends(get_db), _=Dep
         a.updated_at = datetime.utcnow()
         db.commit()
         queue_narration(db, a)
+        if is_ai_translation_configured():
+            scheduler.add_job(generate_missing_translations, args=[a.id], id=f"article_translation_{a.id}_{datetime.utcnow().timestamp()}", replace_existing=False)
         db.commit()
     return RedirectResponse('/admin/articles?status=published', status_code=302)
 
@@ -975,7 +986,10 @@ async def edit_article(article_id: int, request: Request, db=Depends(get_db), _=
         row.tags = form.get(f'tags_{lang}', '')
         row.updated_at = datetime.utcnow()
     db.commit()
-    return RedirectResponse(f'/admin/articles/{a.id}/edit?saved=1', status_code=302)
+    translation_status = "queued" if is_ai_translation_configured() else "not_configured"
+    if is_ai_translation_configured():
+        scheduler.add_job(generate_missing_translations, args=[a.id], id=f"article_translation_{a.id}_{datetime.utcnow().timestamp()}", replace_existing=False)
+    return RedirectResponse(f'/admin/articles/{a.id}/edit?saved=1&translations={translation_status}', status_code=302)
 
 
 @app.post('/admin/articles/{article_id}/feature')
@@ -1092,7 +1106,7 @@ def delete_media(asset_id: int, request: Request, db=Depends(get_db), _=Depends(
 @app.get('/admin/settings', response_class=HTMLResponse)
 def settings_page(request: Request, db=Depends(get_db), _=Depends(require_auth)):
     admin_settings = get_settings_map(db)
-    return templates.TemplateResponse('admin/settings.html', {'request': request, 'settings_map': admin_settings, 'config': settings, 'languages': SUPPORTED_LANGUAGES})
+    return templates.TemplateResponse('admin/settings.html', {'request': request, 'settings_map': admin_settings, 'config': settings, 'languages': SUPPORTED_LANGUAGES, 'ai_translation_status': ai_translation_status()})
 
 
 @app.post('/admin/settings')
@@ -1105,33 +1119,43 @@ def save_settings(request: Request, site_name: str = Form('VREYC'), editor_name:
 
 @app.get('/admin/translations', response_class=HTMLResponse)
 def admin_translations(request: Request, db=Depends(get_db), _=Depends(require_auth)):
-    articles = db.query(Article).filter(Article.status == 'published').order_by(Article.published_at.desc()).all()
-    return templates.TemplateResponse('admin/translations.html', {'request': request, 'articles': articles, 'languages': SUPPORTED_LANGUAGES})
+    articles = db.query(Article).options(selectinload(Article.translations)).order_by(Article.updated_at.desc(), Article.created_at.desc()).all()
+    translation_missing_map = {a.id: missing_translation_languages(a) for a in articles}
+    return templates.TemplateResponse('admin/translations.html', {'request': request, 'articles': articles, 'languages': SUPPORTED_LANGUAGES, 'translation_missing_map': translation_missing_map, 'ai_translation_status': ai_translation_status()})
 
 
 @app.post('/admin/translations/{article_id}/generate')
 def admin_generate_translations(article_id: int, request: Request, db=Depends(get_db), _=Depends(require_auth)):
-    article = db.query(Article).get(article_id)
-    if not article:
-        return RedirectResponse('/admin/translations', status_code=302)
-    source = {"title": article.title, "summary": article.summary, "content": article.content, "seo_title": article.seo_title, "tags": article.tags, "meta_description": article.meta_description}
-    for lang in SUPPORTED_LANGUAGES:
-        if lang == "az":
-            continue
-        payload = ai_engine.translate_article(source, lang)
-        row = get_or_create_translation(db, article, lang)
-        row.title = payload.get("title", article.title)
-        row.summary = payload.get("summary", article.summary)
-        row.content = payload.get("content", article.content)
-        row.seo_title = payload.get("seo_title", row.title)
-        row.meta_description = payload.get("meta_description", article.meta_description)
-        row.tags = payload.get("tags", article.tags)
-        if not row.slug:
-            row.slug = unique_translation_slug(db, lang, f"{row.title}-{lang}", row.id)
-        if article.status == "published" and article.narration_enabled:
-            queue_narration(db, article, lang)
-    db.commit()
-    return RedirectResponse('/admin/translations', status_code=302)
+    if not db.query(Article).get(article_id):
+        return RedirectResponse('/admin/translations?queued=missing_article', status_code=302)
+    if not is_ai_translation_configured():
+        db.add(FetchLog(level="WARNING", message=AI_TRANSLATION_WARNING))
+        db.commit()
+        return RedirectResponse('/admin/translations?warning=ai_not_configured', status_code=302)
+    scheduler.add_job(generate_missing_translations, args=[article_id], id=f"manual_article_translation_{article_id}_{datetime.utcnow().timestamp()}", replace_existing=False)
+    return RedirectResponse('/admin/translations?queued=article', status_code=302)
+
+
+@app.post('/admin/translations/generate-missing')
+def admin_generate_all_missing_translations(request: Request, db=Depends(get_db), _=Depends(require_auth)):
+    if not is_ai_translation_configured():
+        db.add(FetchLog(level="WARNING", message=AI_TRANSLATION_WARNING))
+        db.commit()
+        return RedirectResponse('/admin/translations?warning=ai_not_configured', status_code=302)
+    scheduler.add_job(generate_all_missing_translations, id=f"bulk_article_translations_{datetime.utcnow().timestamp()}", replace_existing=False)
+    return RedirectResponse('/admin/translations?queued=bulk', status_code=302)
+
+
+@app.post('/admin/articles/{article_id}/translations/generate')
+def admin_generate_article_missing_translations(article_id: int, request: Request, db=Depends(get_db), _=Depends(require_auth)):
+    if not db.query(Article).get(article_id):
+        return RedirectResponse('/admin/articles', status_code=302)
+    if not is_ai_translation_configured():
+        db.add(FetchLog(level="WARNING", message=AI_TRANSLATION_WARNING))
+        db.commit()
+        return RedirectResponse(f'/admin/articles/{article_id}/edit?warning=ai_not_configured', status_code=302)
+    scheduler.add_job(generate_missing_translations, args=[article_id], id=f"edit_article_translation_{article_id}_{datetime.utcnow().timestamp()}", replace_existing=False)
+    return RedirectResponse(f'/admin/articles/{article_id}/edit?translations=queued', status_code=302)
 
 
 @app.post('/admin/articles/{article_id}/narration/regenerate')

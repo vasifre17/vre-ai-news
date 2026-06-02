@@ -14,13 +14,15 @@
     <div class="panel-head"><h2>Editorial workflow</h2><a class="btn primary" href="/admin/articles/new">New article</a></div>
     <div class="workflow-row"><span>Categories</span><strong>{{ categories }}</strong></div>
     <div class="workflow-row"><span>Languages</span><strong>{{ languages|join(', ')|upper }}</strong></div>
+    <div class="workflow-row"><span>AI translation</span><strong>{{ 'Configured' if ai_translation_status.configured else 'Not configured' }}</strong></div>
+    {% if not ai_translation_status.configured %}<div class="alert danger">{{ ai_translation_status.message }}</div>{% endif %}
     <div class="workflow-row"><span>Publishing</span><strong>Manual + protected</strong></div>
   </div>
   <div class="panel ai-panel">
-    <p class="eyebrow">AI tools placeholders</p>
+    <p class="eyebrow">AI tools</p>
     <h2>Newsroom intelligence</h2>
     <div class="tool-list">
-      <span>SEO headline optimizer</span><span>Auto translation QA</span><span>Image prompt assistant</span><span>Audio narration review</span>
+      <span>Automatic AZ → EN/RU/TR/ZH/ES translation</span><span>SEO field translation</span><span>Image-safe generation</span><span>Audio narration review</span>
     </div>
   </div>
 </section>

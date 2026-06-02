@@ -14,11 +14,12 @@
       <a href="/admin/articles" class="{{ 'active' if request.url.path.startswith('/admin/articles') else '' }}">Articles</a>
       <a href="/admin/categories" class="{{ 'active' if request.url.path.startswith('/admin/categories') else '' }}">Categories</a>
       <a href="/admin/media" class="{{ 'active' if request.url.path.startswith('/admin/media') else '' }}">Media Library</a>
+      <a href="/admin/translations" class="{{ 'active' if request.url.path.startswith('/admin/translations') else '' }}">AI Translations</a>
       <a href="/admin/settings" class="{{ 'active' if request.url.path.startswith('/admin/settings') else '' }}">Settings</a>
     </nav>
     <div class="admin-sidebar-card">
       <strong>AI desk</strong>
-      <p>Translation, SEO and newsroom automation placeholders are ready for provider wiring.</p>
+      <p>Automatic translations generate missing EN, RU, TR, ZH and ES fields from the AZ source when the AI provider is configured.</p>
     </div>
   </aside>
   <div class="admin-main">
