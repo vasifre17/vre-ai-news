@@ -5,6 +5,7 @@ import shutil
 from pathlib import Path
 from uuid import uuid4
 from sqlalchemy import or_, text
+from sqlalchemy.orm import selectinload
 from fastapi import FastAPI, Request, Depends, Form, HTTPException, UploadFile, File
 from PIL import Image, UnidentifiedImageError
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
@@ -447,16 +448,26 @@ def article_url(language: str, slug: str) -> str:
 
 
 def get_translation(article: Article, language: str):
-    if language == "az":
+    """Return the stored translation row for a public language, if one exists.
+
+    Azerbaijani content is stored directly on the Article row. EN/RU/TR/ZH/ES
+    content is stored in ArticleTranslation rows created by the admin form or
+    translation generator.
+    """
+    normalized_language = (language or "az").lower()
+    if normalized_language == "az":
         return article
-    for t in article.translations:
-        if t.language == language:
-            return t
+    for translation in getattr(article, "translations", []) or []:
+        if (translation.language or "").lower() == normalized_language:
+            return translation
     return None
 
 
 def localized_value(article: Article, translation: ArticleTranslation | None, field: str):
+    """Use translated article content when present, otherwise fall back to AZ."""
     value = getattr(translation, field, None) if translation else None
+    if isinstance(value, str):
+        value = value.strip()
     if value not in (None, ""):
         return value
     return getattr(article, field, None)
@@ -478,6 +489,8 @@ def localized_article_view(article: Article, language: str):
         seo_title=localized_value(article, translation, "seo_title"),
         meta_description=localized_value(article, translation, "meta_description"),
         tags=localized_value(article, translation, "tags"),
+        category=article.category,
+        category_label=public_category_labels(language).get(article.category, article.category) if article.category else public_labels(language)["news"],
         language=language,
         source_language="az",
         has_translation=bool(translation),
@@ -555,9 +568,20 @@ def public_category_navigation(db) -> dict[str, list[Category]]:
     }
 
 
-def article_card(article: Article, language: str) -> dict:
+def article_card(article: Article, language: str, category_labels: dict[str, str] | None = None) -> dict:
     view = localized_article_view(article, language)
-    return {"article": article, "view": view, "t": view.translation, "title": view.title, "summary": view.summary, "url": article_url(language, view.slug), "image_exists": uploaded_image_exists(article.image_url)}
+    labels = category_labels or public_category_labels(language)
+    category_label = labels.get(article.category, article.category) if article.category else public_labels(language)["news"]
+    return {
+        "article": article,
+        "view": view,
+        "t": view.translation,
+        "title": view.title,
+        "summary": view.summary,
+        "url": article_url(language, view.slug),
+        "category_label": category_label,
+        "image_exists": uploaded_image_exists(article.image_url),
+    }
 
 def get_settings_map(db) -> dict[str, str]:
     return {row.key: row.value for row in db.query(Setting).all()}
@@ -635,26 +659,31 @@ def startup() -> None:
 def home(request: Request, language: str = "az", q: str = "", category: str = "", db=Depends(get_db)):
     language = language if language in SUPPORTED_LANGUAGES else "az"
     ensure_categories(db)
-    query = db.query(Article).filter(Article.status == "published")
+    query = db.query(Article).options(selectinload(Article.translations)).filter(Article.status == "published")
     if q:
-        query = query.filter((Article.title.ilike(f"%{q}%")) | (Article.summary.ilike(f"%{q}%")))
+        translation_matches = db.query(ArticleTranslation.article_id).filter(
+            ArticleTranslation.language == language,
+            (ArticleTranslation.title.ilike(f"%{q}%")) | (ArticleTranslation.summary.ilike(f"%{q}%")),
+        )
+        query = query.filter((Article.title.ilike(f"%{q}%")) | (Article.summary.ilike(f"%{q}%")) | (Article.id.in_(translation_matches.scalar_subquery())))
     if category:
         query = query.filter(Article.category == category)
     articles = query.order_by(Article.homepage_order.asc(), Article.published_at.desc(), Article.created_at.desc()).limit(30).all()
-    featured = db.query(Article).filter(Article.status == "published", Article.is_featured == True).order_by(Article.homepage_order.asc(), Article.published_at.desc()).limit(6).all()
+    featured = db.query(Article).options(selectinload(Article.translations)).filter(Article.status == "published", Article.is_featured == True).order_by(Article.homepage_order.asc(), Article.published_at.desc()).limit(6).all()
     if not featured:
         featured = articles[:6]
-    trending = db.query(Article).filter(Article.status == "published", Article.is_trending == True).order_by(Article.homepage_order.asc(), Article.published_at.desc()).limit(8).all()
+    trending = db.query(Article).options(selectinload(Article.translations)).filter(Article.status == "published", Article.is_trending == True).order_by(Article.homepage_order.asc(), Article.published_at.desc()).limit(8).all()
     if not trending:
         trending = articles[:8]
-    article_cards = [article_card(a, language) for a in articles]
-    featured_cards = [article_card(a, language) for a in featured]
-    trending_cards = [article_card(a, language) for a in trending]
+    category_labels = public_category_labels(language)
+    article_cards = [article_card(a, language, category_labels) for a in articles]
+    featured_cards = [article_card(a, language, category_labels) for a in featured]
+    trending_cards = [article_card(a, language, category_labels) for a in trending]
     hero = featured_cards[0] if featured_cards else (article_cards[0] if article_cards else None)
     latest_cards = [row for row in article_cards if not hero or row["article"].id != hero["article"].id]
     categories = public_category_navigation(db)
     alt_links = {lang: f"/{lang}/" for lang in SUPPORTED_LANGUAGES}
-    return templates.TemplateResponse("public/home.html", {"request": request, "articles": article_cards, "latest_articles": latest_cards, "featured_articles": featured_cards, "trending_articles": trending_cards, "hero": hero, "categories": categories["primary"], "secondary_categories": categories["secondary"], "q": q, "category": category, "site_url": settings.site_url, "canonical": canonical_url(request, f'{language}/'), "language": language, "languages": SUPPORTED_LANGUAGES, "alt_links": alt_links, "ui": public_labels(language), "category_labels": public_category_labels(language)})
+    return templates.TemplateResponse("public/home.html", {"request": request, "articles": article_cards, "latest_articles": latest_cards, "featured_articles": featured_cards, "trending_articles": trending_cards, "hero": hero, "categories": categories["primary"], "secondary_categories": categories["secondary"], "q": q, "category": category, "site_url": settings.site_url, "canonical": canonical_url(request, f'{language}/'), "language": language, "languages": SUPPORTED_LANGUAGES, "alt_links": alt_links, "ui": public_labels(language), "category_labels": category_labels})
 
 
 @app.get("/article/{slug}", response_class=HTMLResponse)
@@ -664,21 +693,22 @@ def article_by_slug(slug: str, request: Request, language: str = "az", db=Depend
     slug_filters = [Article.slug == slug]
     if slug.isdigit():
         slug_filters.append(Article.id == int(slug))
-    article = db.query(Article).filter(or_(*slug_filters), Article.status == "published").first()
+    article = db.query(Article).options(selectinload(Article.translations)).filter(or_(*slug_filters), Article.status == "published").first()
     if not article and language != "az":
         tr = db.query(ArticleTranslation).filter(ArticleTranslation.slug == slug, ArticleTranslation.language == language).first()
-        article = db.query(Article).get(tr.article_id) if tr else None
+        article = db.query(Article).options(selectinload(Article.translations)).filter(Article.id == tr.article_id).first() if tr else None
     if not article:
         raise HTTPException(404)
     view = localized_article_view(article, language)
     narration = db.query(ArticleNarration).filter(ArticleNarration.article_id == article.id, ArticleNarration.language == language).first()
     alt_links = {lang: article_url(lang, localized_slug(article, lang)) for lang in SUPPORTED_LANGUAGES}
-    related = db.query(Article).filter(Article.status == "published", Article.id != article.id, Article.category == article.category).order_by(Article.published_at.desc(), Article.created_at.desc()).limit(3).all()
+    related = db.query(Article).options(selectinload(Article.translations)).filter(Article.status == "published", Article.id != article.id, Article.category == article.category).order_by(Article.published_at.desc(), Article.created_at.desc()).limit(3).all()
     if len(related) < 3:
-        related = related + db.query(Article).filter(Article.status == "published", Article.id != article.id, Article.category != article.category).order_by(Article.published_at.desc(), Article.created_at.desc()).limit(3 - len(related)).all()
+        related = related + db.query(Article).options(selectinload(Article.translations)).filter(Article.status == "published", Article.id != article.id, Article.category != article.category).order_by(Article.published_at.desc(), Article.created_at.desc()).limit(3 - len(related)).all()
     canonical = canonical_url(request, f"{language}/article/{view.slug}")
     navigation = public_category_navigation(db)
-    return templates.TemplateResponse("public/article.html", {"request": request, "article": view, "root_article": article, "image_exists": uploaded_image_exists(article.image_url), "narration": narration, "related_articles": [article_card(a, language) for a in related], "categories": navigation["primary"], "secondary_categories": navigation["secondary"], "share_url": canonical, "site_url": settings.site_url, "canonical": canonical, "language": language, "languages": SUPPORTED_LANGUAGES, "alt_links": alt_links, "ui": public_labels(language), "category_labels": public_category_labels(language)})
+    category_labels = public_category_labels(language)
+    return templates.TemplateResponse("public/article.html", {"request": request, "article": view, "root_article": article, "image_exists": uploaded_image_exists(article.image_url), "narration": narration, "related_articles": [article_card(a, language, category_labels) for a in related], "categories": navigation["primary"], "secondary_categories": navigation["secondary"], "share_url": canonical, "site_url": settings.site_url, "canonical": canonical, "language": language, "languages": SUPPORTED_LANGUAGES, "alt_links": alt_links, "ui": public_labels(language), "category_labels": category_labels})
 
 
 @app.get('/search', response_class=HTMLResponse)
