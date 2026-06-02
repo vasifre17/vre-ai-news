@@ -1,4 +1,6 @@
-from datetime import datetime
+from datetime import datetime, timedelta
+from email.utils import format_datetime
+import html
 from types import SimpleNamespace
 import re
 import shutil
@@ -624,6 +626,148 @@ def get_settings_map(db) -> dict[str, str]:
     return {row.key: row.value for row in db.query(Setting).all()}
 
 
+def seo_setting(settings_map: dict[str, str], key: str, default: str = "") -> str:
+    return (settings_map.get(key) or default or "").strip()
+
+
+def site_name_from_settings(settings_map: dict[str, str] | None = None) -> str:
+    settings_map = settings_map or {}
+    return seo_setting(settings_map, "site_name", settings.app_name)
+
+
+def public_absolute_url(path_or_url: str | None) -> str:
+    value = (path_or_url or "").strip()
+    if value.startswith(("http://", "https://")):
+        return value
+    return f"{settings.site_url.rstrip('/')}/{value.lstrip('/')}"
+
+
+def xml_escape(value) -> str:
+    return html.escape(str(value or ""), quote=True)
+
+
+def iso_datetime(value: datetime | None) -> str:
+    return value.isoformat() + "Z" if value else ""
+
+
+def touch_sitemap_refresh(db) -> None:
+    save_setting(db, "sitemap_last_refreshed_at", datetime.utcnow().isoformat())
+
+
+def article_translation_complete(article: Article, language: str) -> bool:
+    if language == "az":
+        return True
+    translation = get_translation(article, language)
+    return bool(translation and (translation.title or "").strip() and (translation.content or "").strip() and (translation.slug or "").strip())
+
+
+def article_missing_translation_languages(article: Article) -> list[str]:
+    return [lang for lang in SUPPORTED_LANGUAGES if not article_translation_complete(article, lang)]
+
+
+def article_seo_audit(article: Article, language: str = "az") -> dict:
+    view = localized_article_view(article, language)
+    image_exists = uploaded_image_exists(article.image_url)
+    issues = []
+    checks = {
+        "meta_title": bool((view.seo_title or "").strip()),
+        "meta_description": bool((view.meta_description or "").strip()),
+        "image": image_exists,
+        "schema": bool((view.title or "").strip() and article.published_at and image_exists),
+        "canonical": bool((view.slug or "").strip()),
+        "hreflang": all(article_translation_complete(article, lang) for lang in SUPPORTED_LANGUAGES),
+        "translation": language == "az" or article_translation_complete(article, language),
+        "slug": bool((view.slug or "").strip() and slugify(view.slug) == view.slug),
+        "published_timestamp": bool(article.published_at),
+        "updated_timestamp": bool(article.updated_at),
+        "content": len((view.content or "").strip()) >= 200,
+    }
+    issue_labels = {
+        "meta_title": "Missing meta title",
+        "meta_description": "Missing meta description",
+        "image": "Missing image",
+        "schema": "Missing schema data",
+        "canonical": "Missing canonical slug",
+        "hreflang": "Missing hreflang translation",
+        "translation": "Missing translation",
+        "slug": "Invalid slug",
+        "published_timestamp": "Missing publish timestamp",
+        "updated_timestamp": "Missing update timestamp",
+        "content": "Article content is short for Google News",
+    }
+    for key, passed in checks.items():
+        if not passed:
+            issues.append(issue_labels[key])
+    score = round((sum(1 for passed in checks.values() if passed) / len(checks)) * 100)
+    return {"score": score, "issues": issues, "checks": checks, "missing_translations": article_missing_translation_languages(article)}
+
+
+def build_organization_schema(settings_map: dict[str, str]) -> dict:
+    return {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "@id": f"{settings.site_url.rstrip('/')}/#organization",
+        "name": site_name_from_settings(settings_map),
+        "url": f"{settings.site_url.rstrip('/')}/",
+        "logo": public_absolute_url(seo_setting(settings_map, "organization_logo_url", "/assets/og-cover.jpg")),
+        "sameAs": [url for url in [seo_setting(settings_map, "youtube_url", "https://www.youtube.com/@vasifreyc"), seo_setting(settings_map, "tiktok_url", "https://www.tiktok.com/@vasifreyc")] if url],
+    }
+
+
+def build_website_schema(settings_map: dict[str, str], language: str) -> dict:
+    return {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "@id": f"{settings.site_url.rstrip('/')}/#website",
+        "name": site_name_from_settings(settings_map),
+        "url": f"{settings.site_url.rstrip('/')}/",
+        "publisher": {"@id": f"{settings.site_url.rstrip('/')}/#organization"},
+        "inLanguage": language,
+        "potentialAction": {"@type": "SearchAction", "target": f"{settings.site_url.rstrip('/')}/{language}/?q={{query}}", "query-input": "required name=query"},
+    }
+
+
+def build_breadcrumb_schema(items: list[tuple[str, str]]) -> dict:
+    return {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+            {"@type": "ListItem", "position": index, "name": name, "item": url}
+            for index, (name, url) in enumerate(items, start=1)
+        ],
+    }
+
+
+def build_news_article_schema(article: Article, view, canonical: str, image_url: str, settings_map: dict[str, str], language: str) -> dict:
+    return {
+        "@context": "https://schema.org",
+        "@type": "NewsArticle",
+        "@id": f"{canonical}#newsarticle",
+        "mainEntityOfPage": {"@type": "WebPage", "@id": canonical},
+        "headline": view.title,
+        "description": view.meta_description or view.summary or view.title,
+        "image": [image_url],
+        "datePublished": iso_datetime(article.published_at),
+        "dateModified": iso_datetime(article.updated_at or article.published_at),
+        "author": {"@type": "Organization", "name": site_name_from_settings(settings_map)},
+        "publisher": {"@id": f"{settings.site_url.rstrip('/')}/#organization"},
+        "articleSection": view.category_label,
+        "inLanguage": language,
+        "isAccessibleForFree": True,
+    }
+
+
+def seo_verification_meta(settings_map: dict[str, str]) -> dict[str, str]:
+    return {
+        "google": seo_setting(settings_map, "google_search_console_verification"),
+        "bing": seo_setting(settings_map, "bing_webmaster_verification"),
+    }
+
+
+def render_xml_response(content: str) -> Response:
+    return Response(content=content, media_type="application/xml")
+
+
 def save_setting(db, key: str, value: str) -> None:
     row = db.query(Setting).filter(Setting.key == key).first()
     if not row:
@@ -816,7 +960,14 @@ def home(request: Request, language: str = "az", q: str = "", category: str = ""
     latest_cards = [row for row in article_cards if not hero or row["article"].id != hero["article"].id]
     categories = public_category_navigation(db)
     alt_links = {lang: f"/{lang}/" for lang in SUPPORTED_LANGUAGES}
-    return templates.TemplateResponse("public/home.html", {"request": request, "articles": article_cards, "latest_articles": latest_cards, "featured_articles": featured_cards, "trending_articles": trending_cards, "hero": hero, "categories": categories["primary"], "secondary_categories": categories["secondary"], "q": q, "category": category, "site_url": settings.site_url, "canonical": canonical_url(request, f'{language}/'), "language": language, "languages": SUPPORTED_LANGUAGES, "alt_links": alt_links, "ui": public_labels(language), "category_labels": category_labels})
+    settings_map = get_settings_map(db)
+    canonical = canonical_url(request, f'{language}/')
+    schema_graph = [
+        build_organization_schema(settings_map),
+        build_website_schema(settings_map, language),
+        build_breadcrumb_schema([("Home", canonical)]),
+    ]
+    return templates.TemplateResponse("public/home.html", {"request": request, "articles": article_cards, "latest_articles": latest_cards, "featured_articles": featured_cards, "trending_articles": trending_cards, "hero": hero, "categories": categories["primary"], "secondary_categories": categories["secondary"], "q": q, "category": category, "site_url": settings.site_url, "canonical": canonical, "language": language, "languages": SUPPORTED_LANGUAGES, "alt_links": alt_links, "ui": public_labels(language), "category_labels": category_labels, "settings_map": settings_map, "verification_meta": seo_verification_meta(settings_map), "schema_graph": schema_graph, "site_name": site_name_from_settings(settings_map)})
 
 
 def render_article_page(slug: str, request: Request, language: str = "az", db=Depends(get_db)):
@@ -836,7 +987,17 @@ def render_article_page(slug: str, request: Request, language: str = "az", db=De
     canonical = canonical_url(request, f"{language}/{view.slug}")
     navigation = public_category_navigation(db)
     category_labels = public_category_labels(language)
-    return templates.TemplateResponse("public/article.html", {"request": request, "article": view, "root_article": article, "image_exists": uploaded_image_exists(article.image_url), "narration": narration, "related_articles": [article_card(a, language, category_labels) for a in related], "categories": navigation["primary"], "secondary_categories": navigation["secondary"], "share_url": canonical, "site_url": settings.site_url, "canonical": canonical, "language": language, "languages": SUPPORTED_LANGUAGES, "alt_links": alt_links, "ui": public_labels(language), "category_labels": category_labels})
+    settings_map = get_settings_map(db)
+    image_exists = uploaded_image_exists(article.image_url)
+    image_url = public_absolute_url(public_image_url(article.image_url)) if image_exists else public_absolute_url('/assets/og-cover.jpg')
+    schema_graph = [
+        build_organization_schema(settings_map),
+        build_website_schema(settings_map, language),
+        build_breadcrumb_schema([("Home", canonical_url(request, f'{language}/')), (view.category_label, canonical_url(request, f'{language}/?category={article.category or ""}')), (view.title, canonical)]),
+        build_news_article_schema(article, view, canonical, image_url, settings_map, language),
+    ]
+    seo_audit = article_seo_audit(article, language)
+    return templates.TemplateResponse("public/article.html", {"request": request, "article": view, "root_article": article, "image_exists": image_exists, "narration": narration, "related_articles": [article_card(a, language, category_labels) for a in related], "categories": navigation["primary"], "secondary_categories": navigation["secondary"], "share_url": canonical, "site_url": settings.site_url, "canonical": canonical, "language": language, "languages": SUPPORTED_LANGUAGES, "alt_links": alt_links, "ui": public_labels(language), "category_labels": category_labels, "settings_map": settings_map, "verification_meta": seo_verification_meta(settings_map), "schema_graph": schema_graph, "seo_audit": seo_audit, "site_name": site_name_from_settings(settings_map), "og_image": image_url})
 
 
 @app.get("/article/{slug}", response_class=HTMLResponse)
@@ -858,20 +1019,91 @@ def category_page(category: str, request: Request, db=Depends(get_db)):
 @app.get('/sitemap.xml')
 def sitemap(db=Depends(get_db)):
     base_url = settings.site_url.rstrip("/")
-    urls = [f"<url><loc>{base_url}/</loc></url>"]
-    urls.extend(f"<url><loc>{base_url}/{lang}/</loc></url>" for lang in SUPPORTED_LANGUAGES)
-    for a in db.query(Article).options(selectinload(Article.translations)).filter(Article.status == 'published').all():
-        urls.append(f"<url><loc>{base_url}{article_url('az', a.slug or a.id)}</loc></url>")
+    url_entries = [
+        f"<url><loc>{xml_escape(base_url + '/')}</loc><changefreq>hourly</changefreq><priority>1.0</priority></url>"
+    ]
+    url_entries.extend(
+        f"<url><loc>{xml_escape(base_url + '/' + lang + '/')}</loc><changefreq>hourly</changefreq><priority>0.9</priority></url>"
+        for lang in SUPPORTED_LANGUAGES
+    )
+    articles = db.query(Article).options(selectinload(Article.translations)).filter(Article.status == 'published').order_by(Article.published_at.desc()).all()
+    for article in articles:
         for lang in SUPPORTED_LANGUAGES:
-            if lang == "az":
+            if lang != "az" and not article_translation_complete(article, lang):
                 continue
-            urls.append(f"<url><loc>{base_url}{article_url(lang, localized_slug(a, lang))}</loc></url>")
-    return Response(content=f'<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{"".join(urls)}</urlset>', media_type='application/xml')
+            url = f"{base_url}{article_url(lang, localized_slug(article, lang))}"
+            lastmod = (article.updated_at or article.published_at or article.created_at)
+            url_entries.append(
+                f"<url><loc>{xml_escape(url)}</loc><lastmod>{xml_escape(iso_datetime(lastmod))}</lastmod><changefreq>daily</changefreq><priority>0.8</priority></url>"
+            )
+    content = f'''<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{''.join(url_entries)}</urlset>'''
+    return render_xml_response(content)
+
+
+@app.get('/news-sitemap.xml')
+def news_sitemap(db=Depends(get_db)):
+    base_url = settings.site_url.rstrip("/")
+    news_cutoff = datetime.utcnow() - timedelta(days=2)
+    articles = db.query(Article).options(selectinload(Article.translations)).filter(Article.status == 'published', Article.published_at.isnot(None), Article.published_at >= news_cutoff).order_by(Article.published_at.desc()).limit(1000).all()
+    entries = []
+    for article in articles:
+        view = localized_article_view(article, "az")
+        entries.append(
+            "<url>"
+            f"<loc>{xml_escape(base_url + article_url('az', article.slug or str(article.id)))}</loc>"
+            "<news:news>"
+            "<news:publication><news:name>VREYC</news:name><news:language>az</news:language></news:publication>"
+            f"<news:publication_date>{xml_escape(iso_datetime(article.published_at))}</news:publication_date>"
+            f"<news:title>{xml_escape(view.title)}</news:title>"
+            "</news:news>"
+            "</url>"
+        )
+    content = f'''<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:news="http://www.google.com/schemas/sitemap-news/0.9">{''.join(entries)}</urlset>'''
+    return render_xml_response(content)
+
+
+@app.get('/rss.xml')
+@app.get('/feed.xml')
+def rss_feed(db=Depends(get_db)):
+    base_url = settings.site_url.rstrip("/")
+    articles = db.query(Article).options(selectinload(Article.translations)).filter(Article.status == 'published').order_by(Article.published_at.desc(), Article.created_at.desc()).limit(50).all()
+    items = []
+    for article in articles:
+        view = localized_article_view(article, "az")
+        link = f"{base_url}{article_url('az', article.slug or str(article.id))}"
+        pub_date = format_datetime(article.published_at or article.created_at)
+        enclosure = ""
+        if uploaded_image_exists(article.image_url):
+            enclosure = f'<enclosure url="{xml_escape(public_absolute_url(public_image_url(article.image_url)))}" type="image/jpeg" />'
+        items.append(
+            "<item>"
+            f"<title>{xml_escape(view.title)}</title>"
+            f"<link>{xml_escape(link)}</link>"
+            f'<guid isPermaLink="true">{xml_escape(link)}</guid>'
+            f"<description>{xml_escape(view.summary or view.meta_description or view.title)}</description>"
+            f"<pubDate>{xml_escape(pub_date)}</pubDate>"
+            f"{enclosure}"
+            "</item>"
+        )
+    content = f'''<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"><channel><title>VREYC Latest News</title><link>{xml_escape(base_url + '/')}</link><description>Latest VREYC news updates</description>{''.join(items)}</channel></rss>'''
+    return Response(content=content, media_type='application/rss+xml')
 
 
 @app.get('/robots.txt')
 def robots():
-    return Response(content=f"User-agent: *\nAllow: /\nDisallow: /admin\nSitemap: {settings.site_url.rstrip('/')}/sitemap.xml\n", media_type='text/plain')
+    base_url = settings.site_url.rstrip('/')
+    content = (
+        "User-agent: *\n"
+        "Allow: /\n"
+        "Disallow: /admin\n"
+        f"Sitemap: {base_url}/sitemap.xml\n"
+        f"Sitemap: {base_url}/news-sitemap.xml\n"
+        f"RSS: {base_url}/rss.xml\n"
+    )
+    return Response(content=content, media_type='text/plain')
 
 
 @app.exception_handler(401)
@@ -940,9 +1172,10 @@ def admin_articles(
     articles = apply_admin_article_sort(query, sort).offset((page - 1) * per_page).limit(per_page).all()
     narration_map = {n.article_id: n for n in db.query(ArticleNarration).filter(ArticleNarration.article_id.in_([a.id for a in articles] or [0])).all()}
     translation_missing_map = {a.id: missing_translation_languages(a) for a in articles}
+    seo_score_map = {a.id: article_seo_audit(a, 'az')['score'] for a in articles}
     categories = admin_article_categories(db)
     filters = {"q": q, "status": status, "category": category, "language": language, "date_from": date_from, "date_to": date_to, "sort": sort, "page": page, "per_page": per_page}
-    return templates.TemplateResponse("admin/articles.html", {"request": request, "articles": articles, "status": status, "narration_map": narration_map, "translation_missing_map": translation_missing_map, "languages": SUPPORTED_LANGUAGES, "language_labels": LANGUAGE_LABELS, "categories": categories, "filters": filters, "total": total, "total_pages": total_pages, "page": page, "per_page": per_page, "ai_translation_status": ai_translation_status()})
+    return templates.TemplateResponse("admin/articles.html", {"request": request, "articles": articles, "status": status, "narration_map": narration_map, "translation_missing_map": translation_missing_map, "seo_score_map": seo_score_map, "languages": SUPPORTED_LANGUAGES, "language_labels": LANGUAGE_LABELS, "categories": categories, "filters": filters, "total": total, "total_pages": total_pages, "page": page, "per_page": per_page, "ai_translation_status": ai_translation_status()})
 
 
 
@@ -967,6 +1200,7 @@ async def bulk_articles(request: Request, db=Depends(get_db), _=Depends(require_
             article.published_at = article.published_at or now
             article.slug = article.slug or unique_article_slug(db, article.title, article.id)
             article.updated_at = now
+            touch_sitemap_refresh(db)
             queue_narration(db, article)
     elif action == 'unpublish':
         for article in articles:
@@ -1030,6 +1264,8 @@ async def create_article(request: Request, db=Depends(get_db), _=Depends(require
             row.meta_description = form.get(f'meta_description_{lang}', '')
             row.tags = form.get(f'tags_{lang}', '')
             db.add(row)
+    if article.status == 'published':
+        touch_sitemap_refresh(db)
     db.commit()
     if is_ai_translation_configured():
         scheduler.add_job(generate_missing_translations, args=[article.id], id=f"article_translation_{article.id}_{datetime.utcnow().timestamp()}", replace_existing=False)
@@ -1044,6 +1280,7 @@ def publish_article(article_id: int, request: Request, db=Depends(get_db), _=Dep
         a.published_at = a.published_at or datetime.utcnow()
         a.slug = a.slug or unique_article_slug(db, a.title, a.id)
         a.updated_at = datetime.utcnow()
+        touch_sitemap_refresh(db)
         db.commit()
         queue_narration(db, a)
         if is_ai_translation_configured():
@@ -1124,6 +1361,8 @@ async def edit_article(article_id: int, request: Request, db=Depends(get_db), _=
         row.meta_description = form.get(f'meta_description_{lang}', '')
         row.tags = form.get(f'tags_{lang}', '')
         row.updated_at = datetime.utcnow()
+    if a.status == 'published':
+        touch_sitemap_refresh(db)
     db.commit()
     translation_status = "queued" if is_ai_translation_configured() else "not_configured"
     if is_ai_translation_configured():
@@ -1242,6 +1481,33 @@ def delete_media(asset_id: int, request: Request, db=Depends(get_db), _=Depends(
     return RedirectResponse('/admin/media', status_code=302)
 
 
+@app.get('/admin/seo', response_class=HTMLResponse)
+def admin_seo_diagnostics(request: Request, db=Depends(get_db), _=Depends(require_auth)):
+    articles = db.query(Article).options(selectinload(Article.translations)).order_by(Article.status.desc(), Article.published_at.desc(), Article.updated_at.desc()).all()
+    rows = []
+    issue_counts = {
+        'Missing meta title': 0,
+        'Missing meta description': 0,
+        'Missing image': 0,
+        'Missing schema': 0,
+        'Missing canonical': 0,
+        'Missing hreflang': 0,
+        'Missing translation': 0,
+    }
+    for article in articles:
+        audit = article_seo_audit(article, 'az')
+        for issue in audit['issues']:
+            if issue.startswith('Missing schema'):
+                issue_counts['Missing schema'] += 1
+            elif issue in issue_counts:
+                issue_counts[issue] += 1
+            elif issue == 'Missing hreflang translation':
+                issue_counts['Missing hreflang'] += 1
+        rows.append({'article': article, 'audit': audit})
+    settings_map = get_settings_map(db)
+    return templates.TemplateResponse('admin/seo.html', {'request': request, 'rows': rows, 'issue_counts': issue_counts, 'settings_map': settings_map, 'languages': SUPPORTED_LANGUAGES, 'ai_translation_status': ai_translation_status()})
+
+
 @app.get('/admin/settings', response_class=HTMLResponse)
 def settings_page(request: Request, db=Depends(get_db), _=Depends(require_auth)):
     admin_settings = get_settings_map(db)
@@ -1249,9 +1515,21 @@ def settings_page(request: Request, db=Depends(get_db), _=Depends(require_auth))
 
 
 @app.post('/admin/settings')
-def save_settings(request: Request, site_name: str = Form('VREYC'), editor_name: str = Form('Editor'), publish_mode: str = Form('manual'), default_language: str = Form('az'), db=Depends(get_db), _=Depends(require_auth)):
-    for key, value in {'site_name': site_name, 'editor_name': editor_name, 'publish_mode': publish_mode, 'default_language': default_language}.items():
-        save_setting(db, key, value)
+def save_settings(request: Request, site_name: str = Form('VREYC'), editor_name: str = Form('Editor'), publish_mode: str = Form('manual'), default_language: str = Form('az'), google_search_console_verification: str | None = Form(None), bing_webmaster_verification: str | None = Form(None), organization_logo_url: str | None = Form(None), youtube_url: str | None = Form(None), tiktok_url: str | None = Form(None), db=Depends(get_db), _=Depends(require_auth)):
+    values = {
+        'site_name': site_name,
+        'editor_name': editor_name,
+        'publish_mode': publish_mode,
+        'default_language': default_language,
+        'google_search_console_verification': google_search_console_verification.strip() if google_search_console_verification is not None else None,
+        'bing_webmaster_verification': bing_webmaster_verification.strip() if bing_webmaster_verification is not None else None,
+        'organization_logo_url': organization_logo_url.strip() if organization_logo_url is not None else None,
+        'youtube_url': youtube_url.strip() if youtube_url is not None else None,
+        'tiktok_url': tiktok_url.strip() if tiktok_url is not None else None,
+    }
+    for key, value in values.items():
+        if value is not None:
+            save_setting(db, key, value)
     db.commit()
     return RedirectResponse('/admin/settings?saved=1', status_code=302)
 

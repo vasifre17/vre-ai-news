@@ -3,14 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>VREYC — Premium AI News Portal</title>
+  <title>{{ site_name }} — Premium AI News Portal</title>
   <meta name="description" content="VREYC delivers real-time AI-curated global news across politics, world affairs, economy, technology, business, sports and health.">
   <meta name="robots" content="index,follow,max-image-preview:large">
   <link rel="stylesheet" href="/assets/styles.css">
+  {% if verification_meta.google %}<meta name="google-site-verification" content="{{ verification_meta.google }}">{% endif %}{% if verification_meta.bing %}<meta name="msvalidate.01" content="{{ verification_meta.bing }}">{% endif %}
   <link rel="canonical" href="{{ canonical }}">{% for lang, link in alt_links.items() %}<link rel="alternate" hreflang="{{lang}}" href="{{site_url}}{{link}}">{% endfor %}<link rel="alternate" hreflang="x-default" href="{{site_url}}/az/">
-  <meta property="og:type" content="website"><meta property="og:site_name" content="VREYC"><meta property="og:title" content="VREYC — Premium AI News Portal"><meta property="og:description" content="AI-curated world news with a professional newsroom experience."><meta property="og:url" content="{{ canonical }}"><meta property="og:image" content="{{ site_url }}/assets/og-cover.jpg">
-  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="VREYC — Premium AI News Portal"><meta name="twitter:description" content="AI-curated world news with a professional newsroom experience."><meta name="twitter:image" content="{{ site_url }}/assets/og-cover.jpg">
-  <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"VREYC","url":"{{ site_url }}/","potentialAction":{"@type":"SearchAction","target":"{{ site_url }}/{{ language }}/?q={query}","query-input":"required name=query"}}</script>
+  <meta property="og:type" content="website"><meta property="og:site_name" content="{{ site_name }}"><meta property="og:title" content="{{ site_name }} — Premium AI News Portal"><meta property="og:description" content="AI-curated world news with a professional newsroom experience."><meta property="og:url" content="{{ canonical }}"><meta property="og:image" content="{{ site_url }}/assets/og-cover.jpg">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="{{ site_name }} — Premium AI News Portal"><meta name="twitter:description" content="AI-curated world news with a professional newsroom experience."><meta name="twitter:image" content="{{ site_url }}/assets/og-cover.jpg">
+  <script type="application/ld+json">{{ {"@context":"https://schema.org", "@graph": schema_graph}|tojson }}</script>
 </head>
 <body>
 <header class="site-header glass">
