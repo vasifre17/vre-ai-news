@@ -80,18 +80,22 @@ def main() -> int:
     assert_contains(en_home.text, "https://vreyc.com/en/", "English canonical URL")
     assert_contains(en_home.text, "image-placeholder", "VREYC placeholder for missing uploaded image")
 
-    article = client.get("/en/article/azerbaijan-news-en")
+    article = client.get("/en/azerbaijan-news-en")
     article.raise_for_status()
     assert_contains(article.text, "Azerbaijan news SEO", "translated SEO title")
-    assert_contains(article.text, "https://vreyc.com/en/article/azerbaijan-news-en", "article canonical URL")
+    assert_contains(article.text, "https://vreyc.com/en/azerbaijan-news-en", "article canonical URL")
     assert_contains(article.text, "https://vreyc.com/assets/og-cover.jpg", "fallback social image for missing upload")
     assert_contains(article.text, "/static/audio/smoke-en.mp3", "English narration audio")
     assert_contains(article.text, 'hreflang="az"', "alternate language metadata")
 
+    legacy_article = client.get("/en/article/azerbaijan-news-en")
+    legacy_article.raise_for_status()
+    assert_contains(legacy_article.text, "https://vreyc.com/en/azerbaijan-news-en", "legacy article route canonical URL")
+
     sitemap = client.get("/sitemap.xml")
     sitemap.raise_for_status()
     assert_contains(sitemap.text, "https://vreyc.com/", "sitemap root URL")
-    assert_contains(sitemap.text, "https://vreyc.com/en/article/azerbaijan-news-en", "sitemap translated article URL")
+    assert_contains(sitemap.text, "https://vreyc.com/en/azerbaijan-news-en", "sitemap translated article URL")
 
     robots = client.get("/robots.txt")
     robots.raise_for_status()
