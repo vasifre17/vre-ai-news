@@ -10,6 +10,7 @@
       {% set item = translations.get(lang) %}
       <details class="locale-panel" {% if lang == 'az' %}open{% endif %}>
         <summary><span>{{ lang|upper }}</span>{{ language_labels[lang] }}</summary>
+        {% if lang != 'az' %}<p class="muted">Frontend pages use these {{ language_labels[lang] }} article title, summary, SEO and content fields whenever they are filled. Empty fields fall back to Azerbaijani temporarily.</p>{% endif %}
         <div class="form-grid two">
           <label>Title<input name="title_{{ lang }}" value="{{ item.title if item else '' }}" {% if lang == 'az' %}required{% endif %}></label>
           <label>Slug<input name="slug_{{ lang }}" value="{{ item.slug if item else '' }}" placeholder="seo-friendly-slug"></label>
