@@ -1,4 +1,5 @@
 from datetime import datetime
+from types import SimpleNamespace
 import re
 import shutil
 from pathlib import Path
@@ -454,6 +455,36 @@ def get_translation(article: Article, language: str):
     return None
 
 
+def localized_value(article: Article, translation: ArticleTranslation | None, field: str):
+    value = getattr(translation, field, None) if translation else None
+    if value not in (None, ""):
+        return value
+    return getattr(article, field, None)
+
+
+def localized_slug(article: Article, language: str) -> str:
+    translation = get_translation(article, language) if language != "az" else None
+    return localized_value(article, translation, "slug") or article.slug or str(article.id)
+
+
+def localized_article_view(article: Article, language: str):
+    translation = get_translation(article, language) if language != "az" else None
+    return SimpleNamespace(
+        id=article.id,
+        title=localized_value(article, translation, "title"),
+        slug=localized_slug(article, language),
+        summary=localized_value(article, translation, "summary"),
+        content=localized_value(article, translation, "content"),
+        seo_title=localized_value(article, translation, "seo_title"),
+        meta_description=localized_value(article, translation, "meta_description"),
+        tags=localized_value(article, translation, "tags"),
+        language=language,
+        source_language="az",
+        has_translation=bool(translation),
+        translation=translation,
+    )
+
+
 def unique_article_slug(db, requested_slug: str, current_id: int | None = None) -> str:
     root = slugify(requested_slug)
     candidate = root
@@ -525,11 +556,8 @@ def public_category_navigation(db) -> dict[str, list[Category]]:
 
 
 def article_card(article: Article, language: str) -> dict:
-    tr = get_translation(article, language)
-    title = tr.title if tr and tr.title else article.title
-    summary = tr.summary if tr and tr.summary else article.summary
-    slug = tr.slug if tr and tr.slug else (article.slug or str(article.id))
-    return {"article": article, "t": tr, "title": title, "summary": summary, "url": article_url(language, slug), "image_exists": uploaded_image_exists(article.image_url)}
+    view = localized_article_view(article, language)
+    return {"article": article, "view": view, "t": view.translation, "title": view.title, "summary": view.summary, "url": article_url(language, view.slug), "image_exists": uploaded_image_exists(article.image_url)}
 
 def get_settings_map(db) -> dict[str, str]:
     return {row.key: row.value for row in db.query(Setting).all()}
@@ -625,7 +653,8 @@ def home(request: Request, language: str = "az", q: str = "", category: str = ""
     hero = featured_cards[0] if featured_cards else (article_cards[0] if article_cards else None)
     latest_cards = [row for row in article_cards if not hero or row["article"].id != hero["article"].id]
     categories = public_category_navigation(db)
-    return templates.TemplateResponse("public/home.html", {"request": request, "articles": article_cards, "latest_articles": latest_cards, "featured_articles": featured_cards, "trending_articles": trending_cards, "hero": hero, "categories": categories["primary"], "secondary_categories": categories["secondary"], "q": q, "category": category, "site_url": settings.site_url, "canonical": canonical_url(request, f'{language}/'), "language": language, "languages": SUPPORTED_LANGUAGES, "ui": public_labels(language), "category_labels": public_category_labels(language)})
+    alt_links = {lang: f"/{lang}/" for lang in SUPPORTED_LANGUAGES}
+    return templates.TemplateResponse("public/home.html", {"request": request, "articles": article_cards, "latest_articles": latest_cards, "featured_articles": featured_cards, "trending_articles": trending_cards, "hero": hero, "categories": categories["primary"], "secondary_categories": categories["secondary"], "q": q, "category": category, "site_url": settings.site_url, "canonical": canonical_url(request, f'{language}/'), "language": language, "languages": SUPPORTED_LANGUAGES, "alt_links": alt_links, "ui": public_labels(language), "category_labels": public_category_labels(language)})
 
 
 @app.get("/article/{slug}", response_class=HTMLResponse)
@@ -641,14 +670,13 @@ def article_by_slug(slug: str, request: Request, language: str = "az", db=Depend
         article = db.query(Article).get(tr.article_id) if tr else None
     if not article:
         raise HTTPException(404)
-    tr = get_translation(article, language)
-    view = tr if tr else article
+    view = localized_article_view(article, language)
     narration = db.query(ArticleNarration).filter(ArticleNarration.article_id == article.id, ArticleNarration.language == language).first()
-    alt_links = {lang: article_url(lang, (get_translation(article, lang).slug if get_translation(article, lang) else (article.slug or str(article.id)))) for lang in SUPPORTED_LANGUAGES}
+    alt_links = {lang: article_url(lang, localized_slug(article, lang)) for lang in SUPPORTED_LANGUAGES}
     related = db.query(Article).filter(Article.status == "published", Article.id != article.id, Article.category == article.category).order_by(Article.published_at.desc(), Article.created_at.desc()).limit(3).all()
     if len(related) < 3:
         related = related + db.query(Article).filter(Article.status == "published", Article.id != article.id, Article.category != article.category).order_by(Article.published_at.desc(), Article.created_at.desc()).limit(3 - len(related)).all()
-    canonical = canonical_url(request, f"{language}/article/{view.slug or article.slug or article.id}")
+    canonical = canonical_url(request, f"{language}/article/{view.slug}")
     navigation = public_category_navigation(db)
     return templates.TemplateResponse("public/article.html", {"request": request, "article": view, "root_article": article, "image_exists": uploaded_image_exists(article.image_url), "narration": narration, "related_articles": [article_card(a, language) for a in related], "categories": navigation["primary"], "secondary_categories": navigation["secondary"], "share_url": canonical, "site_url": settings.site_url, "canonical": canonical, "language": language, "languages": SUPPORTED_LANGUAGES, "alt_links": alt_links, "ui": public_labels(language), "category_labels": public_category_labels(language)})
 
@@ -670,8 +698,10 @@ def sitemap(db=Depends(get_db)):
     urls.extend(f"<url><loc>{base_url}/{lang}/</loc></url>" for lang in SUPPORTED_LANGUAGES)
     for a in db.query(Article).filter(Article.status == 'published').all():
         urls.append(f"<url><loc>{base_url}/az/article/{a.slug or a.id}</loc></url>")
-        for tr in a.translations:
-            urls.append(f"<url><loc>{base_url}/{tr.language}/article/{tr.slug}</loc></url>")
+        for lang in SUPPORTED_LANGUAGES:
+            if lang == "az":
+                continue
+            urls.append(f"<url><loc>{base_url}/{lang}/article/{localized_slug(a, lang)}</loc></url>")
     return Response(content=f'<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{"".join(urls)}</urlset>', media_type='application/xml')
 
 
@@ -830,7 +860,11 @@ async def edit_article(article_id: int, request: Request, db=Depends(get_db), _=
         db.flush()
     db.add(ArticleRevision(article_id=a.id, title=a.title, content=a.content, image_url=a.image_url, category=a.category, seo_title=a.seo_title, tags=a.tags))
     a.title = form.get('title_az') or form.get('title') or a.title
-    a.slug = unique_article_slug(db, form.get('slug_az') or a.title, a.id)
+    requested_az_slug = form.get('slug_az')
+    if requested_az_slug and requested_az_slug != a.slug:
+        a.slug = unique_article_slug(db, requested_az_slug, a.id)
+    elif not a.slug:
+        a.slug = unique_article_slug(db, a.title, a.id)
     a.summary = form.get('summary_az', '')
     a.content = form.get('content_az', '')
     a.seo_title = form.get('seo_title_az', '')
@@ -852,21 +886,19 @@ async def edit_article(article_id: int, request: Request, db=Depends(get_db), _=
             continue
         has_content = any(form.get(f'{field}_{lang}', '') for field in ['title', 'summary', 'content', 'seo_title', 'meta_description', 'tags', 'slug'])
         row = db.query(ArticleTranslation).filter(ArticleTranslation.article_id == a.id, ArticleTranslation.language == lang).first()
-        if not has_content and row:
-            db.delete(row)
+        if not has_content:
             continue
-        if has_content:
-            row = row or ArticleTranslation(article_id=a.id, language=lang)
-            if row.id is None:
-                db.add(row)
-            row.title = form.get(f'title_{lang}', '')
-            row.slug = slugify(form.get(f'slug_{lang}') or row.title or f'{a.slug}-{lang}')
-            row.summary = form.get(f'summary_{lang}', '')
-            row.content = form.get(f'content_{lang}', '')
-            row.seo_title = form.get(f'seo_title_{lang}', '')
-            row.meta_description = form.get(f'meta_description_{lang}', '')
-            row.tags = form.get(f'tags_{lang}', '')
-            row.updated_at = datetime.utcnow()
+        row = row or ArticleTranslation(article_id=a.id, language=lang)
+        if row.id is None:
+            db.add(row)
+        row.title = form.get(f'title_{lang}', '')
+        row.slug = slugify(form.get(f'slug_{lang}') or row.slug or row.title or f'{a.slug}-{lang}')
+        row.summary = form.get(f'summary_{lang}', '')
+        row.content = form.get(f'content_{lang}', '')
+        row.seo_title = form.get(f'seo_title_{lang}', '')
+        row.meta_description = form.get(f'meta_description_{lang}', '')
+        row.tags = form.get(f'tags_{lang}', '')
+        row.updated_at = datetime.utcnow()
     db.commit()
     return RedirectResponse(f'/admin/articles/{a.id}/edit?saved=1', status_code=302)
 
@@ -1019,7 +1051,8 @@ def admin_generate_translations(article_id: int, request: Request, db=Depends(ge
         row.seo_title = payload.get("seo_title", row.title)
         row.meta_description = payload.get("meta_description", article.meta_description)
         row.tags = payload.get("tags", article.tags)
-        row.slug = slugify(row.title) + f"-{lang}"
+        if not row.slug:
+            row.slug = slugify(row.title) + f"-{lang}"
         if article.status == "published" and article.narration_enabled:
             queue_narration(db, article, lang)
     db.commit()
