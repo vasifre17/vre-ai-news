@@ -1,12 +1,14 @@
 from datetime import datetime, timedelta
+import hashlib
 from email.utils import format_datetime
 import html
 from types import SimpleNamespace
 import re
 import shutil
+from urllib.parse import urlparse
 from pathlib import Path
 from uuid import uuid4
-from sqlalchemy import or_, text
+from sqlalchemy import func, or_, text
 from sqlalchemy.orm import selectinload
 from fastapi import FastAPI, Request, Depends, Form, HTTPException, UploadFile, File
 from PIL import Image, UnidentifiedImageError
@@ -20,7 +22,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from config import settings
 from database.session import SessionLocal, init_db
-from database.models import Article, ArticleRevision, FetchLog, Setting, ArticleNarration, ArticleTranslation, Category, MediaAsset
+from database.models import Article, ArticleRevision, ArticleView, FetchLog, Setting, ArticleNarration, ArticleTranslation, Category, MediaAsset
 from cms.auth.security import is_authenticated, set_session, clear_session, verify_password
 from scheduler.jobs import run_fetch_pipeline, queue_narration, generate_pending_narrations
 from ai.translation_service import (
@@ -855,6 +857,173 @@ def apply_admin_article_sort(query, sort: str):
         return query.order_by(Article.updated_at.desc(), Article.created_at.desc())
     return query.order_by(Article.published_at.desc(), Article.created_at.desc(), Article.id.desc())
 
+def utc_start_of_day(value: datetime | None = None) -> datetime:
+    current = value or datetime.utcnow()
+    return current.replace(hour=0, minute=0, second=0, microsecond=0)
+
+
+def compact_number(value) -> str:
+    number = int(value or 0)
+    if number >= 1_000_000:
+        return f"{number / 1_000_000:.1f}M"
+    if number >= 1_000:
+        return f"{number / 1_000:.1f}K"
+    return str(number)
+
+
+def classify_traffic_source(referrer: str | None, request: Request) -> str:
+    if not referrer:
+        return "Direct"
+    host = (urlparse(referrer).netloc or "").lower()
+    current_host = request.url.hostname or urlparse(settings.site_url).netloc.lower()
+    if current_host and current_host.lower() in host:
+        return "Internal"
+    search_hosts = ("google.", "bing.", "duckduckgo.", "yahoo.", "yandex.")
+    social_hosts = ("facebook.", "fb.", "twitter.", "x.com", "linkedin.", "tiktok.", "instagram.", "threads.")
+    if any(item in host for item in search_hosts):
+        return "Search"
+    if any(item in host for item in social_hosts):
+        return "Social"
+    return "Referral"
+
+
+def visitor_fingerprint(request: Request) -> str:
+    raw = "|".join([
+        get_remote_address(request) or "unknown",
+        request.headers.get("user-agent", "unknown"),
+    ])
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def record_article_view(db, article: Article, request: Request, language: str) -> None:
+    article.view_count = (article.view_count or 0) + 1
+    article.updated_at = article.updated_at or datetime.utcnow()
+    db.add(ArticleView(
+        article_id=article.id,
+        visitor_key=visitor_fingerprint(request),
+        traffic_source=classify_traffic_source(request.headers.get("referer"), request),
+        path=str(request.url.path),
+        language=language,
+    ))
+    db.commit()
+
+
+def analytics_summary(db) -> dict:
+    today = utc_start_of_day()
+    last_7_days = today - timedelta(days=6)
+    last_30_days = today - timedelta(days=29)
+    total_views = db.query(func.coalesce(func.sum(Article.view_count), 0)).scalar() or 0
+    views_today = db.query(func.count(ArticleView.id)).filter(ArticleView.viewed_at >= today).scalar() or 0
+    views_7 = db.query(func.count(ArticleView.id)).filter(ArticleView.viewed_at >= last_7_days).scalar() or 0
+    views_30 = db.query(func.count(ArticleView.id)).filter(ArticleView.viewed_at >= last_30_days).scalar() or 0
+    unique_visitors = db.query(func.count(func.distinct(ArticleView.visitor_key))).filter(ArticleView.visitor_key.isnot(None), ArticleView.visitor_key != "").scalar() or 0
+    returning_rows = db.query(ArticleView.visitor_key).filter(ArticleView.visitor_key.isnot(None), ArticleView.visitor_key != "").group_by(ArticleView.visitor_key).having(func.count(ArticleView.id) > 1).all()
+    return {
+        "total_views": total_views,
+        "views_today": views_today,
+        "views_7_days": views_7,
+        "views_30_days": views_30,
+        "unique_visitors": unique_visitors,
+        "returning_visitors": len(returning_rows),
+    }
+
+
+def top_category_rows(db, limit: int = 10) -> list[dict]:
+    rows = db.query(Article.category, func.count(ArticleView.id)).join(ArticleView, ArticleView.article_id == Article.id).group_by(Article.category).order_by(func.count(ArticleView.id).desc()).limit(limit).all()
+    if not rows:
+        rows = db.query(Article.category, func.coalesce(func.sum(Article.view_count), 0)).group_by(Article.category).order_by(func.coalesce(func.sum(Article.view_count), 0).desc()).limit(limit).all()
+    total = sum(int(count or 0) for _, count in rows) or 1
+    return [{"name": category or "Uncategorized", "views": int(count or 0), "share": round((int(count or 0) / total) * 100)} for category, count in rows]
+
+
+def period_chart(rows: list[ArticleView], start: datetime, days: int, label_format: str) -> list[dict]:
+    buckets = []
+    for offset in range(days):
+        day = start + timedelta(days=offset)
+        buckets.append({"key": day.date().isoformat(), "label": day.strftime(label_format), "views": 0})
+    index = {item["key"]: item for item in buckets}
+    for row in rows:
+        key = row.viewed_at.date().isoformat()
+        if key in index:
+            index[key]["views"] += 1
+    maximum = max([item["views"] for item in buckets] + [1])
+    for item in buckets:
+        item["height"] = max(8, round((item["views"] / maximum) * 100)) if item["views"] else 4
+    return buckets
+
+
+def weekly_chart(rows: list[ArticleView], start: datetime, weeks: int = 8) -> list[dict]:
+    buckets = []
+    for offset in range(weeks):
+        week_start = start + timedelta(days=offset * 7)
+        week_end = week_start + timedelta(days=7)
+        views = sum(1 for row in rows if week_start <= row.viewed_at < week_end)
+        buckets.append({"label": week_start.strftime("%b %d"), "views": views})
+    maximum = max([item["views"] for item in buckets] + [1])
+    for item in buckets:
+        item["height"] = max(8, round((item["views"] / maximum) * 100)) if item["views"] else 4
+    return buckets
+
+
+def monthly_chart(rows: list[ArticleView], months: int = 6) -> list[dict]:
+    today = utc_start_of_day()
+    month_keys = []
+    year, month = today.year, today.month
+    for _ in range(months):
+        month_keys.append((year, month))
+        month -= 1
+        if month == 0:
+            month = 12
+            year -= 1
+    month_keys.reverse()
+    buckets = []
+    for year, month in month_keys:
+        views = sum(1 for row in rows if row.viewed_at.year == year and row.viewed_at.month == month)
+        buckets.append({"label": datetime(year, month, 1).strftime("%b"), "views": views})
+    maximum = max([item["views"] for item in buckets] + [1])
+    for item in buckets:
+        item["height"] = max(8, round((item["views"] / maximum) * 100)) if item["views"] else 4
+    return buckets
+
+
+def traffic_charts(db, article_id: int | None = None) -> dict:
+    today = utc_start_of_day()
+    start_daily = today - timedelta(days=13)
+    start_weekly = today - timedelta(days=7 * 7)
+    start_monthly = today - timedelta(days=190)
+    query = db.query(ArticleView).filter(ArticleView.viewed_at >= start_monthly)
+    if article_id is not None:
+        query = query.filter(ArticleView.article_id == article_id)
+    rows = query.order_by(ArticleView.viewed_at.asc()).all()
+    return {
+        "daily": period_chart([row for row in rows if row.viewed_at >= start_daily], start_daily, 14, "%b %d"),
+        "weekly": weekly_chart([row for row in rows if row.viewed_at >= start_weekly], start_weekly),
+        "monthly": monthly_chart(rows),
+    }
+
+
+def article_analytics_context(db, article: Article) -> dict:
+    history = db.query(ArticleView).filter(ArticleView.article_id == article.id).order_by(ArticleView.viewed_at.desc()).limit(100).all()
+    sources = db.query(ArticleView.traffic_source, func.count(ArticleView.id)).filter(ArticleView.article_id == article.id).group_by(ArticleView.traffic_source).order_by(func.count(ArticleView.id).desc()).all()
+    publish_start = article.published_at or article.created_at or datetime.utcnow()
+    first_24h_end = publish_start + timedelta(days=1)
+    first_24h_views = db.query(func.count(ArticleView.id)).filter(ArticleView.article_id == article.id, ArticleView.viewed_at >= publish_start, ArticleView.viewed_at < first_24h_end).scalar() or 0
+    last_7_views = db.query(func.count(ArticleView.id)).filter(ArticleView.article_id == article.id, ArticleView.viewed_at >= utc_start_of_day() - timedelta(days=6)).scalar() or 0
+    unique_visitors = db.query(func.count(func.distinct(ArticleView.visitor_key))).filter(ArticleView.article_id == article.id, ArticleView.visitor_key.isnot(None), ArticleView.visitor_key != "").scalar() or 0
+    return {
+        "history": history,
+        "sources": [{"name": source or "Direct", "views": int(count or 0)} for source, count in sources],
+        "charts": traffic_charts(db, article.id),
+        "publish_performance": {
+            "total_views": article.view_count or 0,
+            "first_24h_views": first_24h_views,
+            "last_7_views": last_7_views,
+            "unique_visitors": unique_visitors,
+            "published_at": article.published_at,
+        },
+    }
+
+
 def article_form_context(db, article: Article | None = None) -> dict:
     categories = db.query(Category).order_by(Category.name.asc()).all()
     if not categories:
@@ -882,6 +1051,7 @@ def apply_schema_migrations(db) -> None:
     # SQLAlchemy model if older databases were initialized before multilingual
     # article storage existed, then add any newly introduced nullable columns.
     ArticleTranslation.__table__.create(bind=db.get_bind(), checkfirst=True)
+    ArticleView.__table__.create(bind=db.get_bind(), checkfirst=True)
     for statement in [
         "ALTER TABLE articles ADD COLUMN slug VARCHAR(500)",
         "ALTER TABLE articles ADD COLUMN narration_enabled BOOLEAN DEFAULT true",
@@ -906,6 +1076,10 @@ def apply_schema_migrations(db) -> None:
         "CREATE INDEX IF NOT EXISTS ix_article_translations_slug ON article_translations (slug)",
         "CREATE UNIQUE INDEX IF NOT EXISTS ix_article_translations_article_language ON article_translations (article_id, language)",
         "CREATE INDEX IF NOT EXISTS ix_article_translations_language_slug ON article_translations (language, slug)",
+        "CREATE INDEX IF NOT EXISTS ix_article_views_article_id ON article_views (article_id)",
+        "CREATE INDEX IF NOT EXISTS ix_article_views_viewed_at ON article_views (viewed_at)",
+        "CREATE INDEX IF NOT EXISTS ix_article_views_visitor_key ON article_views (visitor_key)",
+        "CREATE INDEX IF NOT EXISTS ix_article_views_traffic_source ON article_views (traffic_source)",
     ]:
         try:
             db.execute(text(statement))
@@ -975,9 +1149,7 @@ def render_article_page(slug: str, request: Request, language: str = "az", db=De
     article = find_published_article_by_slug(db, slug, language)
     if not article:
         raise HTTPException(404)
-    article.view_count = (article.view_count or 0) + 1
-    article.updated_at = article.updated_at or datetime.utcnow()
-    db.commit()
+    record_article_view(db, article, request, language)
     view = localized_article_view(article, language)
     narration = db.query(ArticleNarration).filter(ArticleNarration.article_id == article.id, ArticleNarration.language == language).first()
     alt_links = {lang: article_url(lang, localized_slug(article, lang)) for lang in SUPPORTED_LANGUAGES}
@@ -1145,7 +1317,8 @@ def admin_dashboard(request: Request, db=Depends(get_db), _=Depends(require_auth
     logs = db.query(FetchLog).order_by(FetchLog.created_at.desc()).limit(8).all()
     latest_articles = db.query(Article).order_by(Article.created_at.desc(), Article.id.desc()).limit(10).all()
     most_viewed_articles = db.query(Article).order_by(Article.view_count.desc(), Article.published_at.desc(), Article.created_at.desc()).limit(10).all()
-    return templates.TemplateResponse('admin/dashboard.html', {'request': request, 'drafts': drafts, 'published': published, 'total_articles': total_articles, 'categories': categories, 'media_count': media_count, 'logs': logs, 'recent_articles': latest_articles, 'latest_articles': latest_articles, 'most_viewed_articles': most_viewed_articles, "languages": SUPPORTED_LANGUAGES, "ai_translation_status": ai_translation_status()})
+    analytics = analytics_summary(db)
+    return templates.TemplateResponse('admin/dashboard.html', {'request': request, 'drafts': drafts, 'published': published, 'total_articles': total_articles, 'categories': categories, 'media_count': media_count, 'logs': logs, 'recent_articles': latest_articles, 'latest_articles': latest_articles, 'most_viewed_articles': most_viewed_articles, 'analytics': analytics, 'top_categories': top_category_rows(db), 'traffic_charts': traffic_charts(db), "languages": SUPPORTED_LANGUAGES, "ai_translation_status": ai_translation_status()})
 
 
 @app.get('/admin/articles', response_class=HTMLResponse)
@@ -1297,6 +1470,15 @@ def unpublish_article(article_id: int, request: Request, db=Depends(get_db), _=D
         a.updated_at = datetime.utcnow()
         db.commit()
     return RedirectResponse('/admin/articles?status=draft', status_code=302)
+
+
+@app.get('/admin/articles/{article_id}/analytics', response_class=HTMLResponse)
+def admin_article_analytics(article_id: int, request: Request, db=Depends(get_db), _=Depends(require_auth)):
+    article = db.query(Article).filter(Article.id == article_id).first()
+    if not article:
+        raise HTTPException(404)
+    context = article_analytics_context(db, article)
+    return templates.TemplateResponse('admin/article_analytics.html', {'request': request, 'article': article, **context})
 
 
 @app.get('/admin/articles/{article_id}/edit', response_class=HTMLResponse)
