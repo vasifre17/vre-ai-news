@@ -16,7 +16,7 @@
     <div class="primary-categories">{% for c in categories %}<a href="/{{ language }}/?category={{ c.name }}" style="--cat-color: {{ c.color or '#48a6ff' }}">{{ category_labels.get(c.name, c.name) }}</a>{% endfor %}</div>
     {% if secondary_categories %}<div class="category-menu">
       <button class="category-menu-button" type="button" aria-label="{{ ui.more_categories }}" aria-haspopup="true" aria-expanded="false" aria-controls="category-dropdown-{{ language }}"><span aria-hidden="true">☰</span></button>
-      <div class="category-dropdown" id="category-dropdown-{{ language }}" hidden>{% for c in secondary_categories %}<a href="/{{ language }}/?category={{ c.name }}" style="--cat-color: {{ c.color or '#48a6ff' }}">{{ category_labels.get(c.name, c.name) }}</a>{% endfor %}</div>
+      <div class="category-dropdown" id="category-dropdown-{{ language }}" hidden>{% for c in categories %}{% if loop.index > 3 %}<a class="mobile-only-category" href="/{{ language }}/?category={{ c.name }}" style="--cat-color: {{ c.color or '#48a6ff' }}">{{ category_labels.get(c.name, c.name) }}</a>{% endif %}{% endfor %}{% for c in secondary_categories %}<a href="/{{ language }}/?category={{ c.name }}" style="--cat-color: {{ c.color or '#48a6ff' }}">{{ category_labels.get(c.name, c.name) }}</a>{% endfor %}</div>
     </div>{% endif %}
   </nav>
 </header>
