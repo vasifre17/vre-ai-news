@@ -513,9 +513,14 @@ def category_navigation(db):
 def public_category_navigation(db) -> dict[str, list[Category]]:
     categories = category_navigation(db)
     by_name = {c.name: c for c in categories}
+    primary = [by_name[name] for name in PRIMARY_CATEGORY_NAMES if name in by_name]
+    primary_names = {c.name for c in primary}
+    secondary = [by_name[name] for name in SECONDARY_CATEGORY_NAMES if name in by_name and name not in primary_names]
+    secondary_names = {c.name for c in secondary}
+    secondary.extend(c for c in categories if c.name not in primary_names and c.name not in secondary_names)
     return {
-        "primary": [by_name[name] for name in PRIMARY_CATEGORY_NAMES if name in by_name],
-        "secondary": [by_name[name] for name in SECONDARY_CATEGORY_NAMES if name in by_name],
+        "primary": primary,
+        "secondary": secondary,
     }
 
 
