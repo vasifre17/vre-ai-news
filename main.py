@@ -444,7 +444,8 @@ def canonical_url(request: Request, path: str = "") -> str:
 
 
 def article_url(language: str, slug: str) -> str:
-    return f"/{language}/article/{slug}"
+    """Return the canonical language-aware public article URL."""
+    return f"/{language}/{slug}"
 
 
 def get_translation(article: Article, language: str):
@@ -518,6 +519,35 @@ def get_or_create_translation(db, article: Article, language: str) -> ArticleTra
         row = ArticleTranslation(article_id=article.id, language=language)
         db.add(row)
     return row
+
+
+def unique_translation_slug(db, language: str, requested_slug: str, current_translation_id: int | None = None) -> str:
+    root = slugify(requested_slug)
+    candidate = root
+    suffix = 2
+    while True:
+        query = db.query(ArticleTranslation).filter(ArticleTranslation.language == language, ArticleTranslation.slug == candidate)
+        if current_translation_id:
+            query = query.filter(ArticleTranslation.id != current_translation_id)
+        if not query.first():
+            return candidate
+        candidate = f"{root}-{suffix}"
+        suffix += 1
+
+
+def find_published_article_by_slug(db, slug: str, language: str = "az") -> Article | None:
+    language = language if language in SUPPORTED_LANGUAGES else "az"
+    article = None
+    if language != "az":
+        translation = db.query(ArticleTranslation).filter(ArticleTranslation.language == language, ArticleTranslation.slug == slug).first()
+        if translation:
+            article = db.query(Article).options(selectinload(Article.translations)).filter(Article.id == translation.article_id, Article.status == "published").first()
+    if not article:
+        slug_filters = [Article.slug == slug]
+        if slug.isdigit():
+            slug_filters.append(Article.id == int(slug))
+        article = db.query(Article).options(selectinload(Article.translations)).filter(or_(*slug_filters), Article.status == "published").first()
+    return article
 
 
 def ensure_slugs(db):
@@ -618,6 +648,10 @@ def validate_image_references(db) -> list[str]:
     return sorted(set(missing))
 
 def apply_schema_migrations(db) -> None:
+    # Safe for existing deployments: create the translation table from the
+    # SQLAlchemy model if older databases were initialized before multilingual
+    # article storage existed, then add any newly introduced nullable columns.
+    ArticleTranslation.__table__.create(bind=db.get_bind(), checkfirst=True)
     for statement in [
         "ALTER TABLE articles ADD COLUMN slug VARCHAR(500)",
         "ALTER TABLE articles ADD COLUMN narration_enabled BOOLEAN DEFAULT true",
@@ -627,6 +661,19 @@ def apply_schema_migrations(db) -> None:
         "ALTER TABLE articles ADD COLUMN homepage_order INTEGER DEFAULT 100",
         "ALTER TABLE article_translations ADD COLUMN slug VARCHAR(500)",
         "ALTER TABLE article_translations ADD COLUMN meta_description TEXT",
+        "ALTER TABLE article_translations ADD COLUMN tags VARCHAR(500)",
+    ]:
+        try:
+            db.execute(text(statement))
+            db.commit()
+        except Exception:
+            db.rollback()
+    for statement in [
+        "CREATE INDEX IF NOT EXISTS ix_article_translations_article_id ON article_translations (article_id)",
+        "CREATE INDEX IF NOT EXISTS ix_article_translations_language ON article_translations (language)",
+        "CREATE INDEX IF NOT EXISTS ix_article_translations_slug ON article_translations (slug)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS ix_article_translations_article_language ON article_translations (article_id, language)",
+        "CREATE INDEX IF NOT EXISTS ix_article_translations_language_slug ON article_translations (language, slug)",
     ]:
         try:
             db.execute(text(statement))
@@ -686,17 +733,9 @@ def home(request: Request, language: str = "az", q: str = "", category: str = ""
     return templates.TemplateResponse("public/home.html", {"request": request, "articles": article_cards, "latest_articles": latest_cards, "featured_articles": featured_cards, "trending_articles": trending_cards, "hero": hero, "categories": categories["primary"], "secondary_categories": categories["secondary"], "q": q, "category": category, "site_url": settings.site_url, "canonical": canonical_url(request, f'{language}/'), "language": language, "languages": SUPPORTED_LANGUAGES, "alt_links": alt_links, "ui": public_labels(language), "category_labels": category_labels})
 
 
-@app.get("/article/{slug}", response_class=HTMLResponse)
-@app.get("/{language}/article/{slug}", response_class=HTMLResponse)
-def article_by_slug(slug: str, request: Request, language: str = "az", db=Depends(get_db)):
+def render_article_page(slug: str, request: Request, language: str = "az", db=Depends(get_db)):
     language = language if language in SUPPORTED_LANGUAGES else "az"
-    slug_filters = [Article.slug == slug]
-    if slug.isdigit():
-        slug_filters.append(Article.id == int(slug))
-    article = db.query(Article).options(selectinload(Article.translations)).filter(or_(*slug_filters), Article.status == "published").first()
-    if not article and language != "az":
-        tr = db.query(ArticleTranslation).filter(ArticleTranslation.slug == slug, ArticleTranslation.language == language).first()
-        article = db.query(Article).options(selectinload(Article.translations)).filter(Article.id == tr.article_id).first() if tr else None
+    article = find_published_article_by_slug(db, slug, language)
     if not article:
         raise HTTPException(404)
     view = localized_article_view(article, language)
@@ -705,10 +744,16 @@ def article_by_slug(slug: str, request: Request, language: str = "az", db=Depend
     related = db.query(Article).options(selectinload(Article.translations)).filter(Article.status == "published", Article.id != article.id, Article.category == article.category).order_by(Article.published_at.desc(), Article.created_at.desc()).limit(3).all()
     if len(related) < 3:
         related = related + db.query(Article).options(selectinload(Article.translations)).filter(Article.status == "published", Article.id != article.id, Article.category != article.category).order_by(Article.published_at.desc(), Article.created_at.desc()).limit(3 - len(related)).all()
-    canonical = canonical_url(request, f"{language}/article/{view.slug}")
+    canonical = canonical_url(request, f"{language}/{view.slug}")
     navigation = public_category_navigation(db)
     category_labels = public_category_labels(language)
     return templates.TemplateResponse("public/article.html", {"request": request, "article": view, "root_article": article, "image_exists": uploaded_image_exists(article.image_url), "narration": narration, "related_articles": [article_card(a, language, category_labels) for a in related], "categories": navigation["primary"], "secondary_categories": navigation["secondary"], "share_url": canonical, "site_url": settings.site_url, "canonical": canonical, "language": language, "languages": SUPPORTED_LANGUAGES, "alt_links": alt_links, "ui": public_labels(language), "category_labels": category_labels})
+
+
+@app.get("/article/{slug}", response_class=HTMLResponse)
+@app.get("/{language}/article/{slug}", response_class=HTMLResponse)
+def article_by_slug(slug: str, request: Request, language: str = "az", db=Depends(get_db)):
+    return render_article_page(slug, request, language, db)
 
 
 @app.get('/search', response_class=HTMLResponse)
@@ -727,11 +772,11 @@ def sitemap(db=Depends(get_db)):
     urls = [f"<url><loc>{base_url}/</loc></url>"]
     urls.extend(f"<url><loc>{base_url}/{lang}/</loc></url>" for lang in SUPPORTED_LANGUAGES)
     for a in db.query(Article).filter(Article.status == 'published').all():
-        urls.append(f"<url><loc>{base_url}/az/article/{a.slug or a.id}</loc></url>")
+        urls.append(f"<url><loc>{base_url}{article_url('az', a.slug or a.id)}</loc></url>")
         for lang in SUPPORTED_LANGUAGES:
             if lang == "az":
                 continue
-            urls.append(f"<url><loc>{base_url}/{lang}/article/{localized_slug(a, lang)}</loc></url>")
+            urls.append(f"<url><loc>{base_url}{article_url(lang, localized_slug(a, lang))}</loc></url>")
     return Response(content=f'<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{"".join(urls)}</urlset>', media_type='application/xml')
 
 
@@ -832,7 +877,7 @@ async def create_article(request: Request, db=Depends(get_db), _=Depends(require
         if any(form.get(f'{field}_{lang}', '') for field in ['title', 'summary', 'content', 'seo_title', 'meta_description', 'tags', 'slug']):
             row = ArticleTranslation(article_id=article.id, language=lang)
             row.title = form.get(f'title_{lang}', '')
-            row.slug = slugify(form.get(f'slug_{lang}') or row.title or f'{article.slug}-{lang}')
+            row.slug = unique_translation_slug(db, lang, form.get(f'slug_{lang}') or row.title or f'{article.slug}-{lang}')
             row.summary = form.get(f'summary_{lang}', '')
             row.content = form.get(f'content_{lang}', '')
             row.seo_title = form.get(f'seo_title_{lang}', '')
@@ -922,7 +967,7 @@ async def edit_article(article_id: int, request: Request, db=Depends(get_db), _=
         if row.id is None:
             db.add(row)
         row.title = form.get(f'title_{lang}', '')
-        row.slug = slugify(form.get(f'slug_{lang}') or row.slug or row.title or f'{a.slug}-{lang}')
+        row.slug = unique_translation_slug(db, lang, form.get(f'slug_{lang}') or row.slug or row.title or f'{a.slug}-{lang}', row.id)
         row.summary = form.get(f'summary_{lang}', '')
         row.content = form.get(f'content_{lang}', '')
         row.seo_title = form.get(f'seo_title_{lang}', '')
@@ -1082,7 +1127,7 @@ def admin_generate_translations(article_id: int, request: Request, db=Depends(ge
         row.meta_description = payload.get("meta_description", article.meta_description)
         row.tags = payload.get("tags", article.tags)
         if not row.slug:
-            row.slug = slugify(row.title) + f"-{lang}"
+            row.slug = unique_translation_slug(db, lang, f"{row.title}-{lang}", row.id)
         if article.status == "published" and article.narration_enabled:
             queue_narration(db, article, lang)
     db.commit()
@@ -1123,6 +1168,13 @@ def set_mode(request: Request, mode: str = Form(...), db=Depends(get_db), _=Depe
     save_setting(db, 'publish_mode', mode)
     db.commit()
     return RedirectResponse('/admin/settings', status_code=302)
+
+
+@app.get("/{language}/{slug}", response_class=HTMLResponse)
+def article_by_language_slug(language: str, slug: str, request: Request, db=Depends(get_db)):
+    if language not in SUPPORTED_LANGUAGES:
+        raise HTTPException(404)
+    return render_article_page(slug, request, language, db)
 
 
 @app.exception_handler(404)
