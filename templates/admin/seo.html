@@ -1,0 +1,29 @@
+{% extends "admin/_base.html" %}
+{% set title = 'SEO Diagnostics | VREYC Admin' %}
+{% set heading = 'Google News & SEO readiness' %}
+{% block content %}
+<section class="stats-grid">
+  {% for label, count in issue_counts.items() %}
+  <div class="stat-card"><span>{{ label }}</span><strong>{{ count }}</strong><small>{{ 'Needs attention' if count else 'Ready' }}</small></div>
+  {% endfor %}
+</section>
+<section class="panel">
+  <div class="panel-head wrap">
+    <div><h2>Article eligibility diagnostics</h2><p class="muted">Checks metadata, images, schema prerequisites, canonical slugs, hreflang coverage and translations for Google News indexing readiness.</p></div>
+    <div class="actions"><a class="btn" href="/sitemap.xml" target="_blank">XML sitemap</a><a class="btn" href="/news-sitemap.xml" target="_blank">News sitemap</a><a class="btn" href="/rss.xml" target="_blank">RSS feed</a></div>
+  </div>
+  <div class="workflow-row"><span>Last automatic sitemap refresh</span><strong>{{ settings_map.get('sitemap_last_refreshed_at', 'Dynamic sitemap updates on every request') }}</strong></div>
+  <div class="table-wrap"><table><thead><tr><th>Article</th><th>Status</th><th>SEO score</th><th>Missing / warnings</th><th>Missing translations</th><th>Actions</th></tr></thead><tbody>
+    {% for row in rows %}
+    <tr>
+      <td><strong>{{ row.article.title or 'Untitled' }}</strong><small>{{ row.article.slug or 'no-slug' }}</small></td>
+      <td><span class="badge {{ row.article.status }}">{{ row.article.status }}</span></td>
+      <td><span class="seo-score {{ 'good' if row.audit.score >= 90 else 'warn' if row.audit.score >= 70 else 'bad' }}">{{ row.audit.score }}%</span></td>
+      <td>{% if row.audit.issues %}<div class="tool-list">{% for issue in row.audit.issues %}<span>{{ issue }}</span>{% endfor %}</div>{% else %}<span class="badge published">Ready</span>{% endif %}</td>
+      <td>{% if row.audit.missing_translations %}{{ row.audit.missing_translations|join(', ')|upper }}{% else %}<span class="badge published">Complete</span>{% endif %}</td>
+      <td class="actions"><a class="btn small" href="/admin/articles/{{ row.article.id }}/edit">Edit</a>{% if row.article.status == 'published' and row.article.slug %}<a class="btn small" href="/az/{{ row.article.slug }}" target="_blank">View</a>{% endif %}</td>
+    </tr>
+    {% else %}<tr><td colspan="6">No articles found.</td></tr>{% endfor %}
+  </tbody></table></div>
+</section>
+{% endblock %}
