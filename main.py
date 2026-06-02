@@ -1,6 +1,9 @@
 from datetime import datetime, timedelta
 from email.utils import format_datetime
+import hashlib
 import html
+import time
+import unicodedata
 from types import SimpleNamespace
 import re
 import shutil
@@ -46,6 +49,19 @@ LEGACY_UPLOAD_DIRS = (Path("uploads"), Path("static/uploads/images"), Path("/app
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 IMAGE_VARIANT_WIDTHS = (480, 960, 1440)
+CACHE_TTL_SECONDS = 300
+CACHEABLE_FEED_TTL_SECONDS = 900
+PUBLIC_RESPONSE_CACHE: dict[str, tuple[float, str, str]] = {}
+CACHE_VERSION = 1
+AZ_TRANSLITERATION = str.maketrans({
+    "ə": "e", "Ə": "e", "ö": "o", "Ö": "o", "ü": "u", "Ü": "u",
+    "ı": "i", "I": "i", "İ": "i", "ğ": "g", "Ğ": "g", "ş": "s", "Ş": "s",
+    "ç": "c", "Ç": "c", "а": "a", "б": "b", "в": "v", "г": "g", "д": "d",
+    "е": "e", "ё": "e", "ж": "zh", "з": "z", "и": "i", "й": "y", "к": "k",
+    "л": "l", "м": "m", "н": "n", "о": "o", "п": "p", "р": "r", "с": "s",
+    "т": "t", "у": "u", "ф": "f", "х": "h", "ц": "ts", "ч": "ch", "ш": "sh",
+    "щ": "sch", "ы": "y", "э": "e", "ю": "yu", "я": "ya",
+})
 
 
 def ensure_upload_dir() -> None:
@@ -296,8 +312,15 @@ DEFAULT_CATEGORIES = [
 
 
 def slugify(text: str) -> str:
-    base = re.sub(r"[^a-z0-9]+", "-", (text or "").strip().lower()).strip("-")
+    normalized = unicodedata.normalize("NFKD", (text or "").strip().translate(AZ_TRANSLITERATION))
+    ascii_text = "".join(ch for ch in normalized if not unicodedata.combining(ch)).lower()
+    base = re.sub(r"[^a-z0-9]+", "-", ascii_text).strip("-")
+    base = re.sub(r"-{2,}", "-", base)[:90].strip("-")
     return base or "article"
+
+
+def clean_seo_text(value: str | None, fallback: str = "") -> str:
+    return re.sub(r"\s+", " ", (value or fallback or "").strip())
 
 
 def format_published_at(value):
@@ -352,6 +375,28 @@ def uploaded_image_exists(path: str | None) -> bool:
         local_path = Path(public_path.lstrip("/"))
         return local_path.is_file()
     return True
+
+
+def image_dimensions(path: str | None) -> tuple[int | None, int | None]:
+    source = local_uploaded_image_path(path)
+    if not source or not source.exists():
+        return (None, None)
+    try:
+        with Image.open(source) as img:
+            return img.size
+    except OSError:
+        return (None, None)
+
+
+def largest_image_variant_url(path: str | None) -> str:
+    source = local_uploaded_image_path(path)
+    if not source:
+        return public_image_url(path)
+    for width in sorted(IMAGE_VARIANT_WIDTHS, reverse=True):
+        variant = source.with_name(f"{source.stem}-{width}.webp")
+        if variant.exists():
+            return f"{UPLOAD_URL_PREFIX}/{variant.name}"
+    return public_image_url(path)
 
 
 def image_srcset(path: str | None) -> str:
@@ -430,6 +475,7 @@ def save_image_upload(file, alt_text: str = "") -> MediaAsset | None:
 
 templates.env.filters["format_published_at"] = format_published_at
 templates.env.filters["image_srcset"] = image_srcset
+templates.env.filters["image_dimensions"] = image_dimensions
 templates.env.filters["public_image_url"] = public_image_url
 templates.env.filters["uploaded_image_exists"] = uploaded_image_exists
 
@@ -537,7 +583,8 @@ def unique_translation_slug(db, language: str, requested_slug: str, current_tran
         query = db.query(ArticleTranslation).filter(ArticleTranslation.language == language, ArticleTranslation.slug == candidate)
         if current_translation_id:
             query = query.filter(ArticleTranslation.id != current_translation_id)
-        if not query.first():
+        root_collision = language == "az" and db.query(Article).filter(Article.slug == candidate).first()
+        if not query.first() and not root_collision:
             return candidate
         candidate = f"{root}-{suffix}"
         suffix += 1
@@ -561,7 +608,7 @@ def find_published_article_by_slug(db, slug: str, language: str = "az") -> Artic
 def ensure_slugs(db):
     used = set()
     for a in db.query(Article).all():
-        candidate = getattr(a, "slug", None) or slugify(a.title)
+        candidate = slugify(getattr(a, "slug", None) or a.title)
         original = candidate
         n = 2
         while candidate in used:
@@ -650,8 +697,42 @@ def iso_datetime(value: datetime | None) -> str:
     return value.isoformat() + "Z" if value else ""
 
 
+def invalidate_public_cache() -> None:
+    PUBLIC_RESPONSE_CACHE.clear()
+    global CACHE_VERSION
+    CACHE_VERSION += 1
+
+
+def cache_get(key: str, ttl: int = CACHE_TTL_SECONDS) -> Response | None:
+    cached = PUBLIC_RESPONSE_CACHE.get(key)
+    if not cached:
+        return None
+    created_at, media_type, content = cached
+    if time.time() - created_at > ttl:
+        PUBLIC_RESPONSE_CACHE.pop(key, None)
+        return None
+    return Response(content=content, media_type=media_type, headers={"X-VREYC-Cache": "HIT"})
+
+
+def cache_set(key: str, content: str, media_type: str = "text/html") -> Response:
+    PUBLIC_RESPONSE_CACHE[key] = (time.time(), media_type, content)
+    return Response(content=content, media_type=media_type, headers={"X-VREYC-Cache": "MISS"})
+
+
+def render_cached_template(template_name: str, context: dict, cache_key: str | None = None, ttl: int = CACHE_TTL_SECONDS) -> Response:
+    if cache_key:
+        cached = cache_get(cache_key, ttl)
+        if cached:
+            return cached
+    content = templates.env.get_template(template_name).render(context)
+    if cache_key:
+        return cache_set(cache_key, content, "text/html")
+    return Response(content=content, media_type="text/html")
+
+
 def touch_sitemap_refresh(db) -> None:
     save_setting(db, "sitemap_last_refreshed_at", datetime.utcnow().isoformat())
+    invalidate_public_cache()
 
 
 def article_translation_complete(article: Article, language: str) -> bool:
@@ -702,6 +783,99 @@ def article_seo_audit(article: Article, language: str = "az") -> dict:
     return {"score": score, "issues": issues, "checks": checks, "missing_translations": article_missing_translation_languages(article)}
 
 
+def article_seo_recommendations(article: Article, language: str = "az") -> list[str]:
+    view = localized_article_view(article, language)
+    title = clean_seo_text(view.seo_title or view.title)
+    description = clean_seo_text(view.meta_description or view.summary)
+    content = clean_seo_text(view.content)
+    tags = [tag.strip().lower() for tag in (view.tags or "").split(",") if tag.strip()]
+    recommendations: list[str] = []
+    if len(title) < 30 or len(title) > 65:
+        recommendations.append("SEO title should be 30–65 characters.")
+    if len(description) < 120 or len(description) > 160:
+        recommendations.append("Meta description should be 120–160 characters.")
+    if not tags or (tags[0] not in (title + " " + content).lower()):
+        recommendations.append("Add a focus keyword in tags and use it naturally in title/content.")
+    if not uploaded_image_exists(article.image_url):
+        recommendations.append("Add a high-quality article image for Google Discover and social previews.")
+    width, height = image_dimensions(article.image_url)
+    if uploaded_image_exists(article.image_url) and width and (width < 1200 or (height or 0) < 675):
+        recommendations.append("Use an image at least 1200×675 for Discover large-image previews.")
+    if len(re.findall(r"\w+", content)) < 250:
+        recommendations.append("Article content is short; add original reporting/context where appropriate.")
+    return recommendations
+
+
+def extract_internal_links(content: str | None) -> list[str]:
+    if not content:
+        return []
+    return sorted(set(re.findall(r'href=["\']([^"\']+)["\']', content)))
+
+
+def extract_image_sources(content: str | None) -> list[str]:
+    if not content:
+        return []
+    return sorted(set(re.findall(r'src=["\']([^"\']+)["\']', content)))
+
+
+def internal_link_exists(db, url: str) -> bool:
+    if not url or url.startswith(("#", "mailto:", "tel:", "http://", "https://")):
+        return True
+    path = url.split("?", 1)[0].strip("/")
+    if not path or path in {"sitemap.xml", "news-sitemap.xml", "rss.xml", "feed.xml", "robots.txt"}:
+        return True
+    parts = path.split("/")
+    if len(parts) >= 2 and parts[0] in SUPPORTED_LANGUAGES:
+        slug = parts[-1]
+        return bool(find_published_article_by_slug(db, slug, parts[0]))
+    if parts[0] in {"assets", "static"}:
+        return Path(path).is_file()
+    if path.startswith(UPLOAD_URL_PREFIX.strip("/")):
+        return uploaded_image_exists("/" + path)
+    return True
+
+
+def technical_seo_diagnostics(db, articles: list[Article]) -> dict:
+    title_map: dict[str, list[int]] = {}
+    description_map: dict[str, list[int]] = {}
+    broken_links: list[dict] = []
+    missing_images: list[dict] = []
+    for article in articles:
+        view = localized_article_view(article, "az")
+        title_key = clean_seo_text(view.seo_title or view.title).lower()
+        desc_key = clean_seo_text(view.meta_description or view.summary).lower()
+        if title_key:
+            title_map.setdefault(title_key, []).append(article.id)
+        if desc_key:
+            description_map.setdefault(desc_key, []).append(article.id)
+        for link in extract_internal_links(view.content):
+            if not internal_link_exists(db, link):
+                broken_links.append({"article": article, "url": link})
+        if not uploaded_image_exists(article.image_url):
+            missing_images.append({"article": article, "url": article.image_url or "missing hero image"})
+        for image in extract_image_sources(view.content):
+            if not uploaded_image_exists(image):
+                missing_images.append({"article": article, "url": image})
+    duplicate_titles = {key: ids for key, ids in title_map.items() if len(ids) > 1}
+    duplicate_descriptions = {key: ids for key, ids in description_map.items() if len(ids) > 1}
+    return {
+        "broken_links": broken_links,
+        "missing_images": missing_images,
+        "duplicate_titles": duplicate_titles,
+        "duplicate_descriptions": duplicate_descriptions,
+    }
+
+
+def log_404(path: str) -> None:
+    db = SessionLocal()
+    try:
+        digest = hashlib.sha1(path.encode("utf-8")).hexdigest()[:10]
+        db.add(FetchLog(level="WARNING", message=f"404 monitor: {path} [{digest}]"))
+        db.commit()
+    finally:
+        db.close()
+
+
 def build_organization_schema(settings_map: dict[str, str]) -> dict:
     return {
         "@context": "https://schema.org",
@@ -746,7 +920,7 @@ def build_news_article_schema(article: Article, view, canonical: str, image_url:
         "mainEntityOfPage": {"@type": "WebPage", "@id": canonical},
         "headline": view.title,
         "description": view.meta_description or view.summary or view.title,
-        "image": [image_url],
+        "image": [{"@type": "ImageObject", "url": image_url, "width": image_dimensions(article.image_url)[0] or 1200, "height": image_dimensions(article.image_url)[1] or 675}],
         "datePublished": iso_datetime(article.published_at),
         "dateModified": iso_datetime(article.updated_at or article.published_at),
         "author": {"@type": "Organization", "name": site_name_from_settings(settings_map)},
@@ -754,6 +928,7 @@ def build_news_article_schema(article: Article, view, canonical: str, image_url:
         "articleSection": view.category_label,
         "inLanguage": language,
         "isAccessibleForFree": True,
+        "wordCount": len(re.findall(r"\w+", view.content or "")),
     }
 
 
@@ -861,7 +1036,8 @@ def article_form_context(db, article: Article | None = None) -> dict:
         names = [c[0] for c in db.query(Article.category).filter(Article.category.isnot(None)).distinct().all() if c[0]]
         categories = [Category(name=name, slug=slugify(name), description="") for name in names]
     translations = {lang: get_translation(article, lang) for lang in SUPPORTED_LANGUAGES} if article else {lang: None for lang in SUPPORTED_LANGUAGES}
-    return {"categories": categories, "languages": SUPPORTED_LANGUAGES, "language_labels": LANGUAGE_LABELS, "translations": translations, "ai_translation_status": ai_translation_status()}
+    seo_recommendations = {lang: article_seo_recommendations(article, lang) for lang in SUPPORTED_LANGUAGES} if article else {}
+    return {"categories": categories, "languages": SUPPORTED_LANGUAGES, "language_labels": LANGUAGE_LABELS, "translations": translations, "seo_recommendations": seo_recommendations, "ai_translation_status": ai_translation_status()}
 
 
 
@@ -937,6 +1113,11 @@ def startup() -> None:
 @app.get("/{language}/", response_class=HTMLResponse)
 def home(request: Request, language: str = "az", q: str = "", category: str = "", db=Depends(get_db)):
     language = language if language in SUPPORTED_LANGUAGES else "az"
+    home_cache_key = f"home:{CACHE_VERSION}:{language}:{q}:{category}" if not q and not category else None
+    if home_cache_key:
+        cached = cache_get(home_cache_key)
+        if cached:
+            return cached
     ensure_categories(db)
     query = db.query(Article).options(selectinload(Article.translations)).filter(Article.status == "published")
     if q:
@@ -967,11 +1148,17 @@ def home(request: Request, language: str = "az", q: str = "", category: str = ""
         build_website_schema(settings_map, language),
         build_breadcrumb_schema([("Home", canonical)]),
     ]
-    return templates.TemplateResponse("public/home.html", {"request": request, "articles": article_cards, "latest_articles": latest_cards, "featured_articles": featured_cards, "trending_articles": trending_cards, "hero": hero, "categories": categories["primary"], "secondary_categories": categories["secondary"], "q": q, "category": category, "site_url": settings.site_url, "canonical": canonical, "language": language, "languages": SUPPORTED_LANGUAGES, "alt_links": alt_links, "ui": public_labels(language), "category_labels": category_labels, "settings_map": settings_map, "verification_meta": seo_verification_meta(settings_map), "schema_graph": schema_graph, "site_name": site_name_from_settings(settings_map)})
+    hero_image = public_absolute_url(largest_image_variant_url(hero["article"].image_url)) if hero and hero["image_exists"] else public_absolute_url('/assets/og-cover.jpg')
+    context = {"request": request, "articles": article_cards, "latest_articles": latest_cards, "featured_articles": featured_cards, "trending_articles": trending_cards, "hero": hero, "hero_preload_image": hero_image, "categories": categories["primary"], "secondary_categories": categories["secondary"], "q": q, "category": category, "site_url": settings.site_url, "canonical": canonical, "language": language, "languages": SUPPORTED_LANGUAGES, "alt_links": alt_links, "ui": public_labels(language), "category_labels": category_labels, "settings_map": settings_map, "verification_meta": seo_verification_meta(settings_map), "schema_graph": schema_graph, "site_name": site_name_from_settings(settings_map)}
+    return render_cached_template("public/home.html", context, home_cache_key)
 
 
 def render_article_page(slug: str, request: Request, language: str = "az", db=Depends(get_db)):
     language = language if language in SUPPORTED_LANGUAGES else "az"
+    article_cache_key = f"article:{CACHE_VERSION}:{language}:{slugify(slug)}"
+    cached = cache_get(article_cache_key)
+    if cached:
+        return cached
     article = find_published_article_by_slug(db, slug, language)
     if not article:
         raise HTTPException(404)
@@ -981,15 +1168,20 @@ def render_article_page(slug: str, request: Request, language: str = "az", db=De
     view = localized_article_view(article, language)
     narration = db.query(ArticleNarration).filter(ArticleNarration.article_id == article.id, ArticleNarration.language == language).first()
     alt_links = {lang: article_url(lang, localized_slug(article, lang)) for lang in SUPPORTED_LANGUAGES}
-    related = db.query(Article).options(selectinload(Article.translations)).filter(Article.status == "published", Article.id != article.id, Article.category == article.category).order_by(Article.published_at.desc(), Article.created_at.desc()).limit(3).all()
-    if len(related) < 3:
-        related = related + db.query(Article).options(selectinload(Article.translations)).filter(Article.status == "published", Article.id != article.id, Article.category != article.category).order_by(Article.published_at.desc(), Article.created_at.desc()).limit(3 - len(related)).all()
+    related = db.query(Article).options(selectinload(Article.translations)).filter(Article.status == "published", Article.id != article.id, Article.category == article.category).order_by(Article.published_at.desc(), Article.created_at.desc()).limit(4).all()
+    if len(related) < 4:
+        related = related + db.query(Article).options(selectinload(Article.translations)).filter(Article.status == "published", Article.id != article.id, Article.category != article.category).order_by(Article.published_at.desc(), Article.created_at.desc()).limit(4 - len(related)).all()
+    latest = db.query(Article).options(selectinload(Article.translations)).filter(Article.status == "published", Article.id != article.id).order_by(Article.published_at.desc(), Article.created_at.desc()).limit(5).all()
+    popular = db.query(Article).options(selectinload(Article.translations)).filter(Article.status == "published", Article.id != article.id).order_by(Article.view_count.desc(), Article.published_at.desc()).limit(5).all()
+    previous_article = db.query(Article).options(selectinload(Article.translations)).filter(Article.status == "published", Article.published_at < (article.published_at or article.created_at)).order_by(Article.published_at.desc()).first()
+    next_article = db.query(Article).options(selectinload(Article.translations)).filter(Article.status == "published", Article.published_at > (article.published_at or article.created_at)).order_by(Article.published_at.asc()).first()
     canonical = canonical_url(request, f"{language}/{view.slug}")
     navigation = public_category_navigation(db)
     category_labels = public_category_labels(language)
     settings_map = get_settings_map(db)
     image_exists = uploaded_image_exists(article.image_url)
-    image_url = public_absolute_url(public_image_url(article.image_url)) if image_exists else public_absolute_url('/assets/og-cover.jpg')
+    image_url = public_absolute_url(largest_image_variant_url(article.image_url)) if image_exists else public_absolute_url('/assets/og-cover.jpg')
+    image_width, image_height = image_dimensions(article.image_url)
     schema_graph = [
         build_organization_schema(settings_map),
         build_website_schema(settings_map, language),
@@ -997,7 +1189,8 @@ def render_article_page(slug: str, request: Request, language: str = "az", db=De
         build_news_article_schema(article, view, canonical, image_url, settings_map, language),
     ]
     seo_audit = article_seo_audit(article, language)
-    return templates.TemplateResponse("public/article.html", {"request": request, "article": view, "root_article": article, "image_exists": image_exists, "narration": narration, "related_articles": [article_card(a, language, category_labels) for a in related], "categories": navigation["primary"], "secondary_categories": navigation["secondary"], "share_url": canonical, "site_url": settings.site_url, "canonical": canonical, "language": language, "languages": SUPPORTED_LANGUAGES, "alt_links": alt_links, "ui": public_labels(language), "category_labels": category_labels, "settings_map": settings_map, "verification_meta": seo_verification_meta(settings_map), "schema_graph": schema_graph, "seo_audit": seo_audit, "site_name": site_name_from_settings(settings_map), "og_image": image_url})
+    context = {"request": request, "article": view, "root_article": article, "image_exists": image_exists, "image_width": image_width, "image_height": image_height, "narration": narration, "related_articles": [article_card(a, language, category_labels) for a in related], "latest_articles": [article_card(a, language, category_labels) for a in latest], "popular_articles": [article_card(a, language, category_labels) for a in popular], "previous_article": article_card(previous_article, language, category_labels) if previous_article else None, "next_article": article_card(next_article, language, category_labels) if next_article else None, "categories": navigation["primary"], "secondary_categories": navigation["secondary"], "share_url": canonical, "site_url": settings.site_url, "canonical": canonical, "language": language, "languages": SUPPORTED_LANGUAGES, "alt_links": alt_links, "ui": public_labels(language), "category_labels": category_labels, "settings_map": settings_map, "verification_meta": seo_verification_meta(settings_map), "schema_graph": schema_graph, "seo_audit": seo_audit, "site_name": site_name_from_settings(settings_map), "og_image": image_url}
+    return render_cached_template("public/article.html", context, article_cache_key)
 
 
 @app.get("/article/{slug}", response_class=HTMLResponse)
@@ -1018,12 +1211,18 @@ def category_page(category: str, request: Request, db=Depends(get_db)):
 
 @app.get('/sitemap.xml')
 def sitemap(db=Depends(get_db)):
+    cache_key = f"sitemap:{CACHE_VERSION}"
+    cached = cache_get(cache_key, CACHEABLE_FEED_TTL_SECONDS)
+    if cached:
+        return cached
     base_url = settings.site_url.rstrip("/")
+    latest_lastmod = db.query(Article.updated_at).filter(Article.status == 'published').order_by(Article.updated_at.desc()).first()
+    site_lastmod = iso_datetime(latest_lastmod[0] if latest_lastmod else datetime.utcnow())
     url_entries = [
-        f"<url><loc>{xml_escape(base_url + '/')}</loc><changefreq>hourly</changefreq><priority>1.0</priority></url>"
+        f"<url><loc>{xml_escape(base_url + '/')}</loc><lastmod>{xml_escape(site_lastmod)}</lastmod><changefreq>hourly</changefreq><priority>1.0</priority></url>"
     ]
     url_entries.extend(
-        f"<url><loc>{xml_escape(base_url + '/' + lang + '/')}</loc><changefreq>hourly</changefreq><priority>0.9</priority></url>"
+        f"<url><loc>{xml_escape(base_url + '/' + lang + '/')}</loc><lastmod>{xml_escape(site_lastmod)}</lastmod><changefreq>hourly</changefreq><priority>0.9</priority></url>"
         for lang in SUPPORTED_LANGUAGES
     )
     articles = db.query(Article).options(selectinload(Article.translations)).filter(Article.status == 'published').order_by(Article.published_at.desc()).all()
@@ -1038,11 +1237,15 @@ def sitemap(db=Depends(get_db)):
             )
     content = f'''<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{''.join(url_entries)}</urlset>'''
-    return render_xml_response(content)
+    return cache_set(cache_key, content, "application/xml")
 
 
 @app.get('/news-sitemap.xml')
 def news_sitemap(db=Depends(get_db)):
+    cache_key = f"news-sitemap:{CACHE_VERSION}"
+    cached = cache_get(cache_key, CACHEABLE_FEED_TTL_SECONDS)
+    if cached:
+        return cached
     base_url = settings.site_url.rstrip("/")
     news_cutoff = datetime.utcnow() - timedelta(days=2)
     articles = db.query(Article).options(selectinload(Article.translations)).filter(Article.status == 'published', Article.published_at.isnot(None), Article.published_at >= news_cutoff).order_by(Article.published_at.desc()).limit(1000).all()
@@ -1061,12 +1264,16 @@ def news_sitemap(db=Depends(get_db)):
         )
     content = f'''<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:news="http://www.google.com/schemas/sitemap-news/0.9">{''.join(entries)}</urlset>'''
-    return render_xml_response(content)
+    return cache_set(cache_key, content, "application/xml")
 
 
 @app.get('/rss.xml')
 @app.get('/feed.xml')
 def rss_feed(db=Depends(get_db)):
+    cache_key = f"rss:{CACHE_VERSION}"
+    cached = cache_get(cache_key, CACHEABLE_FEED_TTL_SECONDS)
+    if cached:
+        return cached
     base_url = settings.site_url.rstrip("/")
     articles = db.query(Article).options(selectinload(Article.translations)).filter(Article.status == 'published').order_by(Article.published_at.desc(), Article.created_at.desc()).limit(50).all()
     items = []
@@ -1089,7 +1296,7 @@ def rss_feed(db=Depends(get_db)):
         )
     content = f'''<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0"><channel><title>VREYC Latest News</title><link>{xml_escape(base_url + '/')}</link><description>Latest VREYC news updates</description>{''.join(items)}</channel></rss>'''
-    return Response(content=content, media_type='application/rss+xml')
+    return cache_set(cache_key, content, 'application/rss+xml')
 
 
 @app.get('/robots.txt')
@@ -1213,6 +1420,7 @@ async def bulk_articles(request: Request, db=Depends(get_db), _=Depends(require_
                 article.category = new_category
                 article.updated_at = now
     db.commit()
+    invalidate_public_cache()
     return RedirectResponse(redirect_url, status_code=302)
 
 
@@ -1267,6 +1475,7 @@ async def create_article(request: Request, db=Depends(get_db), _=Depends(require
     if article.status == 'published':
         touch_sitemap_refresh(db)
     db.commit()
+    invalidate_public_cache()
     if is_ai_translation_configured():
         scheduler.add_job(generate_missing_translations, args=[article.id], id=f"article_translation_{article.id}_{datetime.utcnow().timestamp()}", replace_existing=False)
     return RedirectResponse('/admin/articles', status_code=302)
@@ -1282,6 +1491,7 @@ def publish_article(article_id: int, request: Request, db=Depends(get_db), _=Dep
         a.updated_at = datetime.utcnow()
         touch_sitemap_refresh(db)
         db.commit()
+        invalidate_public_cache()
         queue_narration(db, a)
         if is_ai_translation_configured():
             scheduler.add_job(generate_missing_translations, args=[a.id], id=f"article_translation_{a.id}_{datetime.utcnow().timestamp()}", replace_existing=False)
@@ -1296,6 +1506,7 @@ def unpublish_article(article_id: int, request: Request, db=Depends(get_db), _=D
         a.status = 'draft'
         a.updated_at = datetime.utcnow()
         db.commit()
+        invalidate_public_cache()
     return RedirectResponse('/admin/articles?status=draft', status_code=302)
 
 
@@ -1364,6 +1575,7 @@ async def edit_article(article_id: int, request: Request, db=Depends(get_db), _=
     if a.status == 'published':
         touch_sitemap_refresh(db)
     db.commit()
+    invalidate_public_cache()
     translation_status = "queued" if is_ai_translation_configured() else "not_configured"
     if is_ai_translation_configured():
         scheduler.add_job(generate_missing_translations, args=[a.id], id=f"article_translation_{a.id}_{datetime.utcnow().timestamp()}", replace_existing=False)
@@ -1377,6 +1589,7 @@ def toggle_featured(article_id: int, request: Request, db=Depends(get_db), _=Dep
         article.is_featured = not bool(article.is_featured)
         article.updated_at = datetime.utcnow()
         db.commit()
+        invalidate_public_cache()
     return RedirectResponse('/admin/articles', status_code=302)
 
 
@@ -1387,6 +1600,7 @@ def toggle_trending(article_id: int, request: Request, db=Depends(get_db), _=Dep
         article.is_trending = not bool(article.is_trending)
         article.updated_at = datetime.utcnow()
         db.commit()
+        invalidate_public_cache()
     return RedirectResponse('/admin/articles', status_code=302)
 
 
@@ -1397,6 +1611,7 @@ def update_homepage_order(article_id: int, request: Request, homepage_order: int
         article.homepage_order = homepage_order
         article.updated_at = datetime.utcnow()
         db.commit()
+        invalidate_public_cache()
     return RedirectResponse('/admin/articles', status_code=302)
 
 
@@ -1407,6 +1622,7 @@ def delete_article(article_id: int, request: Request, db=Depends(get_db), _=Depe
     if article:
         db.delete(article)
         db.commit()
+        invalidate_public_cache()
     return RedirectResponse(f'/admin/articles?status={status}', status_code=302)
 
 
@@ -1423,6 +1639,7 @@ def create_category(request: Request, name: str = Form(...), description: str = 
     if name and not db.query(Category).filter(Category.name == name).first():
         db.add(Category(name=name, slug=slugify(name), description=description, color=color))
         db.commit()
+        invalidate_public_cache()
     return RedirectResponse('/admin/categories', status_code=302)
 
 
@@ -1438,6 +1655,7 @@ def update_category(category_id: int, request: Request, name: str = Form(...), d
         for article in db.query(Article).filter(Article.category == old_name).all():
             article.category = category.name
         db.commit()
+        invalidate_public_cache()
     return RedirectResponse('/admin/categories', status_code=302)
 
 
@@ -1447,6 +1665,7 @@ def delete_category(category_id: int, request: Request, db=Depends(get_db), _=De
     if category:
         db.delete(category)
         db.commit()
+        invalidate_public_cache()
     return RedirectResponse('/admin/categories', status_code=302)
 
 
@@ -1462,6 +1681,7 @@ async def upload_media(request: Request, file: UploadFile = File(...), alt_text:
     if asset:
         db.add(asset)
         db.commit()
+        invalidate_public_cache()
     return RedirectResponse('/admin/media', status_code=302)
 
 
@@ -1478,6 +1698,7 @@ def delete_media(asset_id: int, request: Request, db=Depends(get_db), _=Depends(
                 variant.unlink()
         db.delete(asset)
         db.commit()
+        invalidate_public_cache()
     return RedirectResponse('/admin/media', status_code=302)
 
 
@@ -1485,6 +1706,7 @@ def delete_media(asset_id: int, request: Request, db=Depends(get_db), _=Depends(
 def admin_seo_diagnostics(request: Request, db=Depends(get_db), _=Depends(require_auth)):
     articles = db.query(Article).options(selectinload(Article.translations)).order_by(Article.status.desc(), Article.published_at.desc(), Article.updated_at.desc()).all()
     rows = []
+    technical = technical_seo_diagnostics(db, articles)
     issue_counts = {
         'Missing meta title': 0,
         'Missing meta description': 0,
@@ -1493,6 +1715,9 @@ def admin_seo_diagnostics(request: Request, db=Depends(get_db), _=Depends(requir
         'Missing canonical': 0,
         'Missing hreflang': 0,
         'Missing translation': 0,
+        'Broken links': len(technical['broken_links']),
+        'Duplicate titles': len(technical['duplicate_titles']),
+        'Duplicate descriptions': len(technical['duplicate_descriptions']),
     }
     for article in articles:
         audit = article_seo_audit(article, 'az')
@@ -1503,9 +1728,10 @@ def admin_seo_diagnostics(request: Request, db=Depends(get_db), _=Depends(requir
                 issue_counts[issue] += 1
             elif issue == 'Missing hreflang translation':
                 issue_counts['Missing hreflang'] += 1
-        rows.append({'article': article, 'audit': audit})
+        rows.append({'article': article, 'audit': audit, 'recommendations': article_seo_recommendations(article, 'az')})
     settings_map = get_settings_map(db)
-    return templates.TemplateResponse('admin/seo.html', {'request': request, 'rows': rows, 'issue_counts': issue_counts, 'settings_map': settings_map, 'languages': SUPPORTED_LANGUAGES, 'ai_translation_status': ai_translation_status()})
+    recent_404s = db.query(FetchLog).filter(FetchLog.message.like('404 monitor:%')).order_by(FetchLog.created_at.desc()).limit(20).all()
+    return templates.TemplateResponse('admin/seo.html', {'request': request, 'rows': rows, 'issue_counts': issue_counts, 'technical': technical, 'recent_404s': recent_404s, 'settings_map': settings_map, 'languages': SUPPORTED_LANGUAGES, 'ai_translation_status': ai_translation_status()})
 
 
 @app.get('/admin/settings', response_class=HTMLResponse)
@@ -1531,6 +1757,7 @@ def save_settings(request: Request, site_name: str = Form('VREYC'), editor_name:
         if value is not None:
             save_setting(db, key, value)
     db.commit()
+    invalidate_public_cache()
     return RedirectResponse('/admin/settings?saved=1', status_code=302)
 
 
@@ -1620,6 +1847,8 @@ def article_by_language_slug(language: str, slug: str, request: Request, db=Depe
 
 @app.exception_handler(404)
 def not_found(request: Request, exc):
+    if not request.url.path.startswith('/admin'):
+        log_404(request.url.path)
     return templates.TemplateResponse('public/404.html', {'request': request}, status_code=404)
 
 

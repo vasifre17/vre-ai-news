@@ -13,7 +13,8 @@
     <div class="actions"><a class="btn" href="/sitemap.xml" target="_blank">XML sitemap</a><a class="btn" href="/news-sitemap.xml" target="_blank">News sitemap</a><a class="btn" href="/rss.xml" target="_blank">RSS feed</a></div>
   </div>
   <div class="workflow-row"><span>Last automatic sitemap refresh</span><strong>{{ settings_map.get('sitemap_last_refreshed_at', 'Dynamic sitemap updates on every request') }}</strong></div>
-  <div class="table-wrap"><table><thead><tr><th>Article</th><th>Status</th><th>SEO score</th><th>Missing / warnings</th><th>Missing translations</th><th>Actions</th></tr></thead><tbody>
+  <div class="workflow-row"><span>Performance cache</span><strong>Homepage, article pages, sitemap and RSS are cached and invalidated after publishing or article edits.</strong></div>
+  <div class="table-wrap"><table><thead><tr><th>Article</th><th>Status</th><th>SEO score</th><th>Missing / warnings</th><th>Missing translations</th><th>Admin recommendations</th><th>Actions</th></tr></thead><tbody>
     {% for row in rows %}
     <tr>
       <td><strong>{{ row.article.title or 'Untitled' }}</strong><small>{{ row.article.slug or 'no-slug' }}</small></td>
@@ -21,9 +22,20 @@
       <td><span class="seo-score {{ 'good' if row.audit.score >= 90 else 'warn' if row.audit.score >= 70 else 'bad' }}">{{ row.audit.score }}%</span></td>
       <td>{% if row.audit.issues %}<div class="tool-list">{% for issue in row.audit.issues %}<span>{{ issue }}</span>{% endfor %}</div>{% else %}<span class="badge published">Ready</span>{% endif %}</td>
       <td>{% if row.audit.missing_translations %}{{ row.audit.missing_translations|join(', ')|upper }}{% else %}<span class="badge published">Complete</span>{% endif %}</td>
+      <td>{% if row.recommendations %}<div class="tool-list">{% for item in row.recommendations %}<span>{{ item }}</span>{% endfor %}</div>{% else %}<span class="badge published">Ready</span>{% endif %}</td>
       <td class="actions"><a class="btn small" href="/admin/articles/{{ row.article.id }}/edit">Edit</a>{% if row.article.status == 'published' and row.article.slug %}<a class="btn small" href="/az/{{ row.article.slug }}" target="_blank">View</a>{% endif %}</td>
     </tr>
-    {% else %}<tr><td colspan="6">No articles found.</td></tr>{% endfor %}
+    {% else %}<tr><td colspan="7">No articles found.</td></tr>{% endfor %}
   </tbody></table></div>
+</section>
+<section class="panel">
+  <div class="panel-head wrap"><div><h2>Technical SEO checks</h2><p class="muted">Monitors broken internal links, missing images and duplicate title/meta-description risks without black-hat SEO.</p></div></div>
+  <div class="form-grid two">
+    <div><h3>Broken links</h3>{% if technical.broken_links %}<div class="tool-list">{% for item in technical.broken_links[:20] %}<span>#{{ item.article.id }} {{ item.url }}</span>{% endfor %}</div>{% else %}<span class="badge published">None found</span>{% endif %}</div>
+    <div><h3>Missing images</h3>{% if technical.missing_images %}<div class="tool-list">{% for item in technical.missing_images[:20] %}<span>#{{ item.article.id }} {{ item.url }}</span>{% endfor %}</div>{% else %}<span class="badge published">None found</span>{% endif %}</div>
+    <div><h3>Duplicate titles</h3>{% if technical.duplicate_titles %}<div class="tool-list">{% for title, ids in technical.duplicate_titles.items() %}<span>{{ ids|join(', ') }} — {{ title }}</span>{% endfor %}</div>{% else %}<span class="badge published">None found</span>{% endif %}</div>
+    <div><h3>Duplicate meta descriptions</h3>{% if technical.duplicate_descriptions %}<div class="tool-list">{% for desc, ids in technical.duplicate_descriptions.items() %}<span>{{ ids|join(', ') }} — {{ desc }}</span>{% endfor %}</div>{% else %}<span class="badge published">None found</span>{% endif %}</div>
+    <div><h3>Recent 404 monitor</h3>{% if recent_404s %}<div class="tool-list">{% for row in recent_404s %}<span>{{ row.created_at }} — {{ row.message }}</span>{% endfor %}</div>{% else %}<span class="badge published">No public 404s logged</span>{% endif %}</div>
+  </div>
 </section>
 {% endblock %}

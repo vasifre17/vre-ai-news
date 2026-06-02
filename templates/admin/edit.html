@@ -16,7 +16,7 @@
         {% if lang != 'az' %}<p class="muted">Frontend pages use these {{ language_labels[lang] }} article title, summary, SEO and content fields whenever they are filled. Empty fields fall back to Azerbaijani temporarily.</p>{% endif %}
         <div class="form-grid two">
           <label>Title<input name="title_{{ lang }}" value="{{ item.title if item else '' }}" {% if lang == 'az' %}required{% endif %}></label>
-          <label>Slug<input name="slug_{{ lang }}" value="{{ item.slug if item else '' }}" placeholder="seo-friendly-slug"></label>
+          <label>Slug<input name="slug_{{ lang }}" value="{{ item.slug if item else '' }}" placeholder="seo-friendly-slug" pattern="[a-z0-9]+(?:-[a-z0-9]+)*" title="Use clean lowercase Latin letters, numbers and hyphens only."><small class="muted">Azerbaijani characters are safely transliterated on save and duplicates receive a numeric suffix.</small></label>
         </div>
         <label>SEO title<input name="seo_title_{{ lang }}" value="{{ item.seo_title if item else '' }}"></label>
         <label>Meta description<textarea name="meta_description_{{ lang }}" rows="2">{{ item.meta_description if item else '' }}</textarea></label>
@@ -29,6 +29,7 @@
   </section>
   <aside class="panel editor-side">
     <h2>Publishing</h2>
+    {% if article %}<div class="seo-recommendations"><h3>SEO recommendations</h3>{% set az_recs = seo_recommendations.get('az', []) %}{% if az_recs %}<ul>{% for rec in az_recs %}<li>{{ rec }}</li>{% endfor %}</ul>{% else %}<p class="muted">SEO basics look ready for this article.</p>{% endif %}</div>{% endif %}
     <label>Status<select name="status"><option value="draft" {{ 'selected' if not article or article.status == 'draft' else '' }}>Draft</option><option value="published" {{ 'selected' if article and article.status == 'published' else '' }}>Published</option></select></label>
     <label>Category<select name="category"><option value="">Uncategorized</option>{% for c in categories %}<option value="{{ c.name }}" {{ 'selected' if article and article.category == c.name else '' }}>{{ c.name }}</option>{% endfor %}</select></label>
     <div class="hero-upload-panel">

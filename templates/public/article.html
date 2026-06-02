@@ -5,11 +5,12 @@
   <title>{{article.seo_title or article.title}} | {{ site_name }}</title><meta name="description" content="{{article.meta_description or article.summary or article.title}}"><meta name="robots" content="index,follow,max-image-preview:large">
   {% if verification_meta.google %}<meta name="google-site-verification" content="{{ verification_meta.google }}">{% endif %}{% if verification_meta.bing %}<meta name="msvalidate.01" content="{{ verification_meta.bing }}">{% endif %}
   <link rel="canonical" href="{{ canonical }}">{% for lang, link in alt_links.items() %}<link rel="alternate" hreflang="{{lang}}" href="{{site_url}}{{link}}">{% endfor %}<link rel="alternate" hreflang="x-default" href="{{site_url}}{{alt_links['az']}}">
-  <meta property="og:type" content="article"><meta property="og:site_name" content="{{ site_name }}"><meta property="og:locale" content="{{ language }}"><meta property="og:title" content="{{article.seo_title or article.title}}"><meta property="og:description" content="{{article.meta_description or article.summary or article.title}}"><meta property="og:url" content="{{canonical}}"><meta property="og:image" content="{{ og_image }}"><meta property="article:published_time" content="{{ root_article.published_at|default('', true) }}"><meta property="article:modified_time" content="{{ root_article.updated_at|default(root_article.published_at, true) }}">
+  <meta property="og:type" content="article"><meta property="og:site_name" content="{{ site_name }}"><meta property="og:locale" content="{{ language }}"><meta property="og:title" content="{{article.seo_title or article.title}}"><meta property="og:description" content="{{article.meta_description or article.summary or article.title}}"><meta property="og:url" content="{{canonical}}"><meta property="og:image" content="{{ og_image }}"><meta property="og:image:width" content="{{ image_width or 1200 }}"><meta property="og:image:height" content="{{ image_height or 675 }}"><meta property="article:published_time" content="{{ root_article.published_at|default('', true) }}"><meta property="article:modified_time" content="{{ root_article.updated_at|default(root_article.published_at, true) }}">
   <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="{{article.seo_title or article.title}}"><meta name="twitter:description" content="{{article.meta_description or article.summary or article.title}}"><meta name="twitter:image" content="{{ og_image }}">
   {% if narration and narration.status == 'ready' and narration.audio_path %}<meta itemprop="audio" content="{{site_url}}{{narration.audio_path}}">{% endif %}
   <script type="application/ld+json">{{ {"@context":"https://schema.org", "@graph": schema_graph}|tojson }}</script>
-  <link rel="stylesheet" href="/assets/styles.css">
+  <link rel="preload" as="image" href="{{ og_image }}" fetchpriority="high">
+  <link rel="stylesheet" href="/assets/styles.min.css">
 </head>
 <body>
 <header class="site-header glass">
@@ -29,13 +30,20 @@
   <div class="container section article-layout">
     <article class="glass article">
       <figure class="article-image-frame">
-        {% if image_exists %}{% set article_srcset = root_article.image_url|image_srcset %}<img src="{{root_article.image_url|public_image_url}}" {% if article_srcset %}srcset="{{ article_srcset }}" sizes="(max-width: 1050px) 92vw, 860px"{% endif %} alt="{{article.title}}" loading="eager">{% else %}<div class="image-placeholder article-image-placeholder">VREYC</div>{% endif %}
+        {% if image_exists %}{% set article_srcset = root_article.image_url|image_srcset %}<img src="{{root_article.image_url|public_image_url}}" {% if article_srcset %}srcset="{{ article_srcset }}" sizes="(max-width: 1050px) 92vw, 860px"{% endif %} alt="{{article.title}}" loading="eager" fetchpriority="high" decoding="async" width="{{ image_width or 1200 }}" height="{{ image_height or 675 }}">{% else %}<div class="image-placeholder article-image-placeholder">VREYC</div>{% endif %}
       </figure>
       <div class="share-row"><span>{{ ui.share }}</span><a class="btn small" href="https://www.facebook.com/sharer/sharer.php?u={{ share_url }}" target="_blank" rel="noopener">Facebook</a><a class="btn small" href="https://twitter.com/intent/tweet?url={{ share_url }}&text={{ article.title }}" target="_blank" rel="noopener">X</a><a class="btn small" href="https://www.linkedin.com/shareArticle?mini=true&url={{ share_url }}" target="_blank" rel="noopener">LinkedIn</a><a class="btn small" href="mailto:?subject={{ article.title }}&body={{ share_url }}">{{ ui.email }}</a></div>
       <section class="glass audio-news" data-audio-ready="{{ '1' if narration and narration.status == 'ready' else '0' }}"><h3>{{ ui.audio_narration }}</h3>{% if narration and narration.status == 'ready' and narration.audio_path %}<audio id="narration" preload="none" src="{{narration.audio_path}}"></audio><div class="audio-controls"><button class="btn" id="playBtn" type="button">{{ ui.play }}</button><button class="btn" id="pauseBtn" type="button">{{ ui.pause }}</button><input id="seek" type="range" value="0" min="0" step="1"><span id="time">0:00 / 0:00</span><select id="speed"><option>1</option><option>1.25</option><option>1.5</option><option>1.75</option><option>2</option></select>{% if narration.allow_download %}<a class="btn" href="{{narration.audio_path}}" download>{{ ui.download }}</a>{% endif %}</div>{% else %}<p>{{ ui.narration_pending }}</p>{% endif %}</section>
       <div class="article-content">{{article.content}}</div>
+      <nav class="article-prev-next" aria-label="Previous and next articles">
+        {% if previous_article %}<a class="glass" href="{{ previous_article.url }}"><span>Previous</span><strong>{{ previous_article.title }}</strong></a>{% endif %}
+        {% if next_article %}<a class="glass" href="{{ next_article.url }}"><span>Next</span><strong>{{ next_article.title }}</strong></a>{% endif %}
+      </nav>
     </article>
-    <aside class="related glass"><p class="eyebrow">{{ ui.related }}</p><h2>{{ ui.more_stories }}</h2>{% for row in related_articles %}<a class="related-card" href="{{ row.url }}">{% if row.image_exists %}{% set related_srcset = row.article.image_url|image_srcset %}<img src="{{ row.article.image_url|public_image_url }}" {% if related_srcset %}srcset="{{ related_srcset }}" sizes="(max-width: 700px) 100vw, 96px"{% endif %} alt="{{ row.title }}" loading="lazy">{% else %}<div class="image-placeholder related-placeholder">VREYC</div>{% endif %}<div><span class="badge">{{ row.category_label }}</span><strong>{{ row.title }}</strong><small>{{ row.article.published_at|format_published_at }}</small></div></a>{% else %}<p class="muted">{{ ui.related_empty }}</p>{% endfor %}</aside>
+    <aside class="related glass"><p class="eyebrow">{{ ui.related }}</p><h2>{{ ui.more_stories }}</h2>{% for row in related_articles %}<a class="related-card" href="{{ row.url }}">{% if row.image_exists %}{% set related_srcset = row.article.image_url|image_srcset %}<img src="{{ row.article.image_url|public_image_url }}" {% if related_srcset %}srcset="{{ related_srcset }}" sizes="(max-width: 700px) 100vw, 96px"{% endif %} alt="{{ row.title }}" loading="lazy" decoding="async">{% else %}<div class="image-placeholder related-placeholder">VREYC</div>{% endif %}<div><span class="badge">{{ row.category_label }}</span><strong>{{ row.title }}</strong><small>{{ row.article.published_at|format_published_at }}</small></div></a>{% else %}<p class="muted">{{ ui.related_empty }}</p>{% endfor %}
+      <hr><p class="eyebrow">Popular</p>{% for row in popular_articles %}<a class="related-card compact-link" href="{{ row.url }}"><div><strong>{{ row.title }}</strong><small>{{ row.view_count }} views</small></div></a>{% endfor %}
+      <hr><p class="eyebrow">Latest</p>{% for row in latest_articles %}<a class="related-card compact-link" href="{{ row.url }}"><div><strong>{{ row.title }}</strong><small>{{ row.article.published_at|format_published_at }}</small></div></a>{% endfor %}
+    </aside>
   </div>
 </main>
 <footer class="footer container">
@@ -62,6 +70,6 @@
   </section>
 </footer>
 <script>(()=>{const w=document.querySelector('.audio-news');if(!w||w.dataset.audioReady!=='1')return;const a=document.getElementById('narration'),play=document.getElementById('playBtn'),pause=document.getElementById('pauseBtn'),seek=document.getElementById('seek'),speed=document.getElementById('speed'),time=document.getElementById('time');const fmt=t=>`${Math.floor(t/60)}:${String(Math.floor(t%60)).padStart(2,'0')}`;play.onclick=()=>a.play();pause.onclick=()=>a.pause();speed.onchange=()=>a.playbackRate=parseFloat(speed.value);a.onloadedmetadata=()=>{seek.max=Math.floor(a.duration||0);time.textContent=`0:00 / ${fmt(a.duration||0)}`};a.ontimeupdate=()=>{seek.value=Math.floor(a.currentTime);time.textContent=`${fmt(a.currentTime)} / ${fmt(a.duration||0)}`};seek.oninput=()=>{a.currentTime=Number(seek.value)}})();</script>
-<script src="/assets/app.js" defer></script>
+<script src="/assets/app.min.js" defer></script>
 </body>
 </html>
