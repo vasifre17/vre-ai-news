@@ -617,6 +617,7 @@ def article_card(article: Article, language: str, category_labels: dict[str, str
         "url": article_url(language, view.slug),
         "category_label": category_label,
         "image_exists": uploaded_image_exists(article.image_url),
+        "view_count": article.view_count or 0,
     }
 
 def get_settings_map(db) -> dict[str, str]:
@@ -630,6 +631,85 @@ def save_setting(db, key: str, value: str) -> None:
     else:
         row.value = value
 
+
+
+def safe_positive_int(value, default: int = 1, maximum: int | None = None) -> int:
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        number = default
+    number = max(1, number)
+    if maximum is not None:
+        number = min(number, maximum)
+    return number
+
+
+def parse_admin_date(value: str | None):
+    if not value:
+        return None
+    try:
+        return datetime.strptime(value, "%Y-%m-%d")
+    except ValueError:
+        return None
+
+
+def admin_articles_redirect(request: Request) -> str:
+    query = request.url.query
+    return f"/admin/articles?{query}" if query else "/admin/articles"
+
+
+def admin_article_categories(db) -> list[str]:
+    category_rows = [name for (name,) in db.query(Category.name).order_by(Category.name.asc()).all() if name]
+    article_rows = [name for (name,) in db.query(Article.category).filter(Article.category.isnot(None), Article.category != "").distinct().order_by(Article.category.asc()).all() if name]
+    return sorted(set(category_rows + article_rows))
+
+
+def filtered_admin_article_query(db, search: str = "", status: str = "all", category: str = "", language: str = "", date_from: str = "", date_to: str = ""):
+    query = db.query(Article).options(selectinload(Article.translations))
+    if status in {"draft", "published"}:
+        query = query.filter(Article.status == status)
+    if category:
+        query = query.filter(Article.category == category)
+    if language in SUPPORTED_LANGUAGES:
+        if language == "az":
+            query = query.filter(Article.language == "az")
+        else:
+            translated_ids = db.query(ArticleTranslation.article_id).filter(ArticleTranslation.language == language)
+            query = query.filter(Article.id.in_(translated_ids.scalar_subquery()))
+    start = parse_admin_date(date_from)
+    end = parse_admin_date(date_to)
+    if start:
+        query = query.filter(Article.created_at >= start)
+    if end:
+        query = query.filter(Article.created_at < end.replace(hour=23, minute=59, second=59, microsecond=999999))
+    if search:
+        term = f"%{search.strip()}%"
+        translation_matches = db.query(ArticleTranslation.article_id).filter(
+            or_(
+                ArticleTranslation.title.ilike(term),
+                ArticleTranslation.slug.ilike(term),
+                ArticleTranslation.content.ilike(term),
+            )
+        )
+        query = query.filter(
+            or_(
+                Article.title.ilike(term),
+                Article.slug.ilike(term),
+                Article.content.ilike(term),
+                Article.id.in_(translation_matches.scalar_subquery()),
+            )
+        )
+    return query
+
+
+def apply_admin_article_sort(query, sort: str):
+    if sort == "oldest":
+        return query.order_by(Article.created_at.asc(), Article.id.asc())
+    if sort == "most_viewed":
+        return query.order_by(Article.view_count.desc(), Article.published_at.desc(), Article.created_at.desc())
+    if sort == "recently_updated":
+        return query.order_by(Article.updated_at.desc(), Article.created_at.desc())
+    return query.order_by(Article.published_at.desc(), Article.created_at.desc(), Article.id.desc())
 
 def article_form_context(db, article: Article | None = None) -> dict:
     categories = db.query(Category).order_by(Category.name.asc()).all()
@@ -665,6 +745,7 @@ def apply_schema_migrations(db) -> None:
         "ALTER TABLE articles ADD COLUMN is_featured BOOLEAN DEFAULT false",
         "ALTER TABLE articles ADD COLUMN is_trending BOOLEAN DEFAULT false",
         "ALTER TABLE articles ADD COLUMN homepage_order INTEGER DEFAULT 100",
+        "ALTER TABLE articles ADD COLUMN view_count INTEGER DEFAULT 0",
         "ALTER TABLE article_translations ADD COLUMN slug VARCHAR(500)",
         "ALTER TABLE article_translations ADD COLUMN meta_description TEXT",
         "ALTER TABLE article_translations ADD COLUMN tags VARCHAR(500)",
@@ -675,6 +756,7 @@ def apply_schema_migrations(db) -> None:
         except Exception:
             db.rollback()
     for statement in [
+        "CREATE INDEX IF NOT EXISTS ix_articles_view_count ON articles (view_count)",
         "CREATE INDEX IF NOT EXISTS ix_article_translations_article_id ON article_translations (article_id)",
         "CREATE INDEX IF NOT EXISTS ix_article_translations_language ON article_translations (language)",
         "CREATE INDEX IF NOT EXISTS ix_article_translations_slug ON article_translations (slug)",
@@ -725,9 +807,7 @@ def home(request: Request, language: str = "az", q: str = "", category: str = ""
     featured = db.query(Article).options(selectinload(Article.translations)).filter(Article.status == "published", Article.is_featured == True).order_by(Article.homepage_order.asc(), Article.published_at.desc()).limit(6).all()
     if not featured:
         featured = articles[:6]
-    trending = db.query(Article).options(selectinload(Article.translations)).filter(Article.status == "published", Article.is_trending == True).order_by(Article.homepage_order.asc(), Article.published_at.desc()).limit(8).all()
-    if not trending:
-        trending = articles[:8]
+    trending = db.query(Article).options(selectinload(Article.translations)).filter(Article.status == "published").order_by(Article.view_count.desc(), Article.published_at.desc(), Article.created_at.desc()).limit(8).all()
     category_labels = public_category_labels(language)
     article_cards = [article_card(a, language, category_labels) for a in articles]
     featured_cards = [article_card(a, language, category_labels) for a in featured]
@@ -744,6 +824,9 @@ def render_article_page(slug: str, request: Request, language: str = "az", db=De
     article = find_published_article_by_slug(db, slug, language)
     if not article:
         raise HTTPException(404)
+    article.view_count = (article.view_count or 0) + 1
+    article.updated_at = article.updated_at or datetime.utcnow()
+    db.commit()
     view = localized_article_view(article, language)
     narration = db.query(ArticleNarration).filter(ArticleNarration.article_id == article.id, ArticleNarration.language == language).first()
     alt_links = {lang: article_url(lang, localized_slug(article, lang)) for lang in SUPPORTED_LANGUAGES}
@@ -828,19 +911,75 @@ def admin_dashboard(request: Request, db=Depends(get_db), _=Depends(require_auth
     categories = db.query(Category).count() or db.query(Article.category).filter(Article.category.isnot(None)).distinct().count()
     media_count = db.query(MediaAsset).count()
     logs = db.query(FetchLog).order_by(FetchLog.created_at.desc()).limit(8).all()
-    recent_articles = db.query(Article).order_by(Article.updated_at.desc(), Article.created_at.desc()).limit(6).all()
-    return templates.TemplateResponse('admin/dashboard.html', {'request': request, 'drafts': drafts, 'published': published, 'total_articles': total_articles, 'categories': categories, 'media_count': media_count, 'logs': logs, 'recent_articles': recent_articles, "languages": SUPPORTED_LANGUAGES, "ai_translation_status": ai_translation_status()})
+    latest_articles = db.query(Article).order_by(Article.created_at.desc(), Article.id.desc()).limit(10).all()
+    most_viewed_articles = db.query(Article).order_by(Article.view_count.desc(), Article.published_at.desc(), Article.created_at.desc()).limit(10).all()
+    return templates.TemplateResponse('admin/dashboard.html', {'request': request, 'drafts': drafts, 'published': published, 'total_articles': total_articles, 'categories': categories, 'media_count': media_count, 'logs': logs, 'recent_articles': latest_articles, 'latest_articles': latest_articles, 'most_viewed_articles': most_viewed_articles, "languages": SUPPORTED_LANGUAGES, "ai_translation_status": ai_translation_status()})
 
 
 @app.get('/admin/articles', response_class=HTMLResponse)
-def admin_articles(request: Request, status: str = "all", db=Depends(get_db), _=Depends(require_auth)):
-    query = db.query(Article)
-    if status in {"draft", "published"}:
-        query = query.filter(Article.status == status)
-    articles = query.order_by(Article.updated_at.desc(), Article.created_at.desc()).all()
+def admin_articles(
+    request: Request,
+    q: str = "",
+    status: str = "all",
+    category: str = "",
+    language: str = "",
+    date_from: str = "",
+    date_to: str = "",
+    sort: str = "newest",
+    page: int = 1,
+    per_page: int = 25,
+    db=Depends(get_db),
+    _=Depends(require_auth),
+):
+    page = safe_positive_int(page, 1)
+    per_page = safe_positive_int(per_page, 25, 100)
+    query = filtered_admin_article_query(db, q, status, category, language, date_from, date_to)
+    total = query.count()
+    total_pages = max(1, (total + per_page - 1) // per_page)
+    page = min(page, total_pages)
+    articles = apply_admin_article_sort(query, sort).offset((page - 1) * per_page).limit(per_page).all()
     narration_map = {n.article_id: n for n in db.query(ArticleNarration).filter(ArticleNarration.article_id.in_([a.id for a in articles] or [0])).all()}
     translation_missing_map = {a.id: missing_translation_languages(a) for a in articles}
-    return templates.TemplateResponse("admin/articles.html", {"request": request, "articles": articles, "status": status, "narration_map": narration_map, "translation_missing_map": translation_missing_map, "languages": SUPPORTED_LANGUAGES, "ai_translation_status": ai_translation_status()})
+    categories = admin_article_categories(db)
+    filters = {"q": q, "status": status, "category": category, "language": language, "date_from": date_from, "date_to": date_to, "sort": sort, "page": page, "per_page": per_page}
+    return templates.TemplateResponse("admin/articles.html", {"request": request, "articles": articles, "status": status, "narration_map": narration_map, "translation_missing_map": translation_missing_map, "languages": SUPPORTED_LANGUAGES, "language_labels": LANGUAGE_LABELS, "categories": categories, "filters": filters, "total": total, "total_pages": total_pages, "page": page, "per_page": per_page, "ai_translation_status": ai_translation_status()})
+
+
+
+@app.post('/admin/articles/bulk')
+async def bulk_articles(request: Request, db=Depends(get_db), _=Depends(require_auth)):
+    form = await request.form()
+    selected_ids = [int(value) for value in form.getlist('article_ids') if str(value).isdigit()]
+    action = form.get('bulk_action', '')
+    redirect_url = admin_articles_redirect(request)
+    if not selected_ids or not action:
+        return RedirectResponse(redirect_url, status_code=302)
+    articles = db.query(Article).filter(Article.id.in_(selected_ids)).all()
+    now = datetime.utcnow()
+    if action == 'delete':
+        if form.get('confirm_bulk_delete', '').strip().upper() != 'DELETE':
+            return RedirectResponse(redirect_url, status_code=302)
+        for article in articles:
+            db.delete(article)
+    elif action == 'publish':
+        for article in articles:
+            article.status = 'published'
+            article.published_at = article.published_at or now
+            article.slug = article.slug or unique_article_slug(db, article.title, article.id)
+            article.updated_at = now
+            queue_narration(db, article)
+    elif action == 'unpublish':
+        for article in articles:
+            article.status = 'draft'
+            article.updated_at = now
+    elif action == 'category':
+        new_category = form.get('bulk_category', '').strip()
+        if new_category:
+            for article in articles:
+                article.category = new_category
+                article.updated_at = now
+    db.commit()
+    return RedirectResponse(redirect_url, status_code=302)
 
 
 @app.get('/admin/articles/new', response_class=HTMLResponse)

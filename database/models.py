@@ -26,6 +26,7 @@ class Article(Base):
     is_featured = Column(Boolean, default=False, index=True)
     is_trending = Column(Boolean, default=False, index=True)
     homepage_order = Column(Integer, default=100, index=True)
+    view_count = Column(Integer, default=0, index=True)
     published_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow)
