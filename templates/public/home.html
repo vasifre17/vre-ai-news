@@ -56,7 +56,7 @@
     </section>
     <aside class="trending-sidebar glass">
       <p class="eyebrow">{{ ui.trending }}</p><h2>{{ ui.most_watched }}</h2>
-      <div class="trending-list">{% for row in trending_articles %}<a href="{{ row.url }}"><span>{{ loop.index }}</span><div><strong>{{ row.title }}</strong><small>{{ row.category_label }} • {{ row.article.published_at|format_published_at }}</small></div></a>{% endfor %}</div>
+      <div class="trending-list">{% for row in trending_articles %}<a href="{{ row.url }}"><span>{{ loop.index }}</span><div><strong>{{ row.title }}</strong><small>{{ row.category_label }} • {{ row.view_count }} views • {{ row.article.published_at|format_published_at }}</small></div></a>{% endfor %}</div>
     </aside>
   </div>
 </main>

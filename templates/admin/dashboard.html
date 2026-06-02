@@ -1,26 +1,26 @@
 {% extends "admin/_base.html" %}
 {% set title = 'Dashboard | VREYC Admin' %}
-{% set heading = 'VREYC Admin Dashboard' %}
+{% set heading = 'Command center' %}
 {% block content %}
-<section class="stats-grid">
-  <article class="stat-card"><span>Total articles</span><strong>{{ total_articles }}</strong><small>Across all statuses</small></article>
-  <article class="stat-card"><span>Published</span><strong>{{ published }}</strong><small>Live on VREYC</small></article>
-  <article class="stat-card"><span>Drafts</span><strong>{{ drafts }}</strong><small>Awaiting editorial review</small></article>
-  <article class="stat-card"><span>Media assets</span><strong>{{ media_count }}</strong><small>Stored in library</small></article>
+<section class="stats-grid dashboard-stats">
+  <article class="stat-card"><span>Total articles</span><strong>{{ total_articles }}</strong><small>Complete editorial archive</small></article>
+  <article class="stat-card"><span>Published articles</span><strong>{{ published }}</strong><small>Live on the public site</small></article>
+  <article class="stat-card"><span>Draft articles</span><strong>{{ drafts }}</strong><small>Awaiting editorial review</small></article>
+  <article class="stat-card"><span>Total categories</span><strong>{{ categories }}</strong><small>Taxonomy sections</small></article>
+  <article class="stat-card"><span>Total images</span><strong>{{ media_count }}</strong><small>Uploaded media assets</small></article>
 </section>
 
 <section class="panel-grid two">
-  <div class="panel">
-    <div class="panel-head"><h2>Editorial workflow</h2><a class="btn primary" href="/admin/articles/new">New article</a></div>
-    <div class="workflow-row"><span>Categories</span><strong>{{ categories }}</strong></div>
-    <div class="workflow-row"><span>Languages</span><strong>{{ languages|join(', ')|upper }}</strong></div>
-    <div class="workflow-row"><span>AI translation</span><strong>{{ 'Configured' if ai_translation_status.configured else 'Not configured' }}</strong></div>
-    {% if not ai_translation_status.configured %}<div class="alert danger">{{ ai_translation_status.message }}</div>{% endif %}
-    <div class="workflow-row"><span>Publishing</span><strong>Manual + protected</strong></div>
-  </div>
   <div class="panel ai-panel">
-    <p class="eyebrow">AI tools</p>
-    <h2>Newsroom intelligence</h2>
+    <div class="panel-head"><h2>Editorial workflow</h2><a class="btn primary" href="/admin/articles/new">New article</a></div>
+    <div class="workflow-row"><span>AI fetch pipeline</span><strong>Automated</strong></div>
+    <div class="workflow-row"><span>Draft review</span><strong>{{ drafts }} waiting</strong></div>
+    <div class="workflow-row"><span>Published inventory</span><strong>{{ published }} live</strong></div>
+  </div>
+  <div class="panel">
+    <h2>AI production tools</h2>
+    {% if not ai_translation_status.configured %}<div class="alert danger">{{ ai_translation_status.message }}</div>{% endif %}
+    <p class="muted">Translations and narration stay available while article management gains CMS-style reporting.</p>
     <div class="tool-list">
       <span>Automatic AZ → EN/RU/TR/ZH/ES translation</span><span>SEO field translation</span><span>Image-safe generation</span><span>Audio narration review</span>
     </div>
@@ -29,18 +29,23 @@
 
 <section class="panel-grid two">
   <div class="panel">
-    <div class="panel-head"><h2>Recent articles</h2><a href="/admin/articles">Manage all</a></div>
-    <div class="table-wrap">
-      <table><thead><tr><th>Title</th><th>Status</th><th>Updated</th></tr></thead><tbody>
-      {% for article in recent_articles %}<tr><td><a href="/admin/articles/{{ article.id }}/edit">{{ article.title or 'Untitled' }}</a></td><td><span class="badge {{ article.status }}">{{ article.status }}</span></td><td>{{ article.updated_at|format_published_at }}</td></tr>{% else %}<tr><td colspan="3">No articles yet.</td></tr>{% endfor %}
-      </tbody></table>
-    </div>
+    <div class="panel-head"><h2>Latest 10 articles</h2><a href="/admin/articles?sort=newest">Manage all</a></div>
+    <div class="table-wrap"><table><thead><tr><th>Title</th><th>Status</th><th>Views</th><th>Created</th></tr></thead><tbody>
+      {% for article in latest_articles %}<tr><td><a href="/admin/articles/{{ article.id }}/edit">{{ article.title or 'Untitled' }}</a><small>{{ article.slug }}</small></td><td><span class="badge {{ article.status }}">{{ article.status }}</span></td><td>{{ article.view_count or 0 }}</td><td>{{ article.created_at|format_published_at }}</td></tr>{% else %}<tr><td colspan="4">No articles yet.</td></tr>{% endfor %}
+    </tbody></table></div>
   </div>
   <div class="panel">
-    <div class="panel-head"><h2>Fetch logs</h2></div>
-    <div class="activity-list">
-      {% for log in logs %}<div><span class="badge">{{ log.level }}</span><p>{{ log.message }}</p><small>{{ log.created_at|format_published_at }}</small></div>{% else %}<p class="muted">No fetch logs yet.</p>{% endfor %}
-    </div>
+    <div class="panel-head"><h2>Most viewed articles</h2><a href="/admin/articles?sort=most_viewed">Open report</a></div>
+    <div class="table-wrap"><table><thead><tr><th>Title</th><th>Status</th><th>Views</th><th>Updated</th></tr></thead><tbody>
+      {% for article in most_viewed_articles %}<tr><td><a href="/admin/articles/{{ article.id }}/edit">{{ article.title or 'Untitled' }}</a><small>{{ article.slug }}</small></td><td><span class="badge {{ article.status }}">{{ article.status }}</span></td><td><strong>{{ article.view_count or 0 }}</strong></td><td>{{ article.updated_at|format_published_at }}</td></tr>{% else %}<tr><td colspan="4">No article views recorded yet.</td></tr>{% endfor %}
+    </tbody></table></div>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>System activity</h2>
+  <div class="activity-list">
+    {% for log in logs %}<div><strong>{{ log.level }}</strong><p>{{ log.message }}</p><small>{{ log.created_at|format_published_at }}</small></div>{% else %}<p class="muted">No pipeline logs yet.</p>{% endfor %}
   </div>
 </section>
 {% endblock %}
