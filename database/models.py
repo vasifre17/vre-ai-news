@@ -33,6 +33,21 @@ class Article(Base):
     revisions = relationship("ArticleRevision", back_populates="article", cascade="all, delete-orphan")
     narrations = relationship("ArticleNarration", back_populates="article", cascade="all, delete-orphan")
     translations = relationship("ArticleTranslation", back_populates="article", cascade="all, delete-orphan")
+    views = relationship("ArticleView", back_populates="article", cascade="all, delete-orphan")
+
+
+class ArticleView(Base):
+    __tablename__ = "article_views"
+    id = Column(Integer, primary_key=True)
+    article_id = Column(Integer, ForeignKey("articles.id", ondelete="CASCADE"), index=True)
+    viewed_at = Column(DateTime, default=datetime.utcnow, index=True)
+    visitor_key = Column(String(128), index=True)
+    traffic_source = Column(String(120), default="Direct", index=True)
+    path = Column(String(1000))
+    language = Column(String(20), default="az", index=True)
+
+    article = relationship("Article", back_populates="views")
+
 
 
 class ArticleTranslation(Base):

@@ -1,0 +1,74 @@
+{% extends "admin/_base.html" %}
+{% set title = 'Article analytics | VREYC Admin' %}
+{% set heading = 'Article analytics' %}
+{% macro chart_block(title, rows) -%}
+  <div class="analytics-chart">
+    <div class="chart-title"><strong>{{ title }}</strong><span>{{ rows|sum(attribute='views') }} views</span></div>
+    <div class="bar-chart" role="img" aria-label="{{ title }} traffic chart">
+      {% for row in rows %}
+      <div class="bar-item">
+        <span class="bar-value">{{ row.views }}</span>
+        <span class="bar" style="height: {{ row.height }}%"></span>
+        <small>{{ row.label }}</small>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+{%- endmacro %}
+{% block content %}
+<section class="panel article-analytics-hero">
+  <div>
+    <p class="eyebrow">Article #{{ article.id }}</p>
+    <h2>{{ article.title or 'Untitled article' }}</h2>
+    <p class="muted">{{ article.slug }}</p>
+  </div>
+  <div class="actions">
+    <a class="btn" href="/admin/articles/{{ article.id }}/edit">Edit article</a>
+    <a class="btn ghost" href="/admin/articles">Back to articles</a>
+  </div>
+</section>
+
+<section class="stats-grid dashboard-stats analytics-stats">
+  <article class="stat-card"><span>Total views</span><strong>{{ publish_performance.total_views }}</strong><small>Lifetime page views</small></article>
+  <article class="stat-card"><span>First 24 hours</span><strong>{{ publish_performance.first_24h_views }}</strong><small>Publish performance</small></article>
+  <article class="stat-card"><span>Last 7 days</span><strong>{{ publish_performance.last_7_views }}</strong><small>Recent momentum</small></article>
+  <article class="stat-card"><span>Unique visitors</span><strong>{{ publish_performance.unique_visitors }}</strong><small>Distinct readers</small></article>
+  <article class="stat-card"><span>Published</span><strong>{{ publish_performance.published_at|format_published_at if publish_performance.published_at else 'Draft' }}</strong><small>Publication timestamp</small></article>
+</section>
+
+<section class="panel-grid two">
+  <div class="panel">
+    <h2>Traffic source</h2>
+    <div class="category-analytics-list">
+      {% set total_sources = sources|sum(attribute='views') %}
+      {% for source in sources %}
+      {% set source_share = ((source.views / total_sources) * 100)|round|int if total_sources else 0 %}
+      <div class="category-analytics-row">
+        <div><strong>{{ source.name }}</strong><small>{{ source.views }} views</small></div>
+        <span class="progress"><span style="width: {{ source_share }}%"></span></span>
+        <em>{{ source_share }}%</em>
+      </div>
+      {% else %}<p class="muted">Traffic sources will appear after this article is viewed.</p>{% endfor %}
+    </div>
+  </div>
+  <div class="panel">
+    <h2>Publish performance</h2>
+    <div class="workflow-row"><span>Lifetime views</span><strong>{{ publish_performance.total_views }}</strong></div>
+    <div class="workflow-row"><span>First-day views</span><strong>{{ publish_performance.first_24h_views }}</strong></div>
+    <div class="workflow-row"><span>Last 7 days</span><strong>{{ publish_performance.last_7_views }}</strong></div>
+    <div class="workflow-row"><span>Unique visitors</span><strong>{{ publish_performance.unique_visitors }}</strong></div>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="panel-head"><div><h2>View history</h2><p class="muted">Recent article page-view events.</p></div></div>
+  <div class="traffic-chart-grid">
+    {{ chart_block('Daily views', charts.daily) }}
+    {{ chart_block('Weekly views', charts.weekly) }}
+    {{ chart_block('Monthly views', charts.monthly) }}
+  </div>
+  <div class="table-wrap analytics-history"><table><thead><tr><th>Viewed</th><th>Source</th><th>Language</th><th>Path</th></tr></thead><tbody>
+    {% for view in history %}<tr><td>{{ view.viewed_at|format_published_at }}</td><td>{{ view.traffic_source or 'Direct' }}</td><td>{{ view.language|upper }}</td><td><code>{{ view.path }}</code></td></tr>{% else %}<tr><td colspan="4">No view history recorded for this article yet.</td></tr>{% endfor %}
+  </tbody></table></div>
+</section>
+{% endblock %}
