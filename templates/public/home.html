@@ -67,14 +67,32 @@
       <div class="featured-slider" aria-label="{{ ui.featured }}">
         {% for row in featured_articles %}
         <article class="feature-card glass">
-          <a href="{{ row.url }}">{% if row.image_exists %}{% set feature_srcset = row.article.image_url|image_srcset %}<img src="{{ row.article.image_url|public_image_url }}" {% if feature_srcset %}srcset="{{ feature_srcset }}" sizes="(max-width: 700px) 86vw, (max-width: 1050px) 70vw, 42vw"{% endif %} alt="{{ row.title }}" loading="lazy">{% else %}<div class="image-placeholder compact">VREYC</div>{% endif %}</a>
-          <div><span class="badge">{{ row.category_label }}</span><h3><a href="{{ row.url }}">{{ row.title }}</a></h3><p>{{ row.summary }}</p><small>{{ row.article.published_at|format_published_at }}</small></div>
+          <a class="card-media" href="{{ row.url }}" aria-label="{{ row.title }}">
+            {% if row.image_exists %}{% set feature_srcset = row.article.image_url|image_srcset %}<img src="{{ row.article.image_url|public_image_url }}" {% if feature_srcset %}srcset="{{ feature_srcset }}" sizes="(max-width: 700px) 86vw, (max-width: 1050px) 70vw, 42vw"{% endif %} alt="{{ row.title }}" loading="lazy">{% else %}<div class="image-placeholder compact">VREYC</div>{% endif %}
+            <span class="badge card-category-badge">{{ row.category_label }}</span>
+          </a>
+          <div class="card-body"><h3><a href="{{ row.url }}">{{ row.title }}</a></h3><p>{{ row.summary }}</p><small>{{ row.article.published_at|format_published_at }}</small></div>
         </article>
         {% endfor %}
       </div>
       <div class="section-title"><p class="eyebrow">{{ ui.latest }}</p><h2>{{ ui.latest_news }}</h2></div>
       {% if latest_articles|length == 0 %}<div class="glass empty-state">{{ ui.no_articles }}</div>{% endif %}
-      <div class="latest-grid">{% for row in latest_articles %}<article class="news-card glass">{% if row.image_exists %}{% set card_srcset = row.article.image_url|image_srcset %}<img src="{{row.article.image_url|public_image_url}}" {% if card_srcset %}srcset="{{ card_srcset }}" sizes="(max-width: 700px) 100vw, (max-width: 1050px) 50vw, 33vw"{% endif %} alt="{{row.title}}" loading="lazy">{% else %}<div class="image-placeholder compact">VREYC</div>{% endif %}<div class="card-body"><span class="badge">{{ row.category_label }}</span><h3><a href="{{row.url}}">{{row.title}}</a></h3><p>{{row.summary}}</p><small class="meta-row"><span>{{row.article.published_at|format_published_at}}</span><span>{{ row.category_label }}</span><span>{{ row.view_count }} views</span></small></div></article>{% if loop.index is divisibleby 6 %}{{ ads.ad_slot("infeed", "ADVERTISEMENT") }}{% endif %}{% endfor %}</div>
+      <div class="latest-grid">
+        {% for row in latest_articles %}
+        <article class="news-card glass">
+          <a class="card-media" href="{{ row.url }}" aria-label="{{ row.title }}">
+            {% if row.image_exists %}{% set card_srcset = row.article.image_url|image_srcset %}<img src="{{row.article.image_url|public_image_url}}" {% if card_srcset %}srcset="{{ card_srcset }}" sizes="(max-width: 700px) 100vw, (max-width: 1050px) 50vw, 33vw"{% endif %} alt="{{row.title}}" loading="lazy">{% else %}<div class="image-placeholder compact">VREYC</div>{% endif %}
+            <span class="badge card-category-badge">{{ row.category_label }}</span>
+          </a>
+          <div class="card-body">
+            <h3><a href="{{row.url}}">{{row.title}}</a></h3>
+            <p>{{row.summary}}</p>
+            <small class="meta-row"><span>{{row.article.published_at|format_published_at}}</span><span>{{ row.category_label }}</span><span>{{ row.view_count }} views</span></small>
+          </div>
+        </article>
+        {% if loop.index is divisibleby 6 %}{{ ads.ad_slot("infeed", "ADVERTISEMENT") }}{% endif %}
+        {% endfor %}
+      </div>
     </section>
     <aside class="trending-sidebar glass">
       <p class="eyebrow">{{ ui.trending }}</p><h2>{{ ui.most_watched }}</h2>
