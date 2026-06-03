@@ -179,24 +179,60 @@ img { display: block; max-width: 100%; }
 .social-mailru { --social-color: #168de2; --social-hover-color: #2fa4f5; }
 
 .ad-zone {
+  --ad-width: 100%;
+  --ad-height: 84px;
+  position: relative;
   display: grid;
   place-items: center;
-  min-height: 84px;
-  border: 1px dashed color-mix(in srgb, var(--accent) 48%, var(--border));
-  border-radius: 18px;
-  color: color-mix(in srgb, var(--muted) 88%, var(--accent));
-  background: repeating-linear-gradient(135deg, rgba(84, 183, 255, .075) 0 10px, rgba(141, 120, 255, .075) 10px 20px), rgba(255, 255, 255, .045);
+  width: min(100%, var(--ad-width));
+  min-height: var(--ad-height);
+  margin-inline: auto;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--accent) 38%, var(--border));
+  border-radius: 20px;
+  color: color-mix(in srgb, var(--muted) 86%, var(--accent));
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, .10), rgba(255, 255, 255, .035)),
+    repeating-linear-gradient(135deg, rgba(84, 183, 255, .075) 0 10px, rgba(141, 120, 255, .075) 10px 20px),
+    color-mix(in srgb, var(--surface) 76%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14), 0 16px 38px rgba(0, 0, 0, .12);
   font-size: .82rem;
-  font-weight: 900;
+  font-weight: 950;
   letter-spacing: .12em;
+  text-align: center;
   text-transform: uppercase;
 }
-.ad-zone-top { margin-top: 1rem; min-height: 96px; }
+.ad-zone::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(circle at 50% 0, rgba(84, 183, 255, .20), transparent 42%);
+  pointer-events: none;
+}
+.ad-zone span { position: relative; z-index: 1; padding: .5rem; }
+.container.ad-zone { width: min(calc(100% - 2rem), var(--ad-width)); }
+[data-theme="light"] .ad-zone { background: linear-gradient(180deg, rgba(255,255,255,.98), rgba(248,251,255,.9)); }
+.ad-zone-top { --ad-width: 970px; --ad-height: 250px; margin-top: 1rem; }
+.ad-zone-hero { --ad-width: 970px; --ad-height: 90px; margin: -.35rem auto 1.1rem; }
+.ad-zone-footer { --ad-width: 1180px; --ad-height: 180px; margin-top: .2rem; margin-bottom: 1.25rem; }
 .page-shell { --container: 1440px; display: grid; grid-template-columns: 132px minmax(0, 1fr) 132px; gap: 1rem; align-items: start; }
 .home-shell { --container: 1180px; display: block; }
 .news-shell { min-width: 0; }
 .ad-zone-vertical { position: sticky; top: 128px; min-height: 520px; writing-mode: vertical-rl; text-orientation: mixed; }
-.ad-zone-infeed { grid-column: 1 / -1; min-height: 110px; margin: .1rem 0; }
+.ad-zone-side {
+  --ad-width: 160px;
+  --ad-height: 600px;
+  position: fixed;
+  top: 142px;
+  z-index: 18;
+  display: none;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+}
+.ad-zone-side-left { left: max(64px, calc((100vw - 1180px) / 2 - 184px)); }
+.ad-zone-side-right { right: max(16px, calc((100vw - 1180px) / 2 - 184px)); }
+.ad-zone-infeed { grid-column: 1 / -1; min-height: 118px; margin: .1rem 0; }
 .ad-zone-article, .ad-zone-content { min-height: 92px; margin: 0 0 1rem; }
 .ad-zone-content { margin: 1rem 0; }
 
@@ -292,6 +328,10 @@ img { display: block; max-width: 100%; }
 .card, .feature { padding: 1rem; }
 .section-head { display: flex; justify-content: space-between; align-items: center; }
 
+@media (min-width: 1500px) {
+  .ad-zone-side { display: grid; }
+}
+
 @media (max-width: 1280px) {
   .page-shell { grid-template-columns: minmax(0, 1fr); width: min(var(--container), calc(100% - 2rem)); }
   .ad-zone-vertical { display: none; }
@@ -320,8 +360,12 @@ img { display: block; max-width: 100%; }
 @media (max-width: 768px) {
   .container { width: min(100% - 1.4rem, 1180px); }
   .section { padding: 1rem 0 1.35rem; }
-  .fixed-social-sidebar, .ad-zone { display: none; }
-  .ad-zone-top { min-height: 72px; margin-top: .75rem; }
+  .fixed-social-sidebar, .ad-zone-side, .ad-zone-vertical { display: none; }
+  .container.ad-zone { width: min(100% - 1.4rem, var(--ad-width)); }
+  .ad-zone-top { --ad-height: clamp(92px, 28vw, 160px); margin-top: .75rem; }
+  .ad-zone-hero { --ad-height: 74px; margin-bottom: .85rem; }
+  .ad-zone-infeed { min-height: 96px; }
+  .ad-zone-footer { --ad-height: 120px; margin-bottom: .9rem; }
   .site-header { border-radius: 0 0 18px 18px; }
   .nav { display: grid; grid-template-columns: 1fr auto; gap: .55rem; align-items: center; padding: .62rem 0 .52rem; }
   .logo { grid-column: 1; font-size: 1.12rem; }
