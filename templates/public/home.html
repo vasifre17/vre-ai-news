@@ -14,6 +14,7 @@
   <script type="application/ld+json">{{ {"@context":"https://schema.org", "@graph": schema_graph}|tojson }}</script>
 </head>
 <body>
+{% import "public/_ad_macros.html" as ads %}
 <header class="site-header glass">
   <nav class="nav container">
     <a class="logo" href="/{{language}}/"><span>VRE</span>YC</a>
@@ -43,7 +44,9 @@
     <svg class="social-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2.1C6.3 2.1 2 6.3 2 12c0 5.6 4.2 9.9 10 9.9 1.9 0 3.8-.5 5.3-1.4l-1.1-2.1c-1.2.7-2.6 1.1-4.2 1.1-4.2 0-7.3-3.2-7.3-7.5S7.8 4.5 12 4.5s7.3 3.1 7.3 7.3c0 2.1-.8 3.3-1.8 3.3-.7 0-1-.4-.9-1.1l.7-6.1h-2.6l-.1.9A4 4 0 0 0 11.5 7c-2.8 0-5 2.2-5 5.2 0 2.9 1.8 4.9 4.4 4.9 1.3 0 2.5-.5 3.4-1.5.5 1.1 1.5 1.6 2.8 1.6 2.8 0 4.9-2.2 4.9-5.4 0-5.5-4.3-9.7-10-9.7zm-.5 12.6c-1.3 0-2.2-1-2.2-2.6s1-2.7 2.4-2.7 2.3 1 2.3 2.5c0 1.7-1.1 2.8-2.5 2.8z"/></svg>
   </a>
 </nav>
-<div class="container ad-zone ad-zone-top" role="complementary" aria-label="Advertisement">Reklam yeri</div>
+{{ ads.ad_slot("top", "TOP BANNER ADVERTISEMENT", container=True) }}
+{{ ads.ad_slot("left-sidebar", "ADVERTISEMENT", "ad-zone-side ad-zone-side-left") }}
+{{ ads.ad_slot("right-sidebar", "ADVERTISEMENT", "ad-zone-side ad-zone-side-right") }}
 <main class="container section page-shell home-shell">
   <div class="news-shell">
   {% if hero %}
@@ -56,6 +59,7 @@
       <small>{{ hero.article.published_at|format_published_at }}</small>
     </div>
   </section>
+  {{ ads.ad_slot("hero", "ADVERTISEMENT") }}
   {% endif %}
   <div class="portal-layout">
     <section>
@@ -70,7 +74,7 @@
       </div>
       <div class="section-title"><p class="eyebrow">{{ ui.latest }}</p><h2>{{ ui.latest_news }}</h2></div>
       {% if latest_articles|length == 0 %}<div class="glass empty-state">{{ ui.no_articles }}</div>{% endif %}
-      <div class="latest-grid">{% for row in latest_articles %}<article class="news-card glass">{% if row.image_exists %}{% set card_srcset = row.article.image_url|image_srcset %}<img src="{{row.article.image_url|public_image_url}}" {% if card_srcset %}srcset="{{ card_srcset }}" sizes="(max-width: 700px) 100vw, (max-width: 1050px) 50vw, 33vw"{% endif %} alt="{{row.title}}" loading="lazy">{% else %}<div class="image-placeholder compact">VREYC</div>{% endif %}<div class="card-body"><span class="badge">{{ row.category_label }}</span><h3><a href="{{row.url}}">{{row.title}}</a></h3><p>{{row.summary}}</p><small class="meta-row"><span>{{row.article.published_at|format_published_at}}</span><span>{{ row.category_label }}</span><span>{{ row.view_count }} views</span></small></div></article>{% if loop.index == 3 %}<div class="ad-zone ad-zone-infeed" role="complementary" aria-label="Advertisement">Reklam yeri</div>{% endif %}{% endfor %}</div>
+      <div class="latest-grid">{% for row in latest_articles %}<article class="news-card glass">{% if row.image_exists %}{% set card_srcset = row.article.image_url|image_srcset %}<img src="{{row.article.image_url|public_image_url}}" {% if card_srcset %}srcset="{{ card_srcset }}" sizes="(max-width: 700px) 100vw, (max-width: 1050px) 50vw, 33vw"{% endif %} alt="{{row.title}}" loading="lazy">{% else %}<div class="image-placeholder compact">VREYC</div>{% endif %}<div class="card-body"><span class="badge">{{ row.category_label }}</span><h3><a href="{{row.url}}">{{row.title}}</a></h3><p>{{row.summary}}</p><small class="meta-row"><span>{{row.article.published_at|format_published_at}}</span><span>{{ row.category_label }}</span><span>{{ row.view_count }} views</span></small></div></article>{% if loop.index is divisibleby 6 %}{{ ads.ad_slot("infeed", "ADVERTISEMENT") }}{% endif %}{% endfor %}</div>
     </section>
     <aside class="trending-sidebar glass">
       <p class="eyebrow">{{ ui.trending }}</p><h2>{{ ui.most_watched }}</h2>
@@ -79,6 +83,7 @@
   </div>
   </div>
 </main>
+{{ ads.ad_slot("footer", "ADVERTISEMENT", container=True) }}
 <footer class="footer container">
   <div class="footer-brand">
     <strong>VREYC</strong>

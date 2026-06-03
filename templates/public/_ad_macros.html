@@ -1,0 +1,5 @@
+{% macro ad_slot(zone, label='ADVERTISEMENT', extra_class='', container=False) -%}
+  <div class="{% if container %}container {% endif %}ad-zone ad-zone-{{ zone }}{% if extra_class %} {{ extra_class }}{% endif %}" role="complementary" aria-label="Advertisement" data-ad-zone="{{ zone }}" data-ad-placeholder="true">
+    <span>{{ label }}</span>
+  </div>
+{%- endmacro %}
