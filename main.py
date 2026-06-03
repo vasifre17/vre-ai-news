@@ -301,12 +301,13 @@ def slugify(text: str) -> str:
 
 ALLOWED_ARTICLE_TAGS = {
     "p", "h2", "h3", "strong", "b", "em", "i", "u", "s", "ul", "ol", "li", "blockquote",
-    "a", "img", "iframe", "table", "thead", "tbody", "tr", "th", "td", "br",
+    "a", "img", "iframe", "div", "table", "thead", "tbody", "tr", "th", "td", "br",
 }
 ALLOWED_ARTICLE_ATTRIBUTES = {
     "a": {"href", "title", "target", "rel"},
     "img": {"src", "alt", "title", "width", "height", "loading"},
-    "iframe": {"src", "title", "allow", "allowfullscreen", "frameborder", "loading"},
+    "iframe": {"src", "width", "height", "allow", "allowfullscreen", "frameborder"},
+    "div": {"class"},
     "th": {"colspan", "rowspan", "style"},
     "td": {"colspan", "rowspan", "style"},
     "p": {"style"},
@@ -315,6 +316,7 @@ ALLOWED_ARTICLE_ATTRIBUTES = {
     "blockquote": {"style"},
 }
 YOUTUBE_HOSTS = {"youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "www.youtu.be", "youtube-nocookie.com", "www.youtube-nocookie.com"}
+IFRAME_WRAPPER_CLASS = "iframe-video-embed"
 
 
 def is_html_fragment(value: str) -> bool:
@@ -349,6 +351,29 @@ def youtube_embed_src(value: str | None) -> str | None:
     return f"https://www.youtube.com/embed/{video_id}"
 
 
+def safe_iframe_src(value: str | None) -> str | None:
+    if not value:
+        return None
+    youtube = youtube_embed_src(value)
+    if youtube:
+        return youtube
+    value = value.strip()
+    if value.startswith("//"):
+        return None
+    parsed = urlparse(value)
+    host = (parsed.netloc or "").lower()
+    path = parsed.path or ""
+    if parsed.scheme != "https" or not host:
+        return None
+    if host == "player.vimeo.com" and path.startswith("/video/"):
+        return value
+    if host in {"facebook.com", "www.facebook.com"} and path == "/plugins/video.php":
+        return value
+    if host == "ok.ru" and path.startswith("/videoembed/"):
+        return value
+    return None
+
+
 def safe_url(value: str | None, *, image: bool = False) -> str | None:
     if not value:
         return None
@@ -381,7 +406,7 @@ def sanitize_article_html(value: str | None) -> str:
     if not is_html_fragment(raw):
         youtube = youtube_embed_src(raw)
         if youtube:
-            raw = f'<iframe src="{youtube}" title="YouTube video" loading="lazy" allowfullscreen></iframe>'
+            raw = f'<iframe src="{youtube}" allowfullscreen></iframe>'
         else:
             raw = safe_plain_text_html(raw)
     soup = BeautifulSoup(raw, "html.parser")
@@ -417,16 +442,23 @@ def sanitize_article_html(value: str | None) -> str:
                 tag.decompose()
                 continue
         elif name == "iframe":
-            src = youtube_embed_src(tag.get("src"))
+            src = safe_iframe_src(tag.get("src"))
             if src:
                 tag["src"] = src
-                tag["title"] = tag.get("title") or "YouTube video"
-                tag["loading"] = "lazy"
-                tag["allow"] = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                tag["allow"] = tag.get("allow") or "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                 tag["allowfullscreen"] = ""
-                tag.attrs.pop("frameborder", None)
+                tag["frameborder"] = tag.get("frameborder") or "0"
+                parent = tag.parent
+                if getattr(parent, "name", None) != "div" or IFRAME_WRAPPER_CLASS not in (parent.get("class") or []):
+                    wrapper = soup.new_tag("div")
+                    wrapper["class"] = IFRAME_WRAPPER_CLASS
+                    tag.wrap(wrapper)
             else:
                 tag.decompose()
+                continue
+        elif name == "div":
+            if tag.get("class") != [IFRAME_WRAPPER_CLASS] or not tag.find("iframe", recursive=False):
+                tag.unwrap()
                 continue
         if tag.attrs and "style" in tag.attrs:
             style = sanitize_style(tag.get("style"))
@@ -434,6 +466,9 @@ def sanitize_article_html(value: str | None) -> str:
                 tag["style"] = style
             else:
                 tag.attrs.pop("style", None)
+    for wrapper in list(soup.find_all("div", class_=IFRAME_WRAPPER_CLASS)):
+        if not wrapper.find("iframe", recursive=False):
+            wrapper.decompose()
     return str(soup)
 
 
