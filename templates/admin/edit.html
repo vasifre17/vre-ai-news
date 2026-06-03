@@ -42,6 +42,7 @@
               <button type="button" data-insert="link" title="Insert link">Link</button>
               <button type="button" data-insert="image" title="Insert image">Image</button>
               <button type="button" data-insert="youtube" title="Embed YouTube">YouTube</button>
+              <button type="button" data-insert="iframe" title="Embed iframe video">Iframe</button>
               <button type="button" data-insert="video" title="Embed video">Video</button>
               <button type="button" data-insert="table" title="Insert table">Table</button>
               <button type="button" data-command="undo" title="Undo">↶</button>
@@ -103,20 +104,59 @@
   const hasHtml = (value) => /<\/?[a-z][\s\S]*>/i.test(value || '');
   const escapeHtml = (value) => (value || '').replace(/[&<>"']/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
   const plainTextToHtml = (value) => (value || '').split(/\n{2,}/).map((part) => `<p>${escapeHtml(part).replace(/\n/g, '<br>')}</p>`).join('');
-  const youtubeEmbedFromUrl = (value) => {
+  const iframeVideoWrapperClass = 'iframe-video-embed';
+  const defaultIframeAllow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
+  const youtubeEmbedSrcFromUrl = (value) => {
     try {
       const url = new URL(value.trim());
-      const host = url.hostname.replace(/^www\./, '');
+      const host = url.hostname.toLowerCase().replace(/^www\./, '');
       let id = '';
       if (host === 'youtu.be') id = url.pathname.split('/').filter(Boolean)[0] || '';
-      if (host === 'youtube.com' || host === 'm.youtube.com') {
+      if (host === 'youtube.com' || host === 'm.youtube.com' || host === 'youtube-nocookie.com') {
         if (url.pathname === '/watch') id = url.searchParams.get('v') || '';
         if (url.pathname.startsWith('/shorts/') || url.pathname.startsWith('/embed/')) id = url.pathname.split('/').filter(Boolean)[1] || '';
       }
       if (!/^[A-Za-z0-9_-]{11}$/.test(id)) return '';
-      return `<iframe src="https://www.youtube.com/embed/${id}" title="YouTube video" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>`;
+      return 'https://www.youtube.com/embed/' + id;
     } catch (error) { return ''; }
   };
+  const safeIframeSrc = (value) => {
+    const youtube = youtubeEmbedSrcFromUrl(value || '');
+    if (youtube) return youtube;
+    try {
+      const url = new URL((value || '').trim());
+      const host = url.hostname.toLowerCase();
+      if (url.protocol !== 'https:') return '';
+      if (host === 'player.vimeo.com' && url.pathname.startsWith('/video/')) return url.href;
+      if ((host === 'facebook.com' || host === 'www.facebook.com') && url.pathname === '/plugins/video.php') return url.href;
+      if (host === 'ok.ru' && url.pathname.startsWith('/videoembed/')) return url.href;
+    } catch (error) { return ''; }
+    return '';
+  };
+  const iframeEmbedFromCode = (value) => {
+    const input = (value || '').trim();
+    if (!input) return '';
+    const parsed = new DOMParser().parseFromString(input, 'text/html');
+    const pastedIframe = parsed.querySelector('iframe');
+    const src = safeIframeSrc(pastedIframe ? pastedIframe.getAttribute('src') : input);
+    if (!src) return '';
+    const iframe = document.createElement('iframe');
+    iframe.setAttribute('src', src);
+    iframe.setAttribute('allow', pastedIframe ? (pastedIframe.getAttribute('allow') || defaultIframeAllow) : defaultIframeAllow);
+    iframe.setAttribute('allowfullscreen', '');
+    iframe.setAttribute('frameborder', pastedIframe ? (pastedIframe.getAttribute('frameborder') || '0') : '0');
+    if (pastedIframe) {
+      ['width', 'height'].forEach((attr) => {
+        const attrValue = pastedIframe.getAttribute(attr);
+        if (/^\d{1,5}$/.test(attrValue || '')) iframe.setAttribute(attr, attrValue);
+      });
+    }
+    const wrapper = document.createElement('div');
+    wrapper.className = iframeVideoWrapperClass;
+    wrapper.appendChild(iframe);
+    return wrapper.outerHTML;
+  };
+  const youtubeEmbedFromUrl = (value) => iframeEmbedFromCode(youtubeEmbedSrcFromUrl(value || ''));
   const insertHtml = (editor, html) => {
     editor.focus();
     document.execCommand('insertHTML', false, html);
@@ -148,6 +188,11 @@
         const url = prompt('Paste a YouTube URL:');
         const embed = url ? youtubeEmbedFromUrl(url) : '';
         if (embed) insertHtml(canvas, embed); else if (url) alert('Only valid YouTube URLs can be embedded.');
+      }
+      if (button.dataset.insert === 'iframe') {
+        const code = prompt('Paste iframe embed code from YouTube, Vimeo, Facebook video or OK.ru:');
+        const embed = code ? iframeEmbedFromCode(code) : '';
+        if (embed) insertHtml(canvas, embed); else if (code) alert('Unsafe iframe source. Use an HTTPS video embed from youtube.com, youtube-nocookie.com, player.vimeo.com, facebook.com/plugins/video or ok.ru/videoembed.');
       }
       if (button.dataset.insert === 'table') insertHtml(canvas, '<table><tbody><tr><th>Header</th><th>Header</th></tr><tr><td>Cell</td><td>Cell</td></tr></tbody></table><p><br></p>');
       if (button.hasAttribute('data-toggle-source')) {
