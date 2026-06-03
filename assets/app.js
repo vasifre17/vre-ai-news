@@ -2,14 +2,16 @@ const root = document.documentElement;
 const btn = document.getElementById('themeToggle');
 const savedTheme = localStorage.getItem('theme');
 if (savedTheme === 'light' || savedTheme === 'dark') root.dataset.theme = savedTheme;
+if (root.dataset.theme !== 'light' && root.dataset.theme !== 'dark') root.dataset.theme = 'light';
 
 const syncThemeToggle = () => {
   if (!btn) return;
   const isLight = root.dataset.theme === 'light';
-  btn.setAttribute('aria-pressed', String(isLight));
+  btn.setAttribute('aria-pressed', String(!isLight));
+  btn.setAttribute('aria-label', isLight ? 'Switch to dark mode' : 'Switch to light mode');
   const icon = btn.querySelector('.theme-icon');
   const text = btn.querySelector('.theme-text');
-  if (icon) icon.textContent = isLight ? '☀' : '◐';
+  if (icon) icon.textContent = '💡';
   if (text) text.textContent = isLight ? 'Light' : 'Dark';
 };
 
