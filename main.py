@@ -66,16 +66,15 @@ PUBLIC_LABELS = {
     "az": {
         "latest": "Son",
         "latest_news": "Son xəbərlər",
-        "most_watched": "Ən çox baxılanlar",
+        "most_watched": "Xəbər lenti",
+        "date_label": "Tarix",
+        "views_label": "Baxış",
         "related": "Oxşar xəbərlər",
         "more_stories": "Daha çox xəbər",
         "search": "Axtar",
         "search_placeholder": "Axtar",
         "news": "Xəbər",
         "top_story": "Əsas xəbər",
-        "featured": "Seçilmiş",
-        "editor_picks": "Redaktorun AI seçimləri",
-        "trending": "Trend",
         "audio_narration": "Audio səsləndirmə",
         "share": "Paylaş",
         "play": "Oxut",
@@ -99,16 +98,15 @@ PUBLIC_LABELS = {
     "en": {
         "latest": "Latest",
         "latest_news": "Latest news",
-        "most_watched": "Most watched",
+        "most_watched": "News feed",
+        "date_label": "Date",
+        "views_label": "Views",
         "related": "Related",
         "more_stories": "More stories",
         "search": "Search",
         "search_placeholder": "Search",
         "news": "News",
         "top_story": "Top Story",
-        "featured": "Featured",
-        "editor_picks": "Editor's AI picks",
-        "trending": "Trending",
         "audio_narration": "Audio narration",
         "share": "Share",
         "play": "Play",
@@ -132,16 +130,15 @@ PUBLIC_LABELS = {
     "ru": {
         "latest": "Последнее",
         "latest_news": "Последние новости",
-        "most_watched": "Самые просматриваемые",
+        "most_watched": "Лента новостей",
+        "date_label": "Дата",
+        "views_label": "Просмотры",
         "related": "Похожие новости",
         "more_stories": "Больше материалов",
         "search": "Поиск",
         "search_placeholder": "Поиск",
         "news": "Новость",
         "top_story": "Главная новость",
-        "featured": "Избранное",
-        "editor_picks": "Выбор AI-редакции",
-        "trending": "В тренде",
         "audio_narration": "Аудиоозвучка",
         "share": "Поделиться",
         "play": "Воспроизвести",
@@ -165,16 +162,15 @@ PUBLIC_LABELS = {
     "tr": {
         "latest": "Son",
         "latest_news": "Son haberler",
-        "most_watched": "En çok izlenenler",
+        "most_watched": "Haber akışı",
+        "date_label": "Tarih",
+        "views_label": "Görüntülenme",
         "related": "İlgili haberler",
         "more_stories": "Daha fazla haber",
         "search": "Ara",
         "search_placeholder": "Ara",
         "news": "Haber",
         "top_story": "Manşet",
-        "featured": "Öne çıkan",
-        "editor_picks": "Editörün AI seçimleri",
-        "trending": "Trend",
         "audio_narration": "Sesli anlatım",
         "share": "Paylaş",
         "play": "Oynat",
@@ -198,16 +194,15 @@ PUBLIC_LABELS = {
     "zh": {
         "latest": "最新",
         "latest_news": "最新新闻",
-        "most_watched": "最多观看",
+        "most_watched": "新闻流",
+        "date_label": "日期",
+        "views_label": "浏览",
         "related": "相关新闻",
         "more_stories": "更多报道",
         "search": "搜索",
         "search_placeholder": "搜索",
         "news": "新闻",
         "top_story": "头条",
-        "featured": "精选",
-        "editor_picks": "AI 编辑精选",
-        "trending": "热门",
         "audio_narration": "音频播报",
         "share": "分享",
         "play": "播放",
@@ -231,16 +226,15 @@ PUBLIC_LABELS = {
     "es": {
         "latest": "Último",
         "latest_news": "Últimas noticias",
-        "most_watched": "Más vistas",
+        "most_watched": "Feed de noticias",
+        "date_label": "Fecha",
+        "views_label": "Vistas",
         "related": "Relacionadas",
         "more_stories": "Más historias",
         "search": "Buscar",
         "search_placeholder": "Buscar",
         "news": "Noticia",
         "top_story": "Noticia principal",
-        "featured": "Destacadas",
-        "editor_picks": "Selección AI del editor",
-        "trending": "Tendencias",
         "audio_narration": "Narración de audio",
         "share": "Compartir",
         "play": "Reproducir",
@@ -1164,19 +1158,16 @@ def home(request: Request, language: str = "az", q: str = "", category: str = ""
         query = query.filter((Article.title.ilike(f"%{q}%")) | (Article.summary.ilike(f"%{q}%")) | (Article.id.in_(translation_matches.scalar_subquery())))
     if category:
         query = query.filter(Article.category == category)
-    articles = attach_real_view_counts(db, query.order_by(Article.homepage_order.asc(), Article.published_at.desc(), Article.created_at.desc()).limit(30).all())
-    featured = attach_real_view_counts(db, db.query(Article).options(selectinload(Article.translations)).filter(Article.status == "published", Article.is_featured == True).order_by(Article.homepage_order.asc(), Article.published_at.desc()).limit(6).all())
-    if not featured:
-        featured = articles[:6]
-    trending = attach_real_view_counts(db, db.query(Article).options(selectinload(Article.translations)).filter(Article.status == "published", Article.is_trending == True).order_by(Article.homepage_order.asc(), Article.published_at.desc(), Article.created_at.desc()).limit(8).all())
-    if not trending:
-        trending = articles[:8]
+    articles = attach_real_view_counts(db, query.order_by(func.coalesce(Article.published_at, Article.created_at).desc(), Article.created_at.desc(), Article.id.desc()).limit(30).all())
     category_labels = public_category_labels(language)
     article_cards = [article_card(a, language, category_labels) for a in articles]
-    featured_cards = [article_card(a, language, category_labels) for a in featured]
-    trending_cards = [article_card(a, language, category_labels) for a in trending]
-    hero = featured_cards[0] if featured_cards else (article_cards[0] if article_cards else None)
+    hero = article_cards[0] if article_cards else None
     latest_cards = [row for row in article_cards if not hero or row["article"].id != hero["article"].id]
+    sidebar_query = db.query(Article).options(selectinload(Article.translations)).filter(Article.status == "published")
+    if hero:
+        sidebar_query = sidebar_query.filter(Article.id != hero["article"].id)
+    sidebar_articles = attach_real_view_counts(db, sidebar_query.order_by(func.coalesce(Article.published_at, Article.created_at).desc(), Article.created_at.desc(), Article.id.desc()).limit(8).all())
+    sidebar_cards = [article_card(a, language, category_labels) for a in sidebar_articles]
     categories = public_category_navigation(db)
     alt_links = {lang: f"/{lang}/" for lang in SUPPORTED_LANGUAGES}
     settings_map = get_settings_map(db)
@@ -1186,7 +1177,7 @@ def home(request: Request, language: str = "az", q: str = "", category: str = ""
         build_website_schema(settings_map, language),
         build_breadcrumb_schema([("Home", canonical)]),
     ]
-    return templates.TemplateResponse("public/home.html", {"request": request, "articles": article_cards, "latest_articles": latest_cards, "featured_articles": featured_cards, "trending_articles": trending_cards, "hero": hero, "categories": categories["primary"], "secondary_categories": categories["secondary"], "q": q, "category": category, "site_url": settings.site_url, "canonical": canonical, "language": language, "languages": SUPPORTED_LANGUAGES, "alt_links": alt_links, "ui": public_labels(language), "category_labels": category_labels, "settings_map": settings_map, "verification_meta": seo_verification_meta(settings_map), "schema_graph": schema_graph, "site_name": site_name_from_settings(settings_map), "app_version": APP_VERSION})
+    return templates.TemplateResponse("public/home.html", {"request": request, "articles": article_cards, "latest_articles": latest_cards, "sidebar_articles": sidebar_cards, "hero": hero, "categories": categories["primary"], "secondary_categories": categories["secondary"], "q": q, "category": category, "site_url": settings.site_url, "canonical": canonical, "language": language, "languages": SUPPORTED_LANGUAGES, "alt_links": alt_links, "ui": public_labels(language), "category_labels": category_labels, "settings_map": settings_map, "verification_meta": seo_verification_meta(settings_map), "schema_graph": schema_graph, "site_name": site_name_from_settings(settings_map), "app_version": APP_VERSION})
 
 
 def render_article_page(slug: str, request: Request, language: str = "az", db=Depends(get_db)):
@@ -1195,6 +1186,7 @@ def render_article_page(slug: str, request: Request, language: str = "az", db=De
     if not article:
         raise HTTPException(404)
     record_article_view(db, article, request, language)
+    article.real_view_count = article_view_count_map(db, [article.id]).get(article.id, 0)
     view = localized_article_view(article, language)
     narration = db.query(ArticleNarration).filter(ArticleNarration.article_id == article.id, ArticleNarration.language == language).first()
     alt_links = {lang: article_url(lang, localized_slug(article, lang)) for lang in SUPPORTED_LANGUAGES}
