@@ -5,7 +5,7 @@ import html
 from types import SimpleNamespace
 import re
 import shutil
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 from pathlib import Path
 from uuid import uuid4
 from sqlalchemy import func, or_, select, text
@@ -19,6 +19,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from apscheduler.schedulers.background import BackgroundScheduler
+from bs4 import BeautifulSoup
 
 from config import settings
 from database.session import SessionLocal, init_db
@@ -297,6 +298,149 @@ def slugify(text: str) -> str:
     return base or "article"
 
 
+
+ALLOWED_ARTICLE_TAGS = {
+    "p", "h2", "h3", "strong", "b", "em", "i", "u", "s", "ul", "ol", "li", "blockquote",
+    "a", "img", "iframe", "table", "thead", "tbody", "tr", "th", "td", "br",
+}
+ALLOWED_ARTICLE_ATTRIBUTES = {
+    "a": {"href", "title", "target", "rel"},
+    "img": {"src", "alt", "title", "width", "height", "loading"},
+    "iframe": {"src", "title", "allow", "allowfullscreen", "frameborder", "loading"},
+    "th": {"colspan", "rowspan", "style"},
+    "td": {"colspan", "rowspan", "style"},
+    "p": {"style"},
+    "h2": {"style"},
+    "h3": {"style"},
+    "blockquote": {"style"},
+}
+YOUTUBE_HOSTS = {"youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "www.youtu.be", "youtube-nocookie.com", "www.youtube-nocookie.com"}
+
+
+def is_html_fragment(value: str) -> bool:
+    return bool(re.search(r"</?[a-z][\s\S]*>", value or "", flags=re.I))
+
+
+def safe_plain_text_html(value: str) -> str:
+    paragraphs = [part.strip() for part in re.split(r"\n\s*\n+", value or "") if part.strip()]
+    if not paragraphs and value and value.strip():
+        paragraphs = [value.strip()]
+    return "".join(f"<p>{html.escape(part).replace(chr(10), '<br>')}</p>" for part in paragraphs)
+
+
+def youtube_embed_src(value: str | None) -> str | None:
+    if not value:
+        return None
+    parsed = urlparse(value.strip())
+    host = (parsed.netloc or "").lower()
+    if host not in YOUTUBE_HOSTS:
+        return None
+    video_id = ""
+    if host.endswith("youtu.be"):
+        video_id = parsed.path.strip("/").split("/")[0] if parsed.path else ""
+    elif parsed.path == "/watch":
+        query = parse_qs(parsed.query)
+        video_id = (query.get("v") or [""])[0]
+    elif parsed.path.startswith(("/embed/", "/shorts/")):
+        parts = parsed.path.strip("/").split("/")
+        video_id = parts[1] if len(parts) > 1 else ""
+    if not re.fullmatch(r"[A-Za-z0-9_-]{11}", video_id or ""):
+        return None
+    return f"https://www.youtube.com/embed/{video_id}"
+
+
+def safe_url(value: str | None, *, image: bool = False) -> str | None:
+    if not value:
+        return None
+    value = value.strip()
+    if value.startswith("//"):
+        return None
+    if value.startswith("/"):
+        return value
+    if not image and value.startswith("#"):
+        return value
+    parsed = urlparse(value)
+    if parsed.scheme in {"http", "https"} and parsed.netloc:
+        return value
+    if not image and parsed.scheme in {"mailto", "tel"}:
+        return value
+    return None
+
+
+def sanitize_style(value: str | None) -> str | None:
+    if not value:
+        return None
+    match = re.search(r"text-align\s*:\s*(left|right|center|justify)", value, flags=re.I)
+    return f"text-align: {match.group(1).lower()};" if match else None
+
+
+def sanitize_article_html(value: str | None) -> str:
+    raw = (value or "").strip()
+    if not raw:
+        return ""
+    if not is_html_fragment(raw):
+        youtube = youtube_embed_src(raw)
+        if youtube:
+            raw = f'<iframe src="{youtube}" title="YouTube video" loading="lazy" allowfullscreen></iframe>'
+        else:
+            raw = safe_plain_text_html(raw)
+    soup = BeautifulSoup(raw, "html.parser")
+    for tag in list(soup.find_all(True)):
+        name = (tag.name or "").lower()
+        if name in {"script", "style", "object", "embed", "form", "input", "button", "svg", "math"}:
+            tag.decompose()
+            continue
+        if name not in ALLOWED_ARTICLE_TAGS:
+            tag.unwrap()
+            continue
+        allowed_attrs = ALLOWED_ARTICLE_ATTRIBUTES.get(name, set())
+        for attr in list(tag.attrs):
+            if attr not in allowed_attrs:
+                del tag.attrs[attr]
+        if name == "a":
+            href = safe_url(tag.get("href"))
+            if href:
+                tag["href"] = href
+                tag["rel"] = "noopener noreferrer"
+                if href.startswith(("http://", "https://")):
+                    tag["target"] = "_blank"
+            else:
+                tag.unwrap()
+                continue
+        elif name == "img":
+            src = safe_url(tag.get("src"), image=True)
+            if src:
+                tag["src"] = src
+                tag["loading"] = tag.get("loading") or "lazy"
+                tag["alt"] = tag.get("alt") or ""
+            else:
+                tag.decompose()
+                continue
+        elif name == "iframe":
+            src = youtube_embed_src(tag.get("src"))
+            if src:
+                tag["src"] = src
+                tag["title"] = tag.get("title") or "YouTube video"
+                tag["loading"] = "lazy"
+                tag["allow"] = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                tag["allowfullscreen"] = ""
+                tag.attrs.pop("frameborder", None)
+            else:
+                tag.decompose()
+                continue
+        if tag.attrs and "style" in tag.attrs:
+            style = sanitize_style(tag.get("style"))
+            if style:
+                tag["style"] = style
+            else:
+                tag.attrs.pop("style", None)
+    return str(soup)
+
+
+def render_article_content(value: str | None) -> str:
+    return sanitize_article_html(value)
+
+
 def format_published_at(value):
     return value.strftime("%b %d, %Y") if value else ""
 
@@ -492,6 +636,7 @@ def localized_article_view(article: Article, language: str):
         slug=localized_slug(article, language),
         summary=localized_value(article, translation, "summary"),
         content=localized_value(article, translation, "content"),
+        content_html=render_article_content(localized_value(article, translation, "content")),
         seo_title=localized_value(article, translation, "seo_title"),
         meta_description=localized_value(article, translation, "meta_description"),
         tags=localized_value(article, translation, "tags"),
@@ -1454,7 +1599,7 @@ async def create_article(request: Request, db=Depends(get_db), _=Depends(require
         title=title,
         slug=unique_article_slug(db, form.get('slug_az') or title),
         summary=form.get('summary_az', ''),
-        content=form.get('content_az', ''),
+        content=sanitize_article_html(form.get('content_az', '')),
         seo_title=form.get('seo_title_az', ''),
         meta_description=form.get('meta_description_az', ''),
         tags=form.get('tags_az', ''),
@@ -1478,7 +1623,7 @@ async def create_article(request: Request, db=Depends(get_db), _=Depends(require
             row.title = form.get(f'title_{lang}', '')
             row.slug = unique_translation_slug(db, lang, form.get(f'slug_{lang}') or row.title or f'{article.slug}-{lang}')
             row.summary = form.get(f'summary_{lang}', '')
-            row.content = form.get(f'content_{lang}', '')
+            row.content = sanitize_article_html(form.get(f'content_{lang}', ''))
             row.seo_title = form.get(f'seo_title_{lang}', '')
             row.meta_description = form.get(f'meta_description_{lang}', '')
             row.tags = form.get(f'tags_{lang}', '')
@@ -1556,7 +1701,7 @@ async def edit_article(article_id: int, request: Request, db=Depends(get_db), _=
     elif not a.slug:
         a.slug = unique_article_slug(db, a.title, a.id)
     a.summary = form.get('summary_az', '')
-    a.content = form.get('content_az', '')
+    a.content = sanitize_article_html(form.get('content_az', ''))
     a.seo_title = form.get('seo_title_az', '')
     a.meta_description = form.get('meta_description_az', '')
     a.tags = form.get('tags_az', '')
@@ -1584,7 +1729,7 @@ async def edit_article(article_id: int, request: Request, db=Depends(get_db), _=
         row.title = form.get(f'title_{lang}', '')
         row.slug = unique_translation_slug(db, lang, form.get(f'slug_{lang}') or row.slug or row.title or f'{a.slug}-{lang}', row.id)
         row.summary = form.get(f'summary_{lang}', '')
-        row.content = form.get(f'content_{lang}', '')
+        row.content = sanitize_article_html(form.get(f'content_{lang}', ''))
         row.seo_title = form.get(f'seo_title_{lang}', '')
         row.meta_description = form.get(f'meta_description_{lang}', '')
         row.tags = form.get(f'tags_{lang}', '')

@@ -406,7 +406,21 @@ img { display: block; max-width: 100%; }
 .audio-controls { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; }
 .audio-controls select, .audio-controls input { border: 1px solid var(--border); border-radius: 12px; background: rgba(255, 255, 255, .1); color: var(--text); padding: .5rem; }
 .audio-controls #seek { flex: 1; min-width: 180px; }
-.article-content { max-width: 760px; margin: 0 auto; font-size: 1rem; line-height: 1.76; color: var(--soft); white-space: pre-wrap; }
+ .article-content { max-width: 760px; margin: 0 auto; font-size: clamp(1rem, 1.2vw, 1.08rem); line-height: 1.82; color: var(--soft); overflow-wrap: anywhere; }
+.article-content p { margin: 0 0 1.15rem; }
+.article-content h2, .article-content h3 { color: var(--text); letter-spacing: -.02em; line-height: 1.25; margin: 1.75rem 0 .75rem; }
+.article-content h2 { font-size: clamp(1.55rem, 2.6vw, 2rem); }
+.article-content h3 { font-size: clamp(1.28rem, 2vw, 1.55rem); }
+.article-content ul, .article-content ol { margin: 0 0 1.2rem; padding-left: 1.45rem; }
+.article-content li { margin: .35rem 0; }
+.article-content blockquote { margin: 1.4rem 0; padding: 1rem 1.15rem; border-left: 4px solid var(--accent); border-radius: 0 18px 18px 0; background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--text); font-weight: 650; }
+.article-content a { color: var(--accent); text-decoration: underline; text-underline-offset: .16em; }
+.article-content img { display: block; max-width: 100%; height: auto; margin: 1.35rem auto; border-radius: 18px; box-shadow: 0 18px 50px rgba(0,0,0,.18); }
+.article-content iframe { display: block; width: 100%; aspect-ratio: 16 / 9; height: auto; margin: 1.35rem 0; border: 0; border-radius: 18px; background: #000; box-shadow: 0 18px 50px rgba(0,0,0,.2); }
+.article-content table { width: 100%; min-width: 0; margin: 1.35rem 0; border-collapse: collapse; overflow: hidden; border-radius: 16px; font-size: .95rem; }
+.article-content th, .article-content td { border: 1px solid var(--border); padding: .75rem; vertical-align: top; }
+.article-content th { color: var(--text); background: color-mix(in srgb, var(--accent) 11%, transparent); font-weight: 850; }
+.article-content br { line-height: 1.7; }
 .related { position: sticky; top: 112px; padding: .9rem; }
 .related-card { display: grid; grid-template-columns: 82px 1fr; gap: .7rem; padding: .78rem 0; border-top: 1px solid var(--border); }
 .related-card img, .related-placeholder { width: 82px; height: 64px; object-fit: cover; border-radius: 14px; }
