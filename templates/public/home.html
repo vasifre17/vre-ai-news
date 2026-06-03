@@ -6,7 +6,7 @@
   <title>{{ site_name }} — Premium AI News Portal</title>
   <meta name="description" content="VREYC delivers real-time AI-curated global news across politics, world affairs, economy, technology, business, sports and health.">
   <meta name="robots" content="index,follow,max-image-preview:large">
-  <link rel="stylesheet" href="/assets/styles.css">
+  <link rel="stylesheet" href="/assets/styles.css?v={{ app_version }}">
   {% if verification_meta.google %}<meta name="google-site-verification" content="{{ verification_meta.google }}">{% endif %}{% if verification_meta.bing %}<meta name="msvalidate.01" content="{{ verification_meta.bing }}">{% endif %}
   <link rel="canonical" href="{{ canonical }}">{% for lang, link in alt_links.items() %}<link rel="alternate" hreflang="{{lang}}" href="{{site_url}}{{link}}">{% endfor %}<link rel="alternate" hreflang="x-default" href="{{site_url}}/az/">
   <meta property="og:type" content="website"><meta property="og:site_name" content="{{ site_name }}"><meta property="og:title" content="{{ site_name }} — Premium AI News Portal"><meta property="og:description" content="AI-curated world news with a professional newsroom experience."><meta property="og:url" content="{{ canonical }}"><meta property="og:image" content="{{ site_url }}/assets/og-cover.jpg">
@@ -102,6 +102,6 @@
     </dl>
   </section>
 </footer>
-<script src="/assets/app.js" defer></script>
+<script src="/assets/app.js?v={{ app_version }}" defer></script>
 </body>
 </html>
