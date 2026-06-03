@@ -1,12 +1,25 @@
 const root = document.documentElement;
 const btn = document.getElementById('themeToggle');
+const savedTheme = localStorage.getItem('theme');
+if (savedTheme === 'light' || savedTheme === 'dark') root.dataset.theme = savedTheme;
+
+const syncThemeToggle = () => {
+  if (!btn) return;
+  const isLight = root.dataset.theme === 'light';
+  btn.setAttribute('aria-pressed', String(isLight));
+  const icon = btn.querySelector('.theme-icon');
+  const text = btn.querySelector('.theme-text');
+  if (icon) icon.textContent = isLight ? '☀' : '◐';
+  if (text) text.textContent = isLight ? 'Light' : 'Dark';
+};
+
 if (btn) {
+  syncThemeToggle();
   btn.addEventListener('click', () => {
     root.dataset.theme = root.dataset.theme === 'dark' ? 'light' : 'dark';
     localStorage.setItem('theme', root.dataset.theme);
+    syncThemeToggle();
   });
-  const saved = localStorage.getItem('theme');
-  if (saved) root.dataset.theme = saved;
 }
 
 const categoryMenus = document.querySelectorAll('.category-menu');

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="{{ language }}">
+<html lang="{{ language }}" data-theme="dark">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{article.seo_title or article.title}} | {{ site_name }}</title><meta name="description" content="{{article.meta_description or article.summary or article.title}}"><meta name="robots" content="index,follow,max-image-preview:large">
@@ -13,7 +13,7 @@
 </head>
 <body>
 <header class="site-header glass">
-  <nav class="nav container"><a class="logo" href="/{{language}}/"><span>VRE</span>YC</a><div class="language-switcher">{% for lang in languages %}<a href="{{alt_links[lang]}}">{{lang|upper}}</a>{% endfor %}</div></nav>
+  <nav class="nav container"><a class="logo" href="/{{language}}/"><span>VRE</span>YC</a><form class="search-wrap" action="/{{ language }}/" role="search"><input type="search" name="q" placeholder="{{ ui.search_placeholder }}" aria-label="{{ ui.search }}"></form><div class="header-actions"><button id="themeToggle" class="theme-toggle" type="button" aria-label="Toggle light and dark theme"><span class="theme-icon" aria-hidden="true">◐</span><span class="theme-text">Theme</span></button><div class="language-switcher">{% for lang in languages %}<a href="{{alt_links[lang]}}">{{lang|upper}}</a>{% endfor %}</div></div></nav>
   <nav class="categories container" aria-label="{{ ui.news }}">
     <div class="primary-categories">{% for c in categories %}<a href="/{{ language }}/?category={{ c.name }}" style="--cat-color: {{ c.color or '#48a6ff' }}">{{ category_labels.get(c.name, c.name) }}</a>{% endfor %}</div>
     {% if secondary_categories %}<div class="category-menu">
@@ -22,21 +22,33 @@
     </div>{% endif %}
   </nav>
 </header>
+<nav class="fixed-social-sidebar" aria-label="Social and share links">
+  <a href="https://www.facebook.com/sharer/sharer.php?u={{ share_url }}" target="_blank" rel="noopener" aria-label="Facebook">f</a>
+  <a href="https://twitter.com/intent/tweet?url={{ share_url }}&text={{ article.title }}" target="_blank" rel="noopener" aria-label="X / Twitter">𝕏</a>
+  <a href="https://t.me/share/url?url={{ share_url }}&text={{ article.title }}" target="_blank" rel="noopener" aria-label="Telegram">Tg</a>
+  <a href="https://wa.me/?text={{ share_url }}" target="_blank" rel="noopener" aria-label="WhatsApp">Wa</a>
+  <a href="https://www.instagram.com/" target="_blank" rel="noopener noreferrer" aria-label="Instagram">Ig</a>
+  <a href="https://www.youtube.com/@vasifreyc" target="_blank" rel="noopener noreferrer" aria-label="YouTube">▶</a>
+  <a href="https://www.tiktok.com/@vasifreyc" target="_blank" rel="noopener noreferrer" aria-label="TikTok">♪</a>
+  <a href="mailto:?subject={{ article.title }}&body={{ share_url }}" aria-label="Email share">✉</a>
+</nav>
+<div class="container ad-zone ad-zone-top" role="complementary" aria-label="Advertisement">Reklam yeri</div>
 <main class="article-page">
   <section class="article-hero">
     <div class="container article-hero-copy"><span class="badge">{{ article.category_label }}</span><h1>{{article.title}}</h1><p>{{article.summary}}</p><small>{{root_article.published_at|format_published_at}}</small></div>
   </section>
-  <div class="container section article-layout">
+  <div class="container section page-shell article-shell"><aside class="ad-zone ad-zone-vertical ad-zone-left" role="complementary" aria-label="Advertisement">Reklam yeri</aside><div class="article-layout">
     <article class="glass article">
       <figure class="article-image-frame">
         {% if image_exists %}{% set article_srcset = root_article.image_url|image_srcset %}<img src="{{root_article.image_url|public_image_url}}" {% if article_srcset %}srcset="{{ article_srcset }}" sizes="(max-width: 1050px) 92vw, 860px"{% endif %} alt="{{article.title}}" loading="eager" fetchpriority="high" decoding="async">{% else %}<div class="image-placeholder article-image-placeholder">VREYC</div>{% endif %}
       </figure>
+      <div class="ad-zone ad-zone-article" role="complementary" aria-label="Advertisement">Reklam yeri</div>
       <div class="share-row"><span>{{ ui.share }}</span><a class="btn small" href="https://www.facebook.com/sharer/sharer.php?u={{ share_url }}" target="_blank" rel="noopener">Facebook</a><a class="btn small" href="https://twitter.com/intent/tweet?url={{ share_url }}&text={{ article.title }}" target="_blank" rel="noopener">X</a><a class="btn small" href="https://www.linkedin.com/shareArticle?mini=true&url={{ share_url }}" target="_blank" rel="noopener">LinkedIn</a><a class="btn small" href="mailto:?subject={{ article.title }}&body={{ share_url }}">{{ ui.email }}</a></div>
       <section class="glass audio-news" data-audio-ready="{{ '1' if narration and narration.status == 'ready' else '0' }}"><h3>{{ ui.audio_narration }}</h3>{% if narration and narration.status == 'ready' and narration.audio_path %}<audio id="narration" preload="none" src="{{narration.audio_path}}"></audio><div class="audio-controls"><button class="btn" id="playBtn" type="button">{{ ui.play }}</button><button class="btn" id="pauseBtn" type="button">{{ ui.pause }}</button><input id="seek" type="range" value="0" min="0" step="1"><span id="time">0:00 / 0:00</span><select id="speed"><option>1</option><option>1.25</option><option>1.5</option><option>1.75</option><option>2</option></select>{% if narration.allow_download %}<a class="btn" href="{{narration.audio_path}}" download>{{ ui.download }}</a>{% endif %}</div>{% else %}<p>{{ ui.narration_pending }}</p>{% endif %}</section>
-      <div class="article-content">{{article.content}}</div>
+      <div class="article-content"><div class="ad-zone ad-zone-content" role="complementary" aria-label="Advertisement">Reklam yeri</div>{{article.content}}</div>
     </article>
     <aside class="related glass"><p class="eyebrow">{{ ui.related }}</p><h2>{{ ui.more_stories }}</h2>{% for row in related_articles %}<a class="related-card" href="{{ row.url }}">{% if row.image_exists %}{% set related_srcset = row.article.image_url|image_srcset %}<img src="{{ row.article.image_url|public_image_url }}" {% if related_srcset %}srcset="{{ related_srcset }}" sizes="(max-width: 700px) 100vw, 96px"{% endif %} alt="{{ row.title }}" loading="lazy" decoding="async">{% else %}<div class="image-placeholder related-placeholder">VREYC</div>{% endif %}<div><span class="badge">{{ row.category_label }}</span><strong>{{ row.title }}</strong><small>{{ row.article.published_at|format_published_at }}</small></div></a>{% else %}<p class="muted">{{ ui.related_empty }}</p>{% endfor %}</aside>
-  </div>
+  </div><aside class="ad-zone ad-zone-vertical ad-zone-right" role="complementary" aria-label="Advertisement">Reklam yeri</aside></div>
 </main>
 <footer class="footer container">
   <div class="footer-brand">
