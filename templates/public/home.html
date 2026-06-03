@@ -29,18 +29,17 @@
   </nav>
 </header>
 <nav class="fixed-social-sidebar" aria-label="Social and share links">
-  <a href="https://www.facebook.com/sharer/sharer.php?u={{ canonical }}" target="_blank" rel="noopener" aria-label="Facebook">f</a>
-  <a href="https://twitter.com/intent/tweet?url={{ canonical }}" target="_blank" rel="noopener" aria-label="X / Twitter">𝕏</a>
-  <a href="https://t.me/share/url?url={{ canonical }}" target="_blank" rel="noopener" aria-label="Telegram">Tg</a>
-  <a href="https://wa.me/?text={{ canonical }}" target="_blank" rel="noopener" aria-label="WhatsApp">Wa</a>
-  <a href="https://www.instagram.com/" target="_blank" rel="noopener noreferrer" aria-label="Instagram">Ig</a>
-  <a href="https://www.youtube.com/@vasifreyc" target="_blank" rel="noopener noreferrer" aria-label="YouTube">▶</a>
-  <a href="https://www.tiktok.com/@vasifreyc" target="_blank" rel="noopener noreferrer" aria-label="TikTok">♪</a>
-  <a href="mailto:?subject=VREYC&body={{ canonical }}" aria-label="Email share">✉</a>
+  <a class="social-button social-facebook" href="https://www.facebook.com/sharer/sharer.php?u={{ canonical }}" target="_blank" rel="noopener" aria-label="Facebook"><span aria-hidden="true">FB</span></a>
+  <a class="social-button social-x" href="https://twitter.com/intent/tweet?url={{ canonical }}" target="_blank" rel="noopener" aria-label="X / Twitter"><span aria-hidden="true">X</span></a>
+  <a class="social-button social-telegram" href="https://t.me/share/url?url={{ canonical }}" target="_blank" rel="noopener" aria-label="Telegram"><span aria-hidden="true">TG</span></a>
+  <a class="social-button social-whatsapp" href="https://wa.me/?text={{ canonical }}" target="_blank" rel="noopener" aria-label="WhatsApp"><span aria-hidden="true">WA</span></a>
+  <a class="social-button social-instagram" href="https://www.instagram.com/" target="_blank" rel="noopener noreferrer" aria-label="Instagram"><span aria-hidden="true">IG</span></a>
+  <a class="social-button social-youtube" href="https://www.youtube.com/@vasifreyc" target="_blank" rel="noopener noreferrer" aria-label="YouTube"><span aria-hidden="true">YT</span></a>
+  <a class="social-button social-tiktok" href="https://www.tiktok.com/@vasifreyc" target="_blank" rel="noopener noreferrer" aria-label="TikTok"><span aria-hidden="true">TT</span></a>
+  <a class="social-button social-email" href="mailto:?subject=VREYC&body={{ canonical }}" aria-label="Email share"><span aria-hidden="true">✉</span></a>
 </nav>
 <div class="container ad-zone ad-zone-top" role="complementary" aria-label="Advertisement">Reklam yeri</div>
-<main class="container section page-shell">
-  <aside class="ad-zone ad-zone-vertical ad-zone-left" role="complementary" aria-label="Advertisement">Reklam yeri</aside>
+<main class="container section page-shell home-shell">
   <div class="news-shell">
   {% if hero %}
   <section class="hero-news glass">
@@ -74,7 +73,6 @@
     </aside>
   </div>
   </div>
-  <aside class="ad-zone ad-zone-vertical ad-zone-right" role="complementary" aria-label="Advertisement">Reklam yeri</aside>
 </main>
 <footer class="footer container">
   <div class="footer-brand">
