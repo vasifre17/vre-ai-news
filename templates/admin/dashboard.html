@@ -17,7 +17,7 @@
 {%- endmacro %}
 {% block content %}
 <section class="stats-grid dashboard-stats analytics-stats">
-  <article class="stat-card"><span>Total views</span><strong>{{ analytics.total_views }}</strong><small>All article page views</small></article>
+  <article class="stat-card"><span>Total views</span><strong>{{ analytics.total_views }}</strong><small>Real tracked views</small></article>
   <article class="stat-card"><span>Views today</span><strong>{{ analytics.views_today }}</strong><small>Since 00:00 UTC</small></article>
   <article class="stat-card"><span>Views last 7 days</span><strong>{{ analytics.views_7_days }}</strong><small>Rolling weekly traffic</small></article>
   <article class="stat-card"><span>Views last 30 days</span><strong>{{ analytics.views_30_days }}</strong><small>Rolling monthly traffic</small></article>
@@ -29,7 +29,7 @@
   <div class="panel">
     <div class="panel-head"><h2>Top 10 most viewed articles</h2><a href="/admin/articles?sort=most_viewed">Open report</a></div>
     <div class="table-wrap"><table><thead><tr><th>Title</th><th>Status</th><th>Views</th><th>Analytics</th></tr></thead><tbody>
-      {% for article in most_viewed_articles %}<tr><td><a href="/admin/articles/{{ article.id }}/edit">{{ article.title or 'Untitled' }}</a><small>{{ article.slug }}</small></td><td><span class="badge {{ article.status }}">{{ article.status }}</span></td><td><strong>{{ article.view_count or 0 }}</strong></td><td><a href="/admin/articles/{{ article.id }}/analytics">View details</a></td></tr>{% else %}<tr><td colspan="4">No article views recorded yet.</td></tr>{% endfor %}
+      {% for article in most_viewed_articles %}<tr><td><a href="/admin/articles/{{ article.id }}/edit">{{ article.title or 'Untitled' }}</a><small>{{ article.slug }}</small></td><td><span class="badge {{ article.status }}">{{ article.status }}</span></td><td><strong>{{ article.real_view_count or 0 }}</strong></td><td><a href="/admin/articles/{{ article.id }}/analytics">View details</a></td></tr>{% else %}<tr><td colspan="4">No article views recorded yet.</td></tr>{% endfor %}
     </tbody></table></div>
   </div>
   <div class="panel">
@@ -76,7 +76,7 @@
   <div class="panel">
     <div class="panel-head"><h2>Latest 10 articles</h2><a href="/admin/articles?sort=newest">Manage all</a></div>
     <div class="table-wrap"><table><thead><tr><th>Title</th><th>Status</th><th>Views</th><th>Created</th></tr></thead><tbody>
-      {% for article in latest_articles %}<tr><td><a href="/admin/articles/{{ article.id }}/edit">{{ article.title or 'Untitled' }}</a><small>{{ article.slug }}</small></td><td><span class="badge {{ article.status }}">{{ article.status }}</span></td><td>{{ article.view_count or 0 }}</td><td>{{ article.created_at|format_published_at }}</td></tr>{% else %}<tr><td colspan="4">No articles yet.</td></tr>{% endfor %}
+      {% for article in latest_articles %}<tr><td><a href="/admin/articles/{{ article.id }}/edit">{{ article.title or 'Untitled' }}</a><small>{{ article.slug }}</small></td><td><span class="badge {{ article.status }}">{{ article.status }}</span></td><td>{{ article.real_view_count or 0 }}</td><td>{{ article.created_at|format_published_at }}</td></tr>{% else %}<tr><td colspan="4">No articles yet.</td></tr>{% endfor %}
     </tbody></table></div>
   </div>
   <div class="panel">
