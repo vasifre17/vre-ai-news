@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="{{ language }}">
+<html lang="{{ language }}" data-theme="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -18,7 +18,7 @@
   <nav class="nav container">
     <a class="logo" href="/{{language}}/"><span>VRE</span>YC</a>
     <form class="search-wrap" action="/{{ language }}/" role="search"><input type="search" name="q" value="{{q}}" placeholder="{{ ui.search_placeholder }}" aria-label="{{ ui.search }}"></form>
-    <div class="language-switcher">{% for lang in languages %}<a href="/{{lang}}/">{{lang|upper}}</a>{% endfor %}</div>
+    <div class="header-actions"><button id="themeToggle" class="theme-toggle" type="button" aria-label="Toggle light and dark theme"><span class="theme-icon" aria-hidden="true">◐</span><span class="theme-text">Theme</span></button><div class="language-switcher">{% for lang in languages %}<a href="/{{lang}}/">{{lang|upper}}</a>{% endfor %}</div></div>
   </nav>
   <nav class="categories container" aria-label="{{ ui.news }}">
     <div class="primary-categories">{% for c in categories %}<a href="/{{ language }}/?category={{ c.name }}" style="--cat-color: {{ c.color or '#48a6ff' }}">{{ category_labels.get(c.name, c.name) }}</a>{% endfor %}</div>
@@ -28,7 +28,20 @@
     </div>{% endif %}
   </nav>
 </header>
-<main class="container section news-shell">
+<nav class="fixed-social-sidebar" aria-label="Social and share links">
+  <a href="https://www.facebook.com/sharer/sharer.php?u={{ canonical }}" target="_blank" rel="noopener" aria-label="Facebook">f</a>
+  <a href="https://twitter.com/intent/tweet?url={{ canonical }}" target="_blank" rel="noopener" aria-label="X / Twitter">𝕏</a>
+  <a href="https://t.me/share/url?url={{ canonical }}" target="_blank" rel="noopener" aria-label="Telegram">Tg</a>
+  <a href="https://wa.me/?text={{ canonical }}" target="_blank" rel="noopener" aria-label="WhatsApp">Wa</a>
+  <a href="https://www.instagram.com/" target="_blank" rel="noopener noreferrer" aria-label="Instagram">Ig</a>
+  <a href="https://www.youtube.com/@vasifreyc" target="_blank" rel="noopener noreferrer" aria-label="YouTube">▶</a>
+  <a href="https://www.tiktok.com/@vasifreyc" target="_blank" rel="noopener noreferrer" aria-label="TikTok">♪</a>
+  <a href="mailto:?subject=VREYC&body={{ canonical }}" aria-label="Email share">✉</a>
+</nav>
+<div class="container ad-zone ad-zone-top" role="complementary" aria-label="Advertisement">Reklam yeri</div>
+<main class="container section page-shell">
+  <aside class="ad-zone ad-zone-vertical ad-zone-left" role="complementary" aria-label="Advertisement">Reklam yeri</aside>
+  <div class="news-shell">
   {% if hero %}
   <section class="hero-news glass">
     <a class="hero-image" href="{{ hero.url }}">{% if hero.image_exists %}{% set hero_srcset = hero.article.image_url|image_srcset %}<img src="{{ hero.article.image_url|public_image_url }}" {% if hero_srcset %}srcset="{{ hero_srcset }}" sizes="(max-width: 1050px) 100vw, 58vw"{% endif %} alt="{{ hero.title }}" loading="eager">{% else %}<div class="image-placeholder">VREYC</div>{% endif %}</a>
@@ -53,13 +66,15 @@
       </div>
       <div class="section-title"><p class="eyebrow">{{ ui.latest }}</p><h2>{{ ui.latest_news }}</h2></div>
       {% if latest_articles|length == 0 %}<div class="glass empty-state">{{ ui.no_articles }}</div>{% endif %}
-      <div class="latest-grid">{% for row in latest_articles %}<article class="news-card glass">{% if row.image_exists %}{% set card_srcset = row.article.image_url|image_srcset %}<img src="{{row.article.image_url|public_image_url}}" {% if card_srcset %}srcset="{{ card_srcset }}" sizes="(max-width: 700px) 100vw, (max-width: 1050px) 50vw, 33vw"{% endif %} alt="{{row.title}}" loading="lazy">{% else %}<div class="image-placeholder compact">VREYC</div>{% endif %}<div class="card-body"><span class="badge">{{ row.category_label }}</span><h3><a href="{{row.url}}">{{row.title}}</a></h3><p>{{row.summary}}</p><small>{{row.article.published_at|format_published_at}}</small></div></article>{% endfor %}</div>
+      <div class="latest-grid">{% for row in latest_articles %}<article class="news-card glass">{% if row.image_exists %}{% set card_srcset = row.article.image_url|image_srcset %}<img src="{{row.article.image_url|public_image_url}}" {% if card_srcset %}srcset="{{ card_srcset }}" sizes="(max-width: 700px) 100vw, (max-width: 1050px) 50vw, 33vw"{% endif %} alt="{{row.title}}" loading="lazy">{% else %}<div class="image-placeholder compact">VREYC</div>{% endif %}<div class="card-body"><span class="badge">{{ row.category_label }}</span><h3><a href="{{row.url}}">{{row.title}}</a></h3><p>{{row.summary}}</p><small class="meta-row"><span>{{row.article.published_at|format_published_at}}</span><span>{{ row.category_label }}</span><span>{{ row.view_count }} views</span></small></div></article>{% if loop.index == 3 %}<div class="ad-zone ad-zone-infeed" role="complementary" aria-label="Advertisement">Reklam yeri</div>{% endif %}{% endfor %}</div>
     </section>
     <aside class="trending-sidebar glass">
       <p class="eyebrow">{{ ui.trending }}</p><h2>{{ ui.most_watched }}</h2>
       <div class="trending-list">{% for row in trending_articles %}<a href="{{ row.url }}"><span>{{ loop.index }}</span><div><strong>{{ row.title }}</strong><small>{{ row.category_label }} • {{ row.view_count }} views • {{ row.article.published_at|format_published_at }}</small></div></a>{% endfor %}</div>
     </aside>
   </div>
+  </div>
+  <aside class="ad-zone ad-zone-vertical ad-zone-right" role="complementary" aria-label="Advertisement">Reklam yeri</aside>
 </main>
 <footer class="footer container">
   <div class="footer-brand">
