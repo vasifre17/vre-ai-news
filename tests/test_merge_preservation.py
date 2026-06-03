@@ -142,3 +142,89 @@ def test_public_seo_feeds_and_admin_features_survive_main_merge():
         media = client.get("/admin/media")
         assert media.status_code == 200
         assert "merge-image.jpg" in media.text
+
+
+def reset_analytics_fixture_data():
+    settings.admin_password_hash = hash_password("merge-password")
+    init_db()
+    db = SessionLocal()
+    try:
+        apply_schema_migrations(db)
+        db.query(ArticleView).delete()
+        db.query(ArticleTranslation).delete()
+        db.query(MediaAsset).delete()
+        db.query(Article).delete()
+        db.commit()
+        published_at = datetime.now(UTC) - timedelta(hours=1)
+        high_fake = Article(
+            original_hash="fake-view-count-high",
+            title="Fake high counter article",
+            slug="fake-high-counter-article",
+            summary="Old seeded view count must be ignored.",
+            content="Article body for analytics assertions.",
+            category="Technology",
+            language="az",
+            status="published",
+            view_count=650,
+            published_at=published_at,
+        )
+        low_fake = Article(
+            original_hash="fake-view-count-low",
+            title="Fake low counter article",
+            slug="fake-low-counter-article",
+            summary="Real article_views rows must be counted.",
+            content="Second article body for analytics assertions.",
+            category="Business",
+            language="az",
+            status="published",
+            view_count=3,
+            published_at=published_at,
+        )
+        db.add_all([high_fake, low_fake])
+        db.flush()
+        db.add_all(
+            [
+                ArticleView(article_id=high_fake.id, visitor_key="repeat-reader", traffic_source="direct", viewed_at=published_at),
+                ArticleView(article_id=high_fake.id, visitor_key="repeat-reader", traffic_source="direct", viewed_at=published_at + timedelta(minutes=1)),
+                ArticleView(article_id=low_fake.id, visitor_key="single-reader", traffic_source="search", viewed_at=published_at + timedelta(minutes=2)),
+            ]
+        )
+        db.commit()
+        return high_fake.id, low_fake.id
+    finally:
+        db.close()
+
+
+def test_admin_analytics_use_only_real_article_views_table():
+    high_fake_id, low_fake_id = reset_analytics_fixture_data()
+    from main import analytics_summary, article_analytics_context, top_category_rows
+
+    db = SessionLocal()
+    try:
+        summary = analytics_summary(db)
+        assert summary["total_views"] == 3
+        assert summary["unique_visitors"] == 2
+        assert summary["returning_visitors"] == 1
+        assert {row["name"]: row["views"] for row in top_category_rows(db)} == {"Technology": 2, "Business": 1}
+
+        high_fake = db.query(Article).get(high_fake_id)
+        low_fake = db.query(Article).get(low_fake_id)
+        assert article_analytics_context(db, high_fake)["publish_performance"]["total_views"] == 2
+        assert article_analytics_context(db, low_fake)["publish_performance"]["total_views"] == 1
+    finally:
+        db.close()
+
+    client = TestClient(app)
+    login(client)
+    dashboard = client.get("/admin")
+    assert dashboard.status_code == 200
+    assert "Real tracked views" in dashboard.text
+    assert "653" not in dashboard.text
+    assert "Fake high counter article" in dashboard.text
+    assert "<strong>2</strong>" in dashboard.text
+
+    article_list = client.get("/admin/articles?sort=most_viewed")
+    assert article_list.status_code == 200
+    assert "Fake high counter article" in article_list.text
+    assert "Fake low counter article" in article_list.text
+    assert "650" not in article_list.text

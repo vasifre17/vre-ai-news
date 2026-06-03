@@ -8,7 +8,7 @@ import shutil
 from urllib.parse import urlparse
 from pathlib import Path
 from uuid import uuid4
-from sqlalchemy import func, or_, text
+from sqlalchemy import func, or_, select, text
 from sqlalchemy.orm import selectinload
 from fastapi import FastAPI, Request, Depends, Form, HTTPException, UploadFile, File
 from PIL import Image, UnidentifiedImageError
@@ -621,8 +621,37 @@ def article_card(article: Article, language: str, category_labels: dict[str, str
         "url": article_url(language, view.slug),
         "category_label": category_label,
         "image_exists": uploaded_image_exists(article.image_url),
-        "view_count": article.view_count or 0,
+        "view_count": getattr(article, "real_view_count", 0) or 0,
     }
+
+def real_article_view_count_subquery():
+    return (
+        select(
+            ArticleView.article_id.label("article_id"),
+            func.count(ArticleView.id).label("real_view_count"),
+        )
+        .group_by(ArticleView.article_id)
+        .subquery()
+    )
+
+
+def article_view_count_map(db, article_ids: list[int]) -> dict[int, int]:
+    if not article_ids:
+        return {}
+    rows = (
+        db.query(ArticleView.article_id, func.count(ArticleView.id))
+        .filter(ArticleView.article_id.in_(article_ids))
+        .group_by(ArticleView.article_id)
+        .all()
+    )
+    return {int(article_id): int(count or 0) for article_id, count in rows}
+
+
+def attach_real_view_counts(db, articles: list[Article]) -> list[Article]:
+    counts = article_view_count_map(db, [article.id for article in articles])
+    for article in articles:
+        article.real_view_count = counts.get(article.id, 0)
+    return articles
 
 def get_settings_map(db) -> dict[str, str]:
     return {row.key: row.value for row in db.query(Setting).all()}
@@ -852,7 +881,16 @@ def apply_admin_article_sort(query, sort: str):
     if sort == "oldest":
         return query.order_by(Article.created_at.asc(), Article.id.asc())
     if sort == "most_viewed":
-        return query.order_by(Article.view_count.desc(), Article.published_at.desc(), Article.created_at.desc())
+        view_counts = real_article_view_count_subquery()
+        return (
+            query.outerjoin(view_counts, Article.id == view_counts.c.article_id)
+            .order_by(
+                func.coalesce(view_counts.c.real_view_count, 0).desc(),
+                Article.published_at.desc(),
+                Article.created_at.desc(),
+                Article.id.desc(),
+            )
+        )
     if sort == "recently_updated":
         return query.order_by(Article.updated_at.desc(), Article.created_at.desc())
     return query.order_by(Article.published_at.desc(), Article.created_at.desc(), Article.id.desc())
@@ -896,7 +934,6 @@ def visitor_fingerprint(request: Request) -> str:
 
 
 def record_article_view(db, article: Article, request: Request, language: str) -> None:
-    article.view_count = (article.view_count or 0) + 1
     article.updated_at = article.updated_at or datetime.utcnow()
     db.add(ArticleView(
         article_id=article.id,
@@ -912,7 +949,7 @@ def analytics_summary(db) -> dict:
     today = utc_start_of_day()
     last_7_days = today - timedelta(days=6)
     last_30_days = today - timedelta(days=29)
-    total_views = db.query(func.coalesce(func.sum(Article.view_count), 0)).scalar() or 0
+    total_views = db.query(func.count(ArticleView.id)).scalar() or 0
     views_today = db.query(func.count(ArticleView.id)).filter(ArticleView.viewed_at >= today).scalar() or 0
     views_7 = db.query(func.count(ArticleView.id)).filter(ArticleView.viewed_at >= last_7_days).scalar() or 0
     views_30 = db.query(func.count(ArticleView.id)).filter(ArticleView.viewed_at >= last_30_days).scalar() or 0
@@ -929,9 +966,14 @@ def analytics_summary(db) -> dict:
 
 
 def top_category_rows(db, limit: int = 10) -> list[dict]:
-    rows = db.query(Article.category, func.count(ArticleView.id)).join(ArticleView, ArticleView.article_id == Article.id).group_by(Article.category).order_by(func.count(ArticleView.id).desc()).limit(limit).all()
-    if not rows:
-        rows = db.query(Article.category, func.coalesce(func.sum(Article.view_count), 0)).group_by(Article.category).order_by(func.coalesce(func.sum(Article.view_count), 0).desc()).limit(limit).all()
+    rows = (
+        db.query(Article.category, func.count(ArticleView.id))
+        .join(ArticleView, ArticleView.article_id == Article.id)
+        .group_by(Article.category)
+        .order_by(func.count(ArticleView.id).desc())
+        .limit(limit)
+        .all()
+    )
     total = sum(int(count or 0) for _, count in rows) or 1
     return [{"name": category or "Uncategorized", "views": int(count or 0), "share": round((int(count or 0) / total) * 100)} for category, count in rows]
 
@@ -1015,7 +1057,7 @@ def article_analytics_context(db, article: Article) -> dict:
         "sources": [{"name": source or "Direct", "views": int(count or 0)} for source, count in sources],
         "charts": traffic_charts(db, article.id),
         "publish_performance": {
-            "total_views": article.view_count or 0,
+            "total_views": db.query(func.count(ArticleView.id)).filter(ArticleView.article_id == article.id).scalar() or 0,
             "first_24h_views": first_24h_views,
             "last_7_views": last_7_views,
             "unique_visitors": unique_visitors,
@@ -1121,11 +1163,13 @@ def home(request: Request, language: str = "az", q: str = "", category: str = ""
         query = query.filter((Article.title.ilike(f"%{q}%")) | (Article.summary.ilike(f"%{q}%")) | (Article.id.in_(translation_matches.scalar_subquery())))
     if category:
         query = query.filter(Article.category == category)
-    articles = query.order_by(Article.homepage_order.asc(), Article.published_at.desc(), Article.created_at.desc()).limit(30).all()
-    featured = db.query(Article).options(selectinload(Article.translations)).filter(Article.status == "published", Article.is_featured == True).order_by(Article.homepage_order.asc(), Article.published_at.desc()).limit(6).all()
+    articles = attach_real_view_counts(db, query.order_by(Article.homepage_order.asc(), Article.published_at.desc(), Article.created_at.desc()).limit(30).all())
+    featured = attach_real_view_counts(db, db.query(Article).options(selectinload(Article.translations)).filter(Article.status == "published", Article.is_featured == True).order_by(Article.homepage_order.asc(), Article.published_at.desc()).limit(6).all())
     if not featured:
         featured = articles[:6]
-    trending = db.query(Article).options(selectinload(Article.translations)).filter(Article.status == "published").order_by(Article.view_count.desc(), Article.published_at.desc(), Article.created_at.desc()).limit(8).all()
+    trending = attach_real_view_counts(db, db.query(Article).options(selectinload(Article.translations)).filter(Article.status == "published", Article.is_trending == True).order_by(Article.homepage_order.asc(), Article.published_at.desc(), Article.created_at.desc()).limit(8).all())
+    if not trending:
+        trending = articles[:8]
     category_labels = public_category_labels(language)
     article_cards = [article_card(a, language, category_labels) for a in articles]
     featured_cards = [article_card(a, language, category_labels) for a in featured]
@@ -1156,6 +1200,7 @@ def render_article_page(slug: str, request: Request, language: str = "az", db=De
     related = db.query(Article).options(selectinload(Article.translations)).filter(Article.status == "published", Article.id != article.id, Article.category == article.category).order_by(Article.published_at.desc(), Article.created_at.desc()).limit(3).all()
     if len(related) < 3:
         related = related + db.query(Article).options(selectinload(Article.translations)).filter(Article.status == "published", Article.id != article.id, Article.category != article.category).order_by(Article.published_at.desc(), Article.created_at.desc()).limit(3 - len(related)).all()
+    related = attach_real_view_counts(db, related)
     canonical = canonical_url(request, f"{language}/{view.slug}")
     navigation = public_category_navigation(db)
     category_labels = public_category_labels(language)
@@ -1315,8 +1360,16 @@ def admin_dashboard(request: Request, db=Depends(get_db), _=Depends(require_auth
     categories = db.query(Category).count() or db.query(Article.category).filter(Article.category.isnot(None)).distinct().count()
     media_count = db.query(MediaAsset).count()
     logs = db.query(FetchLog).order_by(FetchLog.created_at.desc()).limit(8).all()
-    latest_articles = db.query(Article).order_by(Article.created_at.desc(), Article.id.desc()).limit(10).all()
-    most_viewed_articles = db.query(Article).order_by(Article.view_count.desc(), Article.published_at.desc(), Article.created_at.desc()).limit(10).all()
+    latest_articles = attach_real_view_counts(db, db.query(Article).order_by(Article.created_at.desc(), Article.id.desc()).limit(10).all())
+    most_viewed_articles = (
+        db.query(Article, func.count(ArticleView.id).label("real_view_count"))
+        .join(ArticleView, ArticleView.article_id == Article.id)
+        .group_by(Article.id)
+        .order_by(func.count(ArticleView.id).desc(), Article.published_at.desc(), Article.created_at.desc(), Article.id.desc())
+        .limit(10)
+        .all()
+    )
+    most_viewed_articles = [setattr(article, "real_view_count", int(real_view_count or 0)) or article for article, real_view_count in most_viewed_articles]
     analytics = analytics_summary(db)
     return templates.TemplateResponse('admin/dashboard.html', {'request': request, 'drafts': drafts, 'published': published, 'total_articles': total_articles, 'categories': categories, 'media_count': media_count, 'logs': logs, 'recent_articles': latest_articles, 'latest_articles': latest_articles, 'most_viewed_articles': most_viewed_articles, 'analytics': analytics, 'top_categories': top_category_rows(db), 'traffic_charts': traffic_charts(db), "languages": SUPPORTED_LANGUAGES, "ai_translation_status": ai_translation_status()})
 
@@ -1342,7 +1395,7 @@ def admin_articles(
     total = query.count()
     total_pages = max(1, (total + per_page - 1) // per_page)
     page = min(page, total_pages)
-    articles = apply_admin_article_sort(query, sort).offset((page - 1) * per_page).limit(per_page).all()
+    articles = attach_real_view_counts(db, apply_admin_article_sort(query, sort).offset((page - 1) * per_page).limit(per_page).all())
     narration_map = {n.article_id: n for n in db.query(ArticleNarration).filter(ArticleNarration.article_id.in_([a.id for a in articles] or [0])).all()}
     translation_missing_map = {a.id: missing_translation_languages(a) for a in articles}
     seo_score_map = {a.id: article_seo_audit(a, 'az')['score'] for a in articles}
