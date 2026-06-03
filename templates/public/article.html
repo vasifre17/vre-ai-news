@@ -9,7 +9,7 @@
   <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="{{article.seo_title or article.title}}"><meta name="twitter:description" content="{{article.meta_description or article.summary or article.title}}"><meta name="twitter:image" content="{{ og_image }}">
   {% if narration and narration.status == 'ready' and narration.audio_path %}<meta itemprop="audio" content="{{site_url}}{{narration.audio_path}}">{% endif %}
   <script type="application/ld+json">{{ {"@context":"https://schema.org", "@graph": schema_graph}|tojson }}</script>
-  <link rel="stylesheet" href="/assets/styles.css">
+  <link rel="stylesheet" href="/assets/styles.css?v={{ app_version }}">
 </head>
 <body>
 <header class="site-header glass">
@@ -79,6 +79,6 @@
   </section>
 </footer>
 <script>(()=>{const w=document.querySelector('.audio-news');if(!w||w.dataset.audioReady!=='1')return;const a=document.getElementById('narration'),play=document.getElementById('playBtn'),pause=document.getElementById('pauseBtn'),seek=document.getElementById('seek'),speed=document.getElementById('speed'),time=document.getElementById('time');const fmt=t=>`${Math.floor(t/60)}:${String(Math.floor(t%60)).padStart(2,'0')}`;play.onclick=()=>a.play();pause.onclick=()=>a.pause();speed.onchange=()=>a.playbackRate=parseFloat(speed.value);a.onloadedmetadata=()=>{seek.max=Math.floor(a.duration||0);time.textContent=`0:00 / ${fmt(a.duration||0)}`};a.ontimeupdate=()=>{seek.value=Math.floor(a.currentTime);time.textContent=`${fmt(a.currentTime)} / ${fmt(a.duration||0)}`};seek.oninput=()=>{a.currentTime=Number(seek.value)}})();</script>
-<script src="/assets/app.js" defer></script>
+<script src="/assets/app.js?v={{ app_version }}" defer></script>
 </body>
 </html>
