@@ -482,11 +482,11 @@ def format_published_at(value):
 
 
 def format_admin_datetime(value):
-    return value.strftime("%b %d, %Y %H:%M") if value else "—"
+    return value.strftime("%d.%m.%Y %H:%M") if value else "—"
 
 
 def datetime_local_value(value):
-    return value.strftime("%Y-%m-%dT%H:%M") if value else ""
+    return value.strftime("%d.%m.%Y %H:%M") if value else ""
 
 
 def is_uploaded_file(value) -> bool:
@@ -926,7 +926,7 @@ def parse_admin_datetime(value: str | None):
     value = value.strip()
     if not value:
         return None
-    for fmt in ("%Y-%m-%dT%H:%M", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
+    for fmt in ("%d.%m.%Y %H:%M", "%Y-%m-%dT%H:%M", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
         try:
             return datetime.strptime(value, fmt)
         except ValueError:
