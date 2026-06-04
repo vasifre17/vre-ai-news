@@ -12,7 +12,7 @@ os.environ.setdefault("SITE_URL", "https://vreyc.com")
 os.environ["DATABASE_URL"] = f"sqlite:///{tempfile.NamedTemporaryFile(suffix='.db', delete=False).name}"
 os.environ.setdefault("IMAGE_UPLOAD_DIR", tempfile.mkdtemp(prefix="vre-test-uploads-"))
 
-from main import format_admin_datetime, parse_admin_datetime, safe_iframe_src, sanitize_article_html
+from main import datetime_local_value, format_admin_datetime, parse_admin_datetime, safe_iframe_src, sanitize_article_html
 
 
 def test_sanitize_article_html_allows_safe_video_iframe_sources():
@@ -55,6 +55,8 @@ def test_admin_datetime_helpers_use_twenty_four_hour_display_format():
     value = datetime(2026, 6, 5, 14, 30)
 
     assert format_admin_datetime(value) == "05.06.2026 14:30"
+    assert datetime_local_value(value) == "2026-06-05T14:30"
+    assert parse_admin_datetime("2026-06-05T23:45") == datetime(2026, 6, 5, 23, 45)
     assert parse_admin_datetime("05.06.2026 23:45") == datetime(2026, 6, 5, 23, 45)
     assert parse_admin_datetime("05.06.2026 09:00") == datetime(2026, 6, 5, 9, 0)
     assert parse_admin_datetime("05.06.2026 01:30 PM") is None
