@@ -1,5 +1,6 @@
 from datetime import UTC, datetime, timedelta
 import hashlib
+import logging
 from email.utils import format_datetime
 import html
 from types import SimpleNamespace
@@ -51,6 +52,7 @@ UPLOAD_IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
 IMAGE_VARIANT_WIDTHS = (480, 960, 1440)
 APP_VERSION = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
+logger = logging.getLogger(__name__)
 
 
 def ensure_upload_dir() -> None:
@@ -939,6 +941,33 @@ def normalize_article_status(value: str | None) -> str:
     return status if status in {"draft", "published", "scheduled"} else "draft"
 
 
+def publish_due_scheduled_articles(db) -> int:
+    """Publish scheduled articles whose publish_at has passed using server time."""
+    now = datetime.utcnow()
+    due_articles = (
+        db.query(Article)
+        .filter(
+            Article.status == "scheduled",
+            Article.publish_at.isnot(None),
+            Article.publish_at <= now,
+        )
+        .order_by(Article.publish_at.asc(), Article.id.asc())
+        .all()
+    )
+    for article in due_articles:
+        article.status = "published"
+        if not article.published_at:
+            article.published_at = article.publish_at
+        article.updated_at = now
+        message = f"Scheduled article auto-published: {article.id}"
+        logger.info(message)
+        db.add(FetchLog(level="INFO", message=message))
+    if due_articles:
+        touch_sitemap_refresh(db)
+        db.commit()
+    return len(due_articles)
+
+
 def public_article_visibility_filter(now: datetime | None = None):
     current = now or datetime.utcnow()
     return or_(
@@ -1445,6 +1474,7 @@ def startup() -> None:
 @app.get("/{language}/", response_class=HTMLResponse)
 def home(request: Request, language: str = "az", q: str = "", category: str = "", db=Depends(get_db)):
     language = language if language in SUPPORTED_LANGUAGES else "az"
+    publish_due_scheduled_articles(db)
     ensure_categories(db)
     query = db.query(Article).options(selectinload(Article.translations)).filter(public_article_visibility_filter())
     if q:
@@ -1479,6 +1509,7 @@ def home(request: Request, language: str = "az", q: str = "", category: str = ""
 
 def render_article_page(slug: str, request: Request, language: str = "az", db=Depends(get_db)):
     language = language if language in SUPPORTED_LANGUAGES else "az"
+    publish_due_scheduled_articles(db)
     article = find_published_article_by_slug(db, slug, language)
     if not article:
         raise HTTPException(404)
@@ -1525,6 +1556,7 @@ def category_page(category: str, request: Request, db=Depends(get_db)):
 
 @app.get('/sitemap.xml')
 def sitemap(db=Depends(get_db)):
+    publish_due_scheduled_articles(db)
     base_url = settings.site_url.rstrip("/")
     url_entries = [
         f"<url><loc>{xml_escape(base_url + '/')}</loc><changefreq>hourly</changefreq><priority>1.0</priority></url>"
@@ -1550,6 +1582,7 @@ def sitemap(db=Depends(get_db)):
 
 @app.get('/news-sitemap.xml')
 def news_sitemap(db=Depends(get_db)):
+    publish_due_scheduled_articles(db)
     base_url = settings.site_url.rstrip("/")
     news_cutoff = datetime.utcnow() - timedelta(days=2)
     articles = db.query(Article).options(selectinload(Article.translations)).filter(public_article_visibility_filter(), public_article_datetime_expression() >= news_cutoff).order_by(public_article_datetime_expression().desc()).limit(1000).all()
@@ -1574,6 +1607,7 @@ def news_sitemap(db=Depends(get_db)):
 @app.get('/rss.xml')
 @app.get('/feed.xml')
 def rss_feed(db=Depends(get_db)):
+    publish_due_scheduled_articles(db)
     base_url = settings.site_url.rstrip("/")
     articles = db.query(Article).options(selectinload(Article.translations)).filter(public_article_visibility_filter()).order_by(public_article_datetime_expression().desc(), Article.created_at.desc()).limit(50).all()
     items = []
@@ -1644,6 +1678,7 @@ def logout(request: Request):
 
 @app.get('/admin', response_class=HTMLResponse)
 def admin_dashboard(request: Request, db=Depends(get_db), _=Depends(require_auth)):
+    publish_due_scheduled_articles(db)
     drafts = db.query(Article).filter(Article.status == 'draft').count()
     published = db.query(Article).filter(Article.status == 'published').count()
     scheduled = db.query(Article).filter(Article.status == 'scheduled').count()
@@ -1688,6 +1723,7 @@ def admin_articles(
 ):
     page = safe_positive_int(page, 1)
     per_page = safe_positive_int(per_page, 25, 100)
+    publish_due_scheduled_articles(db)
     query = filtered_admin_article_query(db, q, status, category, language, date_from, date_to)
     total = query.count()
     total_pages = max(1, (total + per_page - 1) // per_page)
