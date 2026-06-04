@@ -790,12 +790,12 @@ def find_published_article_by_slug(db, slug: str, language: str = "az") -> Artic
     if language != "az":
         translation = db.query(ArticleTranslation).filter(ArticleTranslation.language == language, ArticleTranslation.slug == slug).first()
         if translation:
-            article = db.query(Article).options(selectinload(Article.translations)).filter(Article.id == translation.article_id, Article.status == "published").first()
+            article = db.query(Article).options(selectinload(Article.translations)).filter(Article.id == translation.article_id, public_article_visibility_filter()).first()
     if not article:
         slug_filters = [Article.slug == slug]
         if slug.isdigit():
             slug_filters.append(Article.id == int(slug))
-        article = db.query(Article).options(selectinload(Article.translations)).filter(or_(*slug_filters), Article.status == "published").first()
+        article = db.query(Article).options(selectinload(Article.translations)).filter(or_(*slug_filters), public_article_visibility_filter()).first()
     return article
 
 
@@ -939,33 +939,24 @@ def normalize_article_status(value: str | None) -> str:
     return status if status in {"draft", "published", "scheduled"} else "draft"
 
 
-def publish_due_scheduled_articles(db) -> int:
-    now = datetime.utcnow()
-    due_articles = (
-        db.query(Article)
-        .filter(Article.status == "scheduled", Article.publish_at.isnot(None), Article.publish_at <= now)
-        .order_by(Article.publish_at.asc(), Article.id.asc())
-        .all()
+def public_article_visibility_filter(now: datetime | None = None):
+    current = now or datetime.utcnow()
+    return or_(
+        Article.status == "published",
+        (Article.status == "scheduled") & Article.publish_at.isnot(None) & (Article.publish_at <= current),
     )
-    if not due_articles:
-        return 0
-    for article in due_articles:
-        article.status = "published"
-        article.published_at = article.published_at or article.publish_at or now
-        article.slug = article.slug or unique_article_slug(db, article.title, article.id)
-        article.updated_at = now
-        queue_narration(db, article)
-    touch_sitemap_refresh(db)
-    db.commit()
-    return len(due_articles)
 
 
-def scheduled_publish_job() -> None:
-    db = SessionLocal()
-    try:
-        publish_due_scheduled_articles(db)
-    finally:
-        db.close()
+def public_article_datetime_expression():
+    return func.coalesce(Article.published_at, Article.publish_at, Article.created_at)
+
+
+def public_article_datetime(article: Article) -> datetime | None:
+    return article.published_at or article.publish_at or article.created_at
+
+
+def require_scheduled_publish_at(status: str, publish_at: datetime | None) -> bool:
+    return status != "scheduled" or publish_at is not None
 
 
 def touch_sitemap_refresh(db) -> None:
@@ -1381,9 +1372,11 @@ def apply_schema_migrations(db) -> None:
     # Safe for existing deployments: create the translation table from the
     # SQLAlchemy model if older databases were initialized before multilingual
     # article storage existed, then add any newly introduced nullable columns.
-    ArticleTranslation.__table__.create(bind=db.get_bind(), checkfirst=True)
-    ArticleView.__table__.create(bind=db.get_bind(), checkfirst=True)
-    MediaAsset.__table__.create(bind=db.get_bind(), checkfirst=True)
+    bind = db.get_bind()
+    ArticleTranslation.__table__.create(bind=bind, checkfirst=True)
+    ArticleView.__table__.create(bind=bind, checkfirst=True)
+    MediaAsset.__table__.create(bind=bind, checkfirst=True)
+    publish_at_type = "DATETIME" if bind.dialect.name == "sqlite" else "TIMESTAMP"
     for statement in [
         "ALTER TABLE articles ADD COLUMN slug VARCHAR(500)",
         "ALTER TABLE articles ADD COLUMN narration_enabled BOOLEAN DEFAULT true",
@@ -1392,7 +1385,7 @@ def apply_schema_migrations(db) -> None:
         "ALTER TABLE articles ADD COLUMN is_trending BOOLEAN DEFAULT false",
         "ALTER TABLE articles ADD COLUMN homepage_order INTEGER DEFAULT 100",
         "ALTER TABLE articles ADD COLUMN view_count INTEGER DEFAULT 0",
-        "ALTER TABLE articles ADD COLUMN publish_at DATETIME",
+        f"ALTER TABLE articles ADD COLUMN publish_at {publish_at_type}",
         "ALTER TABLE article_translations ADD COLUMN slug VARCHAR(500)",
         "ALTER TABLE article_translations ADD COLUMN meta_description TEXT",
         "ALTER TABLE article_translations ADD COLUMN tags VARCHAR(500)",
@@ -1444,7 +1437,6 @@ def startup() -> None:
     db.close()
     scheduler.add_job(run_fetch_pipeline, "interval", minutes=max(13, min(17, settings.fetch_interval_min)), id="fetch_job", replace_existing=True)
     scheduler.add_job(generate_pending_narrations, "interval", seconds=45, id="narration_job", replace_existing=True)
-    scheduler.add_job(scheduled_publish_job, "interval", seconds=60, id="scheduled_publish_job", replace_existing=True)
     if not scheduler.running:
         scheduler.start()
 
@@ -1452,10 +1444,9 @@ def startup() -> None:
 @app.get("/", response_class=HTMLResponse)
 @app.get("/{language}/", response_class=HTMLResponse)
 def home(request: Request, language: str = "az", q: str = "", category: str = "", db=Depends(get_db)):
-    publish_due_scheduled_articles(db)
     language = language if language in SUPPORTED_LANGUAGES else "az"
     ensure_categories(db)
-    query = db.query(Article).options(selectinload(Article.translations)).filter(Article.status == "published")
+    query = db.query(Article).options(selectinload(Article.translations)).filter(public_article_visibility_filter())
     if q:
         translation_matches = db.query(ArticleTranslation.article_id).filter(
             ArticleTranslation.language == language,
@@ -1464,15 +1455,15 @@ def home(request: Request, language: str = "az", q: str = "", category: str = ""
         query = query.filter((Article.title.ilike(f"%{q}%")) | (Article.summary.ilike(f"%{q}%")) | (Article.id.in_(translation_matches.scalar_subquery())))
     if category:
         query = query.filter(Article.category == category)
-    articles = attach_real_view_counts(db, query.order_by(func.coalesce(Article.published_at, Article.created_at).desc(), Article.created_at.desc(), Article.id.desc()).limit(30).all())
+    articles = attach_real_view_counts(db, query.order_by(public_article_datetime_expression().desc(), Article.created_at.desc(), Article.id.desc()).limit(30).all())
     category_labels = public_category_labels(language)
     article_cards = [article_card(a, language, category_labels) for a in articles]
     hero = article_cards[0] if article_cards else None
     latest_cards = [row for row in article_cards if not hero or row["article"].id != hero["article"].id]
-    sidebar_query = db.query(Article).options(selectinload(Article.translations)).filter(Article.status == "published")
+    sidebar_query = db.query(Article).options(selectinload(Article.translations)).filter(public_article_visibility_filter())
     if hero:
         sidebar_query = sidebar_query.filter(Article.id != hero["article"].id)
-    sidebar_articles = attach_real_view_counts(db, sidebar_query.order_by(func.coalesce(Article.published_at, Article.created_at).desc(), Article.created_at.desc(), Article.id.desc()).limit(8).all())
+    sidebar_articles = attach_real_view_counts(db, sidebar_query.order_by(public_article_datetime_expression().desc(), Article.created_at.desc(), Article.id.desc()).limit(8).all())
     sidebar_cards = [article_card(a, language, category_labels) for a in sidebar_articles]
     categories = public_category_navigation(db)
     alt_links = {lang: f"/{lang}/" for lang in SUPPORTED_LANGUAGES}
@@ -1487,7 +1478,6 @@ def home(request: Request, language: str = "az", q: str = "", category: str = ""
 
 
 def render_article_page(slug: str, request: Request, language: str = "az", db=Depends(get_db)):
-    publish_due_scheduled_articles(db)
     language = language if language in SUPPORTED_LANGUAGES else "az"
     article = find_published_article_by_slug(db, slug, language)
     if not article:
@@ -1497,9 +1487,9 @@ def render_article_page(slug: str, request: Request, language: str = "az", db=De
     view = localized_article_view(article, language)
     narration = db.query(ArticleNarration).filter(ArticleNarration.article_id == article.id, ArticleNarration.language == language).first()
     alt_links = {lang: article_url(lang, localized_slug(article, lang)) for lang in SUPPORTED_LANGUAGES}
-    related = db.query(Article).options(selectinload(Article.translations)).filter(Article.status == "published", Article.id != article.id, Article.category == article.category).order_by(Article.published_at.desc(), Article.created_at.desc()).limit(3).all()
+    related = db.query(Article).options(selectinload(Article.translations)).filter(public_article_visibility_filter(), Article.id != article.id, Article.category == article.category).order_by(public_article_datetime_expression().desc(), Article.created_at.desc()).limit(3).all()
     if len(related) < 3:
-        related = related + db.query(Article).options(selectinload(Article.translations)).filter(Article.status == "published", Article.id != article.id, Article.category != article.category).order_by(Article.published_at.desc(), Article.created_at.desc()).limit(3 - len(related)).all()
+        related = related + db.query(Article).options(selectinload(Article.translations)).filter(public_article_visibility_filter(), Article.id != article.id, Article.category != article.category).order_by(public_article_datetime_expression().desc(), Article.created_at.desc()).limit(3 - len(related)).all()
     related = attach_real_view_counts(db, related)
     canonical = canonical_url(request, f"{language}/{view.slug}")
     navigation = public_category_navigation(db)
@@ -1535,7 +1525,6 @@ def category_page(category: str, request: Request, db=Depends(get_db)):
 
 @app.get('/sitemap.xml')
 def sitemap(db=Depends(get_db)):
-    publish_due_scheduled_articles(db)
     base_url = settings.site_url.rstrip("/")
     url_entries = [
         f"<url><loc>{xml_escape(base_url + '/')}</loc><changefreq>hourly</changefreq><priority>1.0</priority></url>"
@@ -1544,13 +1533,13 @@ def sitemap(db=Depends(get_db)):
         f"<url><loc>{xml_escape(base_url + '/' + lang + '/')}</loc><changefreq>hourly</changefreq><priority>0.9</priority></url>"
         for lang in SUPPORTED_LANGUAGES
     )
-    articles = db.query(Article).options(selectinload(Article.translations)).filter(Article.status == 'published').order_by(Article.published_at.desc()).all()
+    articles = db.query(Article).options(selectinload(Article.translations)).filter(public_article_visibility_filter()).order_by(public_article_datetime_expression().desc()).all()
     for article in articles:
         for lang in SUPPORTED_LANGUAGES:
             if lang != "az" and not article_translation_complete(article, lang):
                 continue
             url = f"{base_url}{article_url(lang, localized_slug(article, lang))}"
-            lastmod = (article.updated_at or article.published_at or article.created_at)
+            lastmod = (article.updated_at or public_article_datetime(article))
             url_entries.append(
                 f"<url><loc>{xml_escape(url)}</loc><lastmod>{xml_escape(iso_datetime(lastmod))}</lastmod><changefreq>daily</changefreq><priority>0.8</priority></url>"
             )
@@ -1561,10 +1550,9 @@ def sitemap(db=Depends(get_db)):
 
 @app.get('/news-sitemap.xml')
 def news_sitemap(db=Depends(get_db)):
-    publish_due_scheduled_articles(db)
     base_url = settings.site_url.rstrip("/")
     news_cutoff = datetime.utcnow() - timedelta(days=2)
-    articles = db.query(Article).options(selectinload(Article.translations)).filter(Article.status == 'published', Article.published_at.isnot(None), Article.published_at >= news_cutoff).order_by(Article.published_at.desc()).limit(1000).all()
+    articles = db.query(Article).options(selectinload(Article.translations)).filter(public_article_visibility_filter(), public_article_datetime_expression() >= news_cutoff).order_by(public_article_datetime_expression().desc()).limit(1000).all()
     entries = []
     for article in articles:
         view = localized_article_view(article, "az")
@@ -1573,7 +1561,7 @@ def news_sitemap(db=Depends(get_db)):
             f"<loc>{xml_escape(base_url + article_url('az', article.slug or str(article.id)))}</loc>"
             "<news:news>"
             "<news:publication><news:name>VREYC</news:name><news:language>az</news:language></news:publication>"
-            f"<news:publication_date>{xml_escape(iso_datetime(article.published_at))}</news:publication_date>"
+            f"<news:publication_date>{xml_escape(iso_datetime(public_article_datetime(article)))}</news:publication_date>"
             f"<news:title>{xml_escape(view.title)}</news:title>"
             "</news:news>"
             "</url>"
@@ -1586,14 +1574,13 @@ def news_sitemap(db=Depends(get_db)):
 @app.get('/rss.xml')
 @app.get('/feed.xml')
 def rss_feed(db=Depends(get_db)):
-    publish_due_scheduled_articles(db)
     base_url = settings.site_url.rstrip("/")
-    articles = db.query(Article).options(selectinload(Article.translations)).filter(Article.status == 'published').order_by(Article.published_at.desc(), Article.created_at.desc()).limit(50).all()
+    articles = db.query(Article).options(selectinload(Article.translations)).filter(public_article_visibility_filter()).order_by(public_article_datetime_expression().desc(), Article.created_at.desc()).limit(50).all()
     items = []
     for article in articles:
         view = localized_article_view(article, "az")
         link = f"{base_url}{article_url('az', article.slug or str(article.id))}"
-        pub_date = format_datetime(article.published_at or article.created_at)
+        pub_date = format_datetime(public_article_datetime(article) or datetime.utcnow())
         enclosure = ""
         if uploaded_image_exists(article.image_url):
             enclosure = f'<enclosure url="{xml_escape(public_absolute_url(public_image_url(article.image_url)))}" type="image/jpeg" />'
@@ -1764,14 +1751,16 @@ def new_article_page(request: Request, db=Depends(get_db), _=Depends(require_aut
 @app.post('/admin/articles/new')
 async def create_article(request: Request, db=Depends(get_db), _=Depends(require_auth)):
     form = await request.form()
+    status = normalize_article_status(form.get('status'))
+    publish_at = parse_admin_datetime(form.get('publish_at'))
+    if not require_scheduled_publish_at(status, publish_at):
+        return RedirectResponse('/admin/articles/new?error=publish_at_required', status_code=302)
     uploaded_image = save_image_upload(form.get('hero_image'), form.get('hero_alt_text', ''))
     if uploaded_image:
         db.add(uploaded_image)
         db.flush()
     title = form.get('title_az') or form.get('title') or 'Untitled article'
     now = datetime.utcnow()
-    status = normalize_article_status(form.get('status'))
-    publish_at = parse_admin_datetime(form.get('publish_at'))
     article = Article(
         title=title,
         slug=unique_article_slug(db, form.get('slug_az') or title),
@@ -1869,6 +1858,10 @@ async def edit_article(article_id: int, request: Request, db=Depends(get_db), _=
     a = db.query(Article).get(article_id)
     if not a:
         return RedirectResponse('/admin/articles', status_code=302)
+    requested_status = normalize_article_status(form.get('status'))
+    requested_publish_at = parse_admin_datetime(form.get('publish_at'))
+    if not require_scheduled_publish_at(requested_status, requested_publish_at):
+        return RedirectResponse(f'/admin/articles/{article_id}/edit?error=publish_at_required', status_code=302)
     uploaded_image = save_image_upload(form.get('hero_image'), form.get('hero_alt_text', ''))
     if uploaded_image:
         db.add(uploaded_image)
@@ -1888,8 +1881,8 @@ async def edit_article(article_id: int, request: Request, db=Depends(get_db), _=
     a.image_url = uploaded_image.path if uploaded_image else form.get('image_url', '')
     a.category = form.get('category', '')
     old_status = a.status
-    a.status = normalize_article_status(form.get('status'))
-    a.publish_at = parse_admin_datetime(form.get('publish_at')) if a.status == 'scheduled' else None
+    a.status = requested_status
+    a.publish_at = requested_publish_at if a.status == 'scheduled' else None
     if a.status == 'scheduled':
         a.published_at = None
     a.narration_enabled = form.get('narration_enabled') == 'on'
