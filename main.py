@@ -481,6 +481,14 @@ def format_published_at(value):
     return value.strftime("%b %d, %Y") if value else ""
 
 
+def format_admin_datetime(value):
+    return value.strftime("%b %d, %Y %H:%M") if value else "—"
+
+
+def datetime_local_value(value):
+    return value.strftime("%Y-%m-%dT%H:%M") if value else ""
+
+
 def is_uploaded_file(value) -> bool:
     return bool(getattr(value, "filename", None)) and hasattr(value, "file")
 
@@ -659,6 +667,8 @@ def media_assets_for_display(db, query, page: int, per_page: int):
 
 
 templates.env.filters["format_published_at"] = format_published_at
+templates.env.filters["format_admin_datetime"] = format_admin_datetime
+templates.env.filters["datetime_local_value"] = datetime_local_value
 templates.env.filters["image_srcset"] = image_srcset
 templates.env.filters["public_image_url"] = public_image_url
 templates.env.filters["uploaded_image_exists"] = uploaded_image_exists
@@ -910,6 +920,54 @@ def iso_datetime(value: datetime | None) -> str:
     return value.isoformat() + "Z" if value else ""
 
 
+def parse_admin_datetime(value: str | None):
+    if not value:
+        return None
+    value = value.strip()
+    if not value:
+        return None
+    for fmt in ("%Y-%m-%dT%H:%M", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(value, fmt)
+        except ValueError:
+            continue
+    return None
+
+
+def normalize_article_status(value: str | None) -> str:
+    status = (value or "draft").strip().lower()
+    return status if status in {"draft", "published", "scheduled"} else "draft"
+
+
+def publish_due_scheduled_articles(db) -> int:
+    now = datetime.utcnow()
+    due_articles = (
+        db.query(Article)
+        .filter(Article.status == "scheduled", Article.publish_at.isnot(None), Article.publish_at <= now)
+        .order_by(Article.publish_at.asc(), Article.id.asc())
+        .all()
+    )
+    if not due_articles:
+        return 0
+    for article in due_articles:
+        article.status = "published"
+        article.published_at = article.published_at or article.publish_at or now
+        article.slug = article.slug or unique_article_slug(db, article.title, article.id)
+        article.updated_at = now
+        queue_narration(db, article)
+    touch_sitemap_refresh(db)
+    db.commit()
+    return len(due_articles)
+
+
+def scheduled_publish_job() -> None:
+    db = SessionLocal()
+    try:
+        publish_due_scheduled_articles(db)
+    finally:
+        db.close()
+
+
 def touch_sitemap_refresh(db) -> None:
     save_setting(db, "sitemap_last_refreshed_at", datetime.utcnow().isoformat())
 
@@ -1070,7 +1128,7 @@ def admin_article_categories(db) -> list[str]:
 
 def filtered_admin_article_query(db, search: str = "", status: str = "all", category: str = "", language: str = "", date_from: str = "", date_to: str = ""):
     query = db.query(Article).options(selectinload(Article.translations))
-    if status in {"draft", "published"}:
+    if status in {"draft", "published", "scheduled"}:
         query = query.filter(Article.status == status)
     if category:
         query = query.filter(Article.category == category)
@@ -1334,6 +1392,7 @@ def apply_schema_migrations(db) -> None:
         "ALTER TABLE articles ADD COLUMN is_trending BOOLEAN DEFAULT false",
         "ALTER TABLE articles ADD COLUMN homepage_order INTEGER DEFAULT 100",
         "ALTER TABLE articles ADD COLUMN view_count INTEGER DEFAULT 0",
+        "ALTER TABLE articles ADD COLUMN publish_at DATETIME",
         "ALTER TABLE article_translations ADD COLUMN slug VARCHAR(500)",
         "ALTER TABLE article_translations ADD COLUMN meta_description TEXT",
         "ALTER TABLE article_translations ADD COLUMN tags VARCHAR(500)",
@@ -1349,6 +1408,7 @@ def apply_schema_migrations(db) -> None:
             db.rollback()
     for statement in [
         "CREATE INDEX IF NOT EXISTS ix_articles_view_count ON articles (view_count)",
+        "CREATE INDEX IF NOT EXISTS ix_articles_publish_at ON articles (publish_at)",
         "CREATE INDEX IF NOT EXISTS ix_article_translations_article_id ON article_translations (article_id)",
         "CREATE INDEX IF NOT EXISTS ix_article_translations_language ON article_translations (language)",
         "CREATE INDEX IF NOT EXISTS ix_article_translations_slug ON article_translations (slug)",
@@ -1384,12 +1444,15 @@ def startup() -> None:
     db.close()
     scheduler.add_job(run_fetch_pipeline, "interval", minutes=max(13, min(17, settings.fetch_interval_min)), id="fetch_job", replace_existing=True)
     scheduler.add_job(generate_pending_narrations, "interval", seconds=45, id="narration_job", replace_existing=True)
-    scheduler.start()
+    scheduler.add_job(scheduled_publish_job, "interval", seconds=60, id="scheduled_publish_job", replace_existing=True)
+    if not scheduler.running:
+        scheduler.start()
 
 
 @app.get("/", response_class=HTMLResponse)
 @app.get("/{language}/", response_class=HTMLResponse)
 def home(request: Request, language: str = "az", q: str = "", category: str = "", db=Depends(get_db)):
+    publish_due_scheduled_articles(db)
     language = language if language in SUPPORTED_LANGUAGES else "az"
     ensure_categories(db)
     query = db.query(Article).options(selectinload(Article.translations)).filter(Article.status == "published")
@@ -1424,6 +1487,7 @@ def home(request: Request, language: str = "az", q: str = "", category: str = ""
 
 
 def render_article_page(slug: str, request: Request, language: str = "az", db=Depends(get_db)):
+    publish_due_scheduled_articles(db)
     language = language if language in SUPPORTED_LANGUAGES else "az"
     article = find_published_article_by_slug(db, slug, language)
     if not article:
@@ -1471,6 +1535,7 @@ def category_page(category: str, request: Request, db=Depends(get_db)):
 
 @app.get('/sitemap.xml')
 def sitemap(db=Depends(get_db)):
+    publish_due_scheduled_articles(db)
     base_url = settings.site_url.rstrip("/")
     url_entries = [
         f"<url><loc>{xml_escape(base_url + '/')}</loc><changefreq>hourly</changefreq><priority>1.0</priority></url>"
@@ -1496,6 +1561,7 @@ def sitemap(db=Depends(get_db)):
 
 @app.get('/news-sitemap.xml')
 def news_sitemap(db=Depends(get_db)):
+    publish_due_scheduled_articles(db)
     base_url = settings.site_url.rstrip("/")
     news_cutoff = datetime.utcnow() - timedelta(days=2)
     articles = db.query(Article).options(selectinload(Article.translations)).filter(Article.status == 'published', Article.published_at.isnot(None), Article.published_at >= news_cutoff).order_by(Article.published_at.desc()).limit(1000).all()
@@ -1520,6 +1586,7 @@ def news_sitemap(db=Depends(get_db)):
 @app.get('/rss.xml')
 @app.get('/feed.xml')
 def rss_feed(db=Depends(get_db)):
+    publish_due_scheduled_articles(db)
     base_url = settings.site_url.rstrip("/")
     articles = db.query(Article).options(selectinload(Article.translations)).filter(Article.status == 'published').order_by(Article.published_at.desc(), Article.created_at.desc()).limit(50).all()
     items = []
@@ -1592,6 +1659,13 @@ def logout(request: Request):
 def admin_dashboard(request: Request, db=Depends(get_db), _=Depends(require_auth)):
     drafts = db.query(Article).filter(Article.status == 'draft').count()
     published = db.query(Article).filter(Article.status == 'published').count()
+    scheduled = db.query(Article).filter(Article.status == 'scheduled').count()
+    next_scheduled_article = (
+        db.query(Article)
+        .filter(Article.status == 'scheduled', Article.publish_at.isnot(None))
+        .order_by(Article.publish_at.asc(), Article.created_at.asc(), Article.id.asc())
+        .first()
+    )
     total_articles = db.query(Article).count()
     categories = db.query(Category).count() or db.query(Article.category).filter(Article.category.isnot(None)).distinct().count()
     media_count = db.query(MediaAsset).count()
@@ -1607,7 +1681,7 @@ def admin_dashboard(request: Request, db=Depends(get_db), _=Depends(require_auth
     )
     most_viewed_articles = [setattr(article, "real_view_count", int(real_view_count or 0)) or article for article, real_view_count in most_viewed_articles]
     analytics = analytics_summary(db)
-    return templates.TemplateResponse('admin/dashboard.html', {'request': request, 'drafts': drafts, 'published': published, 'total_articles': total_articles, 'categories': categories, 'media_count': media_count, 'logs': logs, 'recent_articles': latest_articles, 'latest_articles': latest_articles, 'most_viewed_articles': most_viewed_articles, 'analytics': analytics, 'top_categories': top_category_rows(db), 'traffic_charts': traffic_charts(db), "languages": SUPPORTED_LANGUAGES, "ai_translation_status": ai_translation_status()})
+    return templates.TemplateResponse('admin/dashboard.html', {'request': request, 'drafts': drafts, 'published': published, 'scheduled': scheduled, 'next_scheduled_article': next_scheduled_article, 'total_articles': total_articles, 'categories': categories, 'media_count': media_count, 'logs': logs, 'recent_articles': latest_articles, 'latest_articles': latest_articles, 'most_viewed_articles': most_viewed_articles, 'analytics': analytics, 'top_categories': top_category_rows(db), 'traffic_charts': traffic_charts(db), "languages": SUPPORTED_LANGUAGES, "ai_translation_status": ai_translation_status()})
 
 
 @app.get('/admin/articles', response_class=HTMLResponse)
@@ -1659,6 +1733,7 @@ async def bulk_articles(request: Request, db=Depends(get_db), _=Depends(require_
     elif action == 'publish':
         for article in articles:
             article.status = 'published'
+            article.publish_at = None
             article.published_at = article.published_at or now
             article.slug = article.slug or unique_article_slug(db, article.title, article.id)
             article.updated_at = now
@@ -1667,6 +1742,7 @@ async def bulk_articles(request: Request, db=Depends(get_db), _=Depends(require_
     elif action == 'unpublish':
         for article in articles:
             article.status = 'draft'
+            article.publish_at = None
             article.updated_at = now
     elif action == 'category':
         new_category = form.get('bulk_category', '').strip()
@@ -1693,6 +1769,9 @@ async def create_article(request: Request, db=Depends(get_db), _=Depends(require
         db.add(uploaded_image)
         db.flush()
     title = form.get('title_az') or form.get('title') or 'Untitled article'
+    now = datetime.utcnow()
+    status = normalize_article_status(form.get('status'))
+    publish_at = parse_admin_datetime(form.get('publish_at'))
     article = Article(
         title=title,
         slug=unique_article_slug(db, form.get('slug_az') or title),
@@ -1703,13 +1782,14 @@ async def create_article(request: Request, db=Depends(get_db), _=Depends(require
         tags=form.get('tags_az', ''),
         image_url=uploaded_image.path if uploaded_image else form.get('image_url', ''),
         category=form.get('category', ''),
-        status=form.get('status', 'draft'),
+        status=status,
         language='az',
         narration_enabled=form.get('narration_enabled') == 'on',
         is_featured=form.get('is_featured') == 'on',
         is_trending=form.get('is_trending') == 'on',
         homepage_order=int(form.get('homepage_order') or 100),
-        published_at=datetime.utcnow() if form.get('status') == 'published' else None,
+        publish_at=publish_at if status == 'scheduled' else None,
+        published_at=now if status == 'published' else None,
     )
     db.add(article)
     db.flush()
@@ -1739,6 +1819,7 @@ def publish_article(article_id: int, request: Request, db=Depends(get_db), _=Dep
     a = db.query(Article).get(article_id)
     if a:
         a.status = 'published'
+        a.publish_at = None
         a.published_at = a.published_at or datetime.utcnow()
         a.slug = a.slug or unique_article_slug(db, a.title, a.id)
         a.updated_at = datetime.utcnow()
@@ -1756,6 +1837,7 @@ def unpublish_article(article_id: int, request: Request, db=Depends(get_db), _=D
     a = db.query(Article).get(article_id)
     if a:
         a.status = 'draft'
+        a.publish_at = None
         a.updated_at = datetime.utcnow()
         db.commit()
     return RedirectResponse('/admin/articles?status=draft', status_code=302)
@@ -1806,7 +1888,10 @@ async def edit_article(article_id: int, request: Request, db=Depends(get_db), _=
     a.image_url = uploaded_image.path if uploaded_image else form.get('image_url', '')
     a.category = form.get('category', '')
     old_status = a.status
-    a.status = form.get('status', 'draft')
+    a.status = normalize_article_status(form.get('status'))
+    a.publish_at = parse_admin_datetime(form.get('publish_at')) if a.status == 'scheduled' else None
+    if a.status == 'scheduled':
+        a.published_at = None
     a.narration_enabled = form.get('narration_enabled') == 'on'
     a.is_featured = form.get('is_featured') == 'on'
     a.is_trending = form.get('is_trending') == 'on'

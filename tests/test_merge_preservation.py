@@ -228,3 +228,69 @@ def test_admin_analytics_use_only_real_article_views_table():
     assert "Fake high counter article" in article_list.text
     assert "Fake low counter article" in article_list.text
     assert "650" not in article_list.text
+
+
+def test_scheduled_articles_stay_hidden_until_publish_at_then_auto_publish():
+    seed_merge_feature_data()
+    db = SessionLocal()
+    try:
+        future = datetime.utcnow() + timedelta(days=1)
+        past = datetime.utcnow() - timedelta(minutes=5)
+        if not db.query(Article).filter(Article.original_hash == "scheduled-future").first():
+            db.add(
+                Article(
+                    original_hash="scheduled-future",
+                    title="Future scheduled article",
+                    slug="future-scheduled-article",
+                    summary="Hidden until its scheduled publish time.",
+                    content="Future scheduled body.",
+                    category="Technology",
+                    language="az",
+                    status="scheduled",
+                    publish_at=future,
+                )
+            )
+        if not db.query(Article).filter(Article.original_hash == "scheduled-due").first():
+            db.add(
+                Article(
+                    original_hash="scheduled-due",
+                    title="Due scheduled article",
+                    slug="due-scheduled-article",
+                    summary="Visible once the request-time scheduler runs.",
+                    content="Due scheduled body.",
+                    category="Technology",
+                    language="az",
+                    status="scheduled",
+                    publish_at=past,
+                )
+            )
+        db.commit()
+    finally:
+        db.close()
+
+    with TestClient(app) as client:
+        home = client.get("/")
+        assert home.status_code == 200
+        assert "Due scheduled article" in home.text
+        assert "Future scheduled article" not in home.text
+
+        rss = client.get("/rss.xml")
+        assert rss.status_code == 200
+        assert "Due scheduled article" in rss.text
+        assert "Future scheduled article" not in rss.text
+
+        sitemap = client.get("/sitemap.xml")
+        assert sitemap.status_code == 200
+        assert "due-scheduled-article" in sitemap.text
+        assert "future-scheduled-article" not in sitemap.text
+
+        db = SessionLocal()
+        try:
+            due = db.query(Article).filter(Article.original_hash == "scheduled-due").one()
+            future = db.query(Article).filter(Article.original_hash == "scheduled-future").one()
+            assert due.status == "published"
+            assert due.published_at is not None
+            assert future.status == "scheduled"
+            assert future.published_at is None
+        finally:
+            db.close()

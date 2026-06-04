@@ -59,7 +59,8 @@
   </section>
   <aside class="panel editor-side">
     <h2>Publishing</h2>
-    <label>Status<select name="status"><option value="draft" {{ 'selected' if not article or article.status == 'draft' else '' }}>Draft</option><option value="published" {{ 'selected' if article and article.status == 'published' else '' }}>Published</option></select></label>
+    <label>Status<select name="status"><option value="draft" {{ 'selected' if not article or article.status == 'draft' else '' }}>Draft</option><option value="published" {{ 'selected' if article and article.status == 'published' else '' }}>Published</option><option value="scheduled" {{ 'selected' if article and article.status == 'scheduled' else '' }}>Scheduled</option></select></label>
+    <label>Publish at<input name="publish_at" type="datetime-local" value="{{ article.publish_at|datetime_local_value if article else '' }}"><small class="muted">Server time. Required when status is Scheduled; scheduled articles stay hidden until this time.</small></label>
     <label>Category<select name="category"><option value="">Uncategorized</option>{% for c in categories %}<option value="{{ c.name }}" {{ 'selected' if article and article.category == c.name else '' }}>{{ c.name }}</option>{% endfor %}</select></label>
     <div class="hero-upload-panel">
       <label>Hero image URL<input id="heroImageUrl" name="image_url" value="{{ article.image_url if article else '' }}" placeholder="/static/uploads/images/image.jpg"></label>
