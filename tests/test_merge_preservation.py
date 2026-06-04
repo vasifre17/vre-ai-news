@@ -230,40 +230,43 @@ def test_admin_analytics_use_only_real_article_views_table():
     assert "650" not in article_list.text
 
 
-def test_scheduled_articles_use_request_time_visibility_without_status_mutation():
+def test_scheduled_articles_auto_publish_when_due_and_stay_hidden_before_publish_at():
     seed_merge_feature_data()
     db = SessionLocal()
     try:
         future = datetime.utcnow() + timedelta(days=1)
         past = datetime.utcnow() - timedelta(minutes=5)
-        if not db.query(Article).filter(Article.original_hash == "scheduled-future").first():
-            db.add(
-                Article(
-                    original_hash="scheduled-future",
-                    title="Future scheduled article",
-                    slug="future-scheduled-article",
-                    summary="Hidden until its scheduled publish time.",
-                    content="Future scheduled body.",
-                    category="Technology",
-                    language="az",
-                    status="scheduled",
-                    publish_at=future,
-                )
+        future_article = db.query(Article).filter(Article.original_hash == "scheduled-future").first()
+        if not future_article:
+            future_article = Article(
+                original_hash="scheduled-future",
+                title="Future scheduled article",
+                slug="future-scheduled-article",
+                summary="Hidden until its scheduled publish time.",
+                content="Future scheduled body.",
+                category="Technology",
+                language="az",
             )
-        if not db.query(Article).filter(Article.original_hash == "scheduled-due").first():
-            db.add(
-                Article(
-                    original_hash="scheduled-due",
-                    title="Due scheduled article",
-                    slug="due-scheduled-article",
-                    summary="Visible once publish_at is due without mutating status.",
-                    content="Due scheduled body.",
-                    category="Technology",
-                    language="az",
-                    status="scheduled",
-                    publish_at=past,
-                )
+            db.add(future_article)
+        future_article.status = "scheduled"
+        future_article.publish_at = future
+        future_article.published_at = None
+
+        due_article = db.query(Article).filter(Article.original_hash == "scheduled-due").first()
+        if not due_article:
+            due_article = Article(
+                original_hash="scheduled-due",
+                title="Due scheduled article",
+                slug="due-scheduled-article",
+                summary="Visible once publish_at is due after status changes.",
+                content="Due scheduled body.",
+                category="Technology",
+                language="az",
             )
+            db.add(due_article)
+        due_article.status = "scheduled"
+        due_article.publish_at = past
+        due_article.published_at = None
         db.commit()
     finally:
         db.close()
@@ -294,12 +297,21 @@ def test_scheduled_articles_use_request_time_visibility_without_status_mutation(
         assert "Due scheduled article" in news_sitemap.text
         assert "Future scheduled article" not in news_sitemap.text
 
+        login(client)
+        admin_articles = client.get("/admin/articles")
+        assert admin_articles.status_code == 200
+        assert "Due scheduled article" in admin_articles.text
+        assert "Published" in admin_articles.text
+        dashboard = client.get("/admin")
+        assert dashboard.status_code == 200
+
         db = SessionLocal()
         try:
             due = db.query(Article).filter(Article.original_hash == "scheduled-due").one()
             future = db.query(Article).filter(Article.original_hash == "scheduled-future").one()
-            assert due.status == "scheduled"
-            assert due.published_at is None
+            assert due.status == "published"
+            assert due.published_at == due.publish_at
+            assert due.updated_at is not None
             assert future.status == "scheduled"
             assert future.published_at is None
         finally:
