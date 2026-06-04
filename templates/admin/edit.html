@@ -63,6 +63,7 @@
     <label>Category<select name="category"><option value="">Uncategorized</option>{% for c in categories %}<option value="{{ c.name }}" {{ 'selected' if article and article.category == c.name else '' }}>{{ c.name }}</option>{% endfor %}</select></label>
     <div class="hero-upload-panel">
       <label>Hero image URL<input id="heroImageUrl" name="image_url" value="{{ article.image_url if article else '' }}" placeholder="/static/uploads/images/image.jpg"></label>
+      <button class="btn full" type="button" id="openMediaPicker">Select from Media Library</button>
       <label>Upload hero image<input id="heroImageFile" name="hero_image" type="file" accept="image/jpeg,image/png,image/webp,image/gif"></label>
       <label>Image alt text<input name="hero_alt_text" value="{{ article.title if article else '' }}" placeholder="Describe the image for accessibility"></label>
       <div class="admin-image-preview" data-empty="VREYC">
@@ -84,19 +85,60 @@
     {% if article %}<hr><h3>Narration</h3><p class="muted">Status: {{ narration.status if narration else 'pending' }}</p><div class="actions vertical"><form method="post" action="/admin/articles/{{ article.id }}/narration/regenerate"><button class="btn small" type="submit">Regenerate</button></form><form method="post" action="/admin/articles/{{ article.id }}/narration/delete"><button class="btn small danger" type="submit">Delete narration</button></form></div>{% if narration and narration.audio_path %}<audio controls src="{{ narration.audio_path }}"></audio>{% endif %}{% endif %}
   </aside>
 </form>
+<div class="media-picker-modal" id="mediaPickerModal" hidden>
+  <div class="media-picker-backdrop" data-close-media-picker></div>
+  <section class="media-picker-dialog" role="dialog" aria-modal="true" aria-labelledby="mediaPickerTitle">
+    <div class="panel-head wrap">
+      <div><h2 id="mediaPickerTitle">Select from Media Library</h2><p class="muted">Search uploaded images and click one to fill the Hero Image URL field.</p></div>
+      <button class="btn small" type="button" data-close-media-picker>Close</button>
+    </div>
+    <label>Search media<input id="mediaPickerSearch" placeholder="Search filename"></label>
+    <div class="media-picker-grid" id="mediaPickerGrid">
+      {% for row in media_picker_assets %}
+      <button class="media-picker-item" type="button" data-url="{{ row.absolute_url }}" data-public-path="{{ row.public_path }}" data-filename="{{ row.asset.filename|lower }}">
+        {% if row.public_path|uploaded_image_exists %}<img src="{{ row.public_path }}" alt="{{ row.asset.alt_text or row.asset.filename }}">{% else %}<span class="image-placeholder compact">VREYC</span>{% endif %}
+        <strong>{{ row.asset.filename }}</strong>
+      </button>
+      {% else %}
+      <p class="muted">No media assets uploaded yet.</p>
+      {% endfor %}
+    </div>
+  </section>
+</div>
 <script>
 (() => {
   const file = document.getElementById('heroImageFile');
   const preview = document.getElementById('heroPreview');
   const placeholder = document.getElementById('heroPreviewPlaceholder');
-  if (!file || !preview) return;
-  file.addEventListener('change', () => {
+  if (!preview) return;
+  if (file) file.addEventListener('change', () => {
     const selected = file.files && file.files[0];
     if (!selected) return;
     preview.src = URL.createObjectURL(selected);
     preview.hidden = false;
     if (placeholder) placeholder.hidden = true;
   });
+  const modal = document.getElementById('mediaPickerModal');
+  const openButton = document.getElementById('openMediaPicker');
+  const heroUrl = document.getElementById('heroImageUrl');
+  const search = document.getElementById('mediaPickerSearch');
+  const items = Array.from(document.querySelectorAll('.media-picker-item'));
+  const openModal = () => { if (modal) { modal.hidden = false; search && search.focus(); } };
+  const closeModal = () => { if (modal) modal.hidden = true; };
+  if (openButton) openButton.addEventListener('click', openModal);
+  document.querySelectorAll('[data-close-media-picker]').forEach((button) => button.addEventListener('click', closeModal));
+  if (search) search.addEventListener('input', () => {
+    const value = search.value.trim().toLowerCase();
+    items.forEach((item) => { item.hidden = value && !item.dataset.filename.includes(value); });
+  });
+  items.forEach((item) => item.addEventListener('click', () => {
+    const selectedUrl = item.dataset.url;
+    heroUrl.value = selectedUrl;
+    preview.src = item.dataset.publicPath || selectedUrl;
+    preview.hidden = false;
+    if (placeholder) placeholder.hidden = true;
+    closeModal();
+  }));
 })();
 </script>
 <script>

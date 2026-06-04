@@ -1,32 +1,90 @@
 {% extends "admin/_base.html" %}
 {% set title = 'Media Library | VREYC Admin' %}
-{% set heading = 'Media upload library' %}
+{% set heading = 'Media Library' %}
 {% block content %}
-<section class="panel">
-  <div class="panel-head wrap"><div><h2>Upload images</h2><p class="muted">Upload JPG, PNG, WEBP or GIF assets for article hero media. Files are stored in the persistent uploads mount with responsive WEBP sizes.</p></div></div>
-  <form method="post" enctype="multipart/form-data" class="upload-box">
-    <input name="file" type="file" accept="image/jpeg,image/png,image/webp,image/gif" required>
-    <input name="alt_text" placeholder="Alt text / caption">
-    <button class="btn primary" type="submit">Upload image</button>
+{% if request.query_params.get('warning') == 'used' %}<div class="alert warning">This image is used by articles and cannot be deleted.</div>{% endif %}
+<section class="panel media-upload-panel">
+  <div class="panel-head wrap"><div><h2>Upload images</h2><p class="muted">Upload JPG, JPEG, PNG or WEBP assets. Files are stored in {{ upload_dir }} with safe unique filenames and responsive WEBP sizes.</p></div></div>
+  <form method="post" enctype="multipart/form-data" class="upload-box media-dropzone" id="mediaUploadForm">
+    <label class="drop-area" id="mediaDropArea">
+      <input id="mediaFiles" name="files" type="file" accept="image/jpeg,image/png,image/webp" multiple required>
+      <span>Drag and drop images here</span>
+      <small>or click to select multiple files</small>
+    </label>
+    <input name="alt_text" placeholder="Alt text / caption for uploaded images">
+    <button class="btn primary" type="submit">Upload selected images</button>
+    <p class="upload-hint" id="mediaFileSummary">No files selected.</p>
   </form>
 </section>
-<section class="media-grid">
-  {% for asset in assets %}
-  <article class="media-card">
-    <div class="media-preview">{% if asset.content_type and asset.content_type.startswith('image') and asset.path|uploaded_image_exists %}{% set media_srcset = asset.path|image_srcset %}<img src="{{ asset.path|public_image_url }}" {% if media_srcset %}srcset="{{ media_srcset }}" sizes="260px"{% endif %} alt="{{ asset.alt_text or asset.filename }}">{% elif asset.content_type and asset.content_type.startswith('image') %}<div class="image-placeholder compact">VREYC</div>{% else %}<span>{{ asset.content_type or 'file' }}</span>{% endif %}</div>
-    <div><strong>{{ asset.filename }}</strong><code>{{ asset.path }}</code><p>{{ asset.alt_text or 'No alt text' }}</p><small>{{ (asset.size_bytes or 0) // 1024 }} KB{% if asset.content_type and asset.content_type.startswith('image') and not asset.path|uploaded_image_exists %} · missing file{% endif %}</small></div>
-    <div class="actions"><button class="btn small copy-path" type="button" data-path="{{ asset.path }}">Copy URL</button></div>
-    <form method="post" action="/admin/media/{{ asset.id }}/delete" onsubmit="return confirm('Delete media asset?')"><button class="btn small danger">Delete</button></form>
+
+<section class="panel">
+  <div class="panel-head wrap"><div><h2>Assets</h2><p class="muted">{{ total }} file{{ '' if total == 1 else 's' }} in the media library.</p></div></div>
+  <form method="get" action="/admin/media" class="article-filters media-filters">
+    <label class="search-field">Search filename<input name="q" value="{{ filters.q }}" placeholder="example.jpg"></label>
+    <label>Uploaded from<input name="date_from" type="date" value="{{ filters.date_from }}"></label>
+    <label>Uploaded to<input name="date_to" type="date" value="{{ filters.date_to }}"></label>
+    <label>Sort<select name="sort"><option value="newest" {{ 'selected' if filters.sort != 'oldest' else '' }}>Newest first</option><option value="oldest" {{ 'selected' if filters.sort == 'oldest' else '' }}>Oldest first</option></select></label>
+    <div class="filter-actions"><button class="btn primary" type="submit">Apply</button><a class="btn" href="/admin/media">Reset</a></div>
+  </form>
+</section>
+
+<section class="media-grid professional-media-grid">
+  {% for row in media_rows %}
+  {% set asset = row.asset %}
+  <article class="media-card professional-media-card">
+    <a class="media-preview" href="{{ row.absolute_url }}" target="_blank" aria-label="Preview {{ asset.filename }}">
+      {% if (asset.mime_type or asset.content_type) and (asset.mime_type or asset.content_type).startswith('image') and row.public_path|uploaded_image_exists %}{% set media_srcset = row.public_path|image_srcset %}<img src="{{ row.public_path }}" {% if media_srcset %}srcset="{{ media_srcset }}" sizes="320px"{% endif %} alt="{{ asset.alt_text or asset.filename }}">{% elif (asset.mime_type or asset.content_type) and (asset.mime_type or asset.content_type).startswith('image') %}<div class="image-placeholder compact">VREYC</div>{% else %}<span>{{ asset.mime_type or asset.content_type or 'file' }}</span>{% endif %}
+    </a>
+    <div class="media-card-body">
+      <strong title="{{ asset.filename }}">{{ asset.filename }}</strong>
+      <dl class="media-meta">
+        <div><dt>Size</dt><dd>{% set bytes = asset.size_bytes or 0 %}{% if bytes >= 1048576 %}{{ '%.1f'|format(bytes / 1048576) }} MB{% else %}{{ ((bytes + 1023) // 1024) }} KB{% endif %}</dd></div>
+        <div><dt>Uploaded</dt><dd>{{ asset.created_at|format_published_at }}</dd></div>
+        {% if asset.width and asset.height %}<div><dt>Dimensions</dt><dd>{{ asset.width }}×{{ asset.height }}</dd></div>{% endif %}
+        <div><dt>Usage</dt><dd>Used in {{ row.usage_count }} article{{ '' if row.usage_count == 1 else 's' }}</dd></div>
+      </dl>
+      <label class="public-url-label">Public URL<input readonly value="{{ row.absolute_url }}" aria-label="Public URL for {{ asset.filename }}"></label>
+      {% if (asset.mime_type or asset.content_type) and (asset.mime_type or asset.content_type).startswith('image') and not row.public_path|uploaded_image_exists %}<p class="alert warning compact">File is missing from uploads.</p>{% endif %}
+      {% if row.usage_count > 0 %}<p class="media-delete-warning">This image is used by articles and cannot be deleted.</p>{% endif %}
+    </div>
+    <div class="actions media-actions">
+      <a class="btn small" href="{{ row.absolute_url }}" target="_blank">Preview</a>
+      <button class="btn small copy-path" type="button" data-url="{{ row.absolute_url }}">Copy URL</button>
+      {% if row.usage_count > 0 %}
+      <button class="btn small danger disabled" type="button" title="This image is used by articles and cannot be deleted.">Delete</button>
+      {% else %}
+      <form method="post" action="/admin/media/{{ asset.id }}/delete" onsubmit="return confirm('Delete this unused media asset?')"><button class="btn small danger" type="submit">Delete</button></form>
+      {% endif %}
+    </div>
   </article>
   {% else %}
-  <div class="panel"><p class="muted">No media assets uploaded yet.</p></div>
+  <div class="panel"><p class="muted">No media assets match your filters.</p></div>
   {% endfor %}
 </section>
+
+<nav class="pagination" aria-label="Media pagination">
+  <a class="btn {{ 'disabled' if page <= 1 else '' }}" href="/admin/media?q={{ filters.q }}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}&sort={{ filters.sort }}&page={{ page - 1 }}">Previous</a>
+  <span class="muted">Page {{ page }} of {{ total_pages }}</span>
+  <a class="btn {{ 'disabled' if page >= total_pages else '' }}" href="/admin/media?q={{ filters.q }}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}&sort={{ filters.sort }}&page={{ page + 1 }}">Next</a>
+</nav>
 <script>
 (() => {
+  const fileInput = document.getElementById('mediaFiles');
+  const summary = document.getElementById('mediaFileSummary');
+  const dropArea = document.getElementById('mediaDropArea');
+  const updateSummary = () => {
+    const files = Array.from(fileInput.files || []);
+    summary.textContent = files.length ? `${files.length} file${files.length === 1 ? '' : 's'} selected: ${files.map((file) => file.name).join(', ')}` : 'No files selected.';
+  };
+  if (fileInput) fileInput.addEventListener('change', updateSummary);
+  if (dropArea && fileInput) {
+    ['dragenter', 'dragover'].forEach((eventName) => dropArea.addEventListener(eventName, (event) => { event.preventDefault(); dropArea.classList.add('is-dragging'); }));
+    ['dragleave', 'drop'].forEach((eventName) => dropArea.addEventListener(eventName, (event) => { event.preventDefault(); dropArea.classList.remove('is-dragging'); }));
+    dropArea.addEventListener('drop', (event) => { fileInput.files = event.dataTransfer.files; updateSummary(); });
+  }
   document.querySelectorAll('.copy-path').forEach((button) => {
     button.addEventListener('click', async () => {
-      await navigator.clipboard.writeText(button.dataset.path);
+      await navigator.clipboard.writeText(button.dataset.url);
       button.textContent = 'Copied';
       setTimeout(() => { button.textContent = 'Copy URL'; }, 1200);
     });

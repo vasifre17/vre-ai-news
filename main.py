@@ -47,7 +47,8 @@ UPLOAD_DIR = Path(settings.image_upload_dir)
 UPLOAD_URL_PREFIX = settings.image_upload_url_prefix
 LEGACY_UPLOAD_DIRS = (Path("uploads"), Path("static/uploads/images"), Path("/app/static/uploads/images"))
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
-ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+UPLOAD_IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
+ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
 IMAGE_VARIANT_WIDTHS = (480, 960, 1440)
 APP_VERSION = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
 
@@ -565,23 +566,36 @@ def preserve_legacy_uploads() -> None:
                 shutil.copy2(source, target)
 
 
+def safe_media_filename(original_name: str) -> str:
+    stem = slugify(Path(original_name or "image").stem) or "image"
+    suffix = Path(original_name or "image.jpg").suffix.lower() or ".jpg"
+    if suffix == ".jpe":
+        suffix = ".jpg"
+    return f"{stem}-{uuid4().hex[:12]}{suffix}"
+
+
 def save_image_upload(file, alt_text: str = "") -> MediaAsset | None:
     if not is_uploaded_file(file):
         return None
     content_type = file.content_type or ""
     if content_type not in ALLOWED_IMAGE_TYPES:
-        raise HTTPException(status_code=400, detail="Only JPG, PNG, WEBP and GIF images can be uploaded.")
+        raise HTTPException(status_code=400, detail="Only JPG, PNG and WEBP images can be uploaded.")
     ensure_upload_dir()
     original_name = Path(file.filename or "image").name
     suffix = Path(original_name).suffix.lower() or ".jpg"
-    safe_root = uuid4().hex
-    target = UPLOAD_DIR / f"{safe_root}{suffix}"
+    if suffix not in UPLOAD_IMAGE_SUFFIXES:
+        raise HTTPException(status_code=400, detail="Only JPG, PNG and WEBP images can be uploaded.")
+    target = UPLOAD_DIR / safe_media_filename(original_name)
+    while target.exists():
+        target = UPLOAD_DIR / safe_media_filename(original_name)
+    safe_root = target.stem
     with target.open("wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
     try:
         with Image.open(target) as img:
             img.verify()
         with Image.open(target) as img:
+            image_width, image_height = img.size
             image = img.convert("RGB") if img.mode not in {"RGB", "RGBA"} else img.copy()
             for width in IMAGE_VARIANT_WIDTHS:
                 if img.width <= width:
@@ -591,17 +605,57 @@ def save_image_upload(file, alt_text: str = "") -> MediaAsset | None:
                 variant = image.copy()
                 variant.thumbnail((width, height), Image.Resampling.LANCZOS)
                 variant.save(UPLOAD_DIR / f"{safe_root}-{width}.webp", "WEBP", quality=82, method=6)
-    except (UnidentifiedImageError, OSError):
+    except (UnidentifiedImageError, OSError, SyntaxError):
         target.unlink(missing_ok=True)
         raise HTTPException(status_code=400, detail="Uploaded file is not a valid image.")
     stat = target.stat()
     return MediaAsset(
         filename=original_name,
         path=f"{UPLOAD_URL_PREFIX}/{target.name}",
+        url=f"{UPLOAD_URL_PREFIX}/{target.name}",
         content_type=content_type,
+        mime_type=content_type,
         size_bytes=stat.st_size,
+        width=image_width,
+        height=image_height,
         alt_text=alt_text,
     )
+
+
+def media_asset_public_path(asset: MediaAsset | None) -> str:
+    if not asset:
+        return ""
+    return public_image_url(getattr(asset, "url", None) or getattr(asset, "path", None))
+
+
+def media_asset_absolute_url(asset: MediaAsset | None) -> str:
+    return public_absolute_url(media_asset_public_path(asset))
+
+
+def media_usage_count(db, asset: MediaAsset) -> int:
+    public_path = media_asset_public_path(asset)
+    if not public_path:
+        return 0
+    values = {public_path, media_asset_absolute_url(asset)}
+    raw_values = [getattr(asset, "path", None), getattr(asset, "url", None)]
+    values.update(value for value in raw_values if value)
+    values.update(public_image_url(value) for value in raw_values if value)
+    return db.query(Article).filter(Article.image_url.in_(values)).count()
+
+
+def media_assets_for_display(db, query, page: int, per_page: int):
+    total = query.count()
+    assets = query.offset((page - 1) * per_page).limit(per_page).all()
+    rows = []
+    for asset in assets:
+        public_path = media_asset_public_path(asset)
+        rows.append(SimpleNamespace(
+            asset=asset,
+            public_path=public_path,
+            absolute_url=public_absolute_url(public_path),
+            usage_count=media_usage_count(db, asset),
+        ))
+    return total, rows
 
 
 templates.env.filters["format_published_at"] = format_published_at
@@ -1247,7 +1301,9 @@ def article_form_context(db, article: Article | None = None) -> dict:
         names = [c[0] for c in db.query(Article.category).filter(Article.category.isnot(None)).distinct().all() if c[0]]
         categories = [Category(name=name, slug=slugify(name), description="") for name in names]
     translations = {lang: get_translation(article, lang) for lang in SUPPORTED_LANGUAGES} if article else {lang: None for lang in SUPPORTED_LANGUAGES}
-    return {"categories": categories, "languages": SUPPORTED_LANGUAGES, "language_labels": LANGUAGE_LABELS, "translations": translations, "ai_translation_status": ai_translation_status()}
+    picker_assets = db.query(MediaAsset).order_by(MediaAsset.created_at.desc()).limit(80).all()
+    picker_rows = [SimpleNamespace(asset=asset, public_path=media_asset_public_path(asset), absolute_url=media_asset_absolute_url(asset)) for asset in picker_assets]
+    return {"categories": categories, "languages": SUPPORTED_LANGUAGES, "language_labels": LANGUAGE_LABELS, "translations": translations, "ai_translation_status": ai_translation_status(), "media_picker_assets": picker_rows}
 
 
 
@@ -1269,6 +1325,7 @@ def apply_schema_migrations(db) -> None:
     # article storage existed, then add any newly introduced nullable columns.
     ArticleTranslation.__table__.create(bind=db.get_bind(), checkfirst=True)
     ArticleView.__table__.create(bind=db.get_bind(), checkfirst=True)
+    MediaAsset.__table__.create(bind=db.get_bind(), checkfirst=True)
     for statement in [
         "ALTER TABLE articles ADD COLUMN slug VARCHAR(500)",
         "ALTER TABLE articles ADD COLUMN narration_enabled BOOLEAN DEFAULT true",
@@ -1280,6 +1337,10 @@ def apply_schema_migrations(db) -> None:
         "ALTER TABLE article_translations ADD COLUMN slug VARCHAR(500)",
         "ALTER TABLE article_translations ADD COLUMN meta_description TEXT",
         "ALTER TABLE article_translations ADD COLUMN tags VARCHAR(500)",
+        "ALTER TABLE media_assets ADD COLUMN url VARCHAR(1000)",
+        "ALTER TABLE media_assets ADD COLUMN mime_type VARCHAR(120)",
+        "ALTER TABLE media_assets ADD COLUMN width INTEGER",
+        "ALTER TABLE media_assets ADD COLUMN height INTEGER",
     ]:
         try:
             db.execute(text(statement))
@@ -1297,6 +1358,8 @@ def apply_schema_migrations(db) -> None:
         "CREATE INDEX IF NOT EXISTS ix_article_views_viewed_at ON article_views (viewed_at)",
         "CREATE INDEX IF NOT EXISTS ix_article_views_visitor_key ON article_views (visitor_key)",
         "CREATE INDEX IF NOT EXISTS ix_article_views_traffic_source ON article_views (traffic_source)",
+        "UPDATE media_assets SET url = path WHERE url IS NULL OR url = ''",
+        "UPDATE media_assets SET mime_type = content_type WHERE mime_type IS NULL OR mime_type = ''",
     ]:
         try:
             db.execute(text(statement))
@@ -1859,17 +1922,39 @@ def delete_category(category_id: int, request: Request, db=Depends(get_db), _=De
 
 
 @app.get('/admin/media', response_class=HTMLResponse)
-def media_page(request: Request, db=Depends(get_db), _=Depends(require_auth)):
-    assets = db.query(MediaAsset).order_by(MediaAsset.created_at.desc()).all()
-    return templates.TemplateResponse('admin/media.html', {'request': request, 'assets': assets})
+def media_page(request: Request, q: str = '', date_from: str = '', date_to: str = '', sort: str = 'newest', page: int = 1, db=Depends(get_db), _=Depends(require_auth)):
+    page = max(1, page)
+    per_page = 24
+    query = db.query(MediaAsset)
+    if q.strip():
+        query = query.filter(MediaAsset.filename.ilike(f"%{q.strip()}%"))
+    if date_from.strip():
+        try:
+            query = query.filter(MediaAsset.created_at >= datetime.fromisoformat(date_from.strip()))
+        except ValueError:
+            pass
+    if date_to.strip():
+        try:
+            query = query.filter(MediaAsset.created_at < datetime.fromisoformat(date_to.strip()) + timedelta(days=1))
+        except ValueError:
+            pass
+    query = query.order_by(MediaAsset.created_at.asc() if sort == 'oldest' else MediaAsset.created_at.desc())
+    total, media_rows = media_assets_for_display(db, query, page, per_page)
+    total_pages = max(1, (total + per_page - 1) // per_page)
+    filters = {'q': q, 'date_from': date_from, 'date_to': date_to, 'sort': sort}
+    return templates.TemplateResponse('admin/media.html', {'request': request, 'media_rows': media_rows, 'assets': [row.asset for row in media_rows], 'filters': filters, 'page': page, 'per_page': per_page, 'total': total, 'total_pages': total_pages, 'upload_dir': str(UPLOAD_DIR)})
 
 
 @app.post('/admin/media')
-async def upload_media(request: Request, file: UploadFile = File(...), alt_text: str = Form(''), db=Depends(get_db), _=Depends(require_auth)):
-    asset = save_image_upload(file, alt_text)
-    if asset:
-        db.add(asset)
-        db.commit()
+async def upload_media(request: Request, files: list[UploadFile] = File(default=[]), file: UploadFile | None = File(default=None), alt_text: str = Form(''), db=Depends(get_db), _=Depends(require_auth)):
+    uploads = [upload for upload in (files or []) if is_uploaded_file(upload)]
+    if is_uploaded_file(file):
+        uploads.append(file)
+    for upload in uploads:
+        asset = save_image_upload(upload, alt_text)
+        if asset:
+            db.add(asset)
+    db.commit()
     return RedirectResponse('/admin/media', status_code=302)
 
 
@@ -1877,7 +1962,10 @@ async def upload_media(request: Request, file: UploadFile = File(...), alt_text:
 def delete_media(asset_id: int, request: Request, db=Depends(get_db), _=Depends(require_auth)):
     asset = db.query(MediaAsset).get(asset_id)
     if asset:
-        local_path = local_uploaded_image_path(asset.path) or Path(asset.path.lstrip('/'))
+        if media_usage_count(db, asset) > 0:
+            return RedirectResponse('/admin/media?warning=used', status_code=302)
+        public_path = media_asset_public_path(asset)
+        local_path = local_uploaded_image_path(public_path) or Path(public_path.lstrip('/'))
         if local_path.exists() and local_path.is_file():
             local_path.unlink()
         for width in IMAGE_VARIANT_WIDTHS:
