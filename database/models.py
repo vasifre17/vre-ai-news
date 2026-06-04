@@ -120,8 +120,12 @@ class MediaAsset(Base):
     id = Column(Integer, primary_key=True)
     filename = Column(String(500))
     path = Column(String(1000), unique=True)
+    url = Column(String(1000), unique=True)
     content_type = Column(String(120))
+    mime_type = Column(String(120))
     size_bytes = Column(Integer, default=0)
+    width = Column(Integer)
+    height = Column(Integer)
     alt_text = Column(String(500))
     created_at = Column(DateTime, default=datetime.utcnow)
 

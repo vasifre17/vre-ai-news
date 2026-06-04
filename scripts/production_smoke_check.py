@@ -113,7 +113,21 @@ def main() -> int:
     dashboard.raise_for_status()
     assert_contains(dashboard.text, "VREYC Admin Dashboard", "admin dashboard")
 
-    print("Production smoke checks passed: multilingual, image fallback, AI audio narration, SEO, sitemap, robots, and admin auth.")
+    media_page = client.get("/admin/media")
+    media_page.raise_for_status()
+    assert_contains(media_page.text, "Media Library", "admin media library page")
+    if not Path(settings.image_upload_dir).is_dir():
+        raise AssertionError(f"Upload directory does not exist: {settings.image_upload_dir}")
+
+    new_article = client.get("/admin/articles/new")
+    new_article.raise_for_status()
+    assert_contains(new_article.text, "Select from Media Library", "new article media picker button")
+
+    edit_article = client.get("/admin/articles/1/edit")
+    edit_article.raise_for_status()
+    assert_contains(edit_article.text, "Select from Media Library", "edit article media picker button")
+
+    print("Production smoke checks passed: multilingual, image fallback, AI audio narration, SEO, sitemap, robots, admin auth, media page, upload directory, and article media picker.")
     return 0
 
 
