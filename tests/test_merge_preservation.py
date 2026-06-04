@@ -230,7 +230,7 @@ def test_admin_analytics_use_only_real_article_views_table():
     assert "650" not in article_list.text
 
 
-def test_scheduled_articles_stay_hidden_until_publish_at_then_auto_publish():
+def test_scheduled_articles_use_request_time_visibility_without_status_mutation():
     seed_merge_feature_data()
     db = SessionLocal()
     try:
@@ -256,7 +256,7 @@ def test_scheduled_articles_stay_hidden_until_publish_at_then_auto_publish():
                     original_hash="scheduled-due",
                     title="Due scheduled article",
                     slug="due-scheduled-article",
-                    summary="Visible once the request-time scheduler runs.",
+                    summary="Visible once publish_at is due without mutating status.",
                     content="Due scheduled body.",
                     category="Technology",
                     language="az",
@@ -279,17 +279,27 @@ def test_scheduled_articles_stay_hidden_until_publish_at_then_auto_publish():
         assert "Due scheduled article" in rss.text
         assert "Future scheduled article" not in rss.text
 
+        article = client.get("/az/due-scheduled-article")
+        assert article.status_code == 200
+        future_article = client.get("/az/future-scheduled-article")
+        assert future_article.status_code == 404
+
         sitemap = client.get("/sitemap.xml")
         assert sitemap.status_code == 200
         assert "due-scheduled-article" in sitemap.text
         assert "future-scheduled-article" not in sitemap.text
 
+        news_sitemap = client.get("/news-sitemap.xml")
+        assert news_sitemap.status_code == 200
+        assert "Due scheduled article" in news_sitemap.text
+        assert "Future scheduled article" not in news_sitemap.text
+
         db = SessionLocal()
         try:
             due = db.query(Article).filter(Article.original_hash == "scheduled-due").one()
             future = db.query(Article).filter(Article.original_hash == "scheduled-future").one()
-            assert due.status == "published"
-            assert due.published_at is not None
+            assert due.status == "scheduled"
+            assert due.published_at is None
             assert future.status == "scheduled"
             assert future.published_at is None
         finally:
