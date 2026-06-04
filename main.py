@@ -936,30 +936,54 @@ def parse_admin_datetime(value: str | None):
     return None
 
 
+SCHEDULED_STATUS_VALUES = ("scheduled", "Scheduled", "SCHEDULED")
+
+
 def normalize_article_status(value: str | None) -> str:
     status = (value or "draft").strip().lower()
     return status if status in {"draft", "published", "scheduled"} else "draft"
 
 
+def current_server_utc() -> datetime:
+    """Return the current server time as a timezone-aware UTC datetime."""
+    return datetime.now(UTC)
+
+
+def datetime_for_database(value: datetime) -> datetime:
+    """Normalize datetimes for DateTime columns that may store naive UTC values."""
+    if value.tzinfo is not None:
+        return value.astimezone(UTC).replace(tzinfo=None)
+    return value
+
+
+def comparable_utc_datetime(value: datetime | None) -> datetime | None:
+    """Normalize stored datetimes before comparing them with server UTC time."""
+    if value is None:
+        return None
+    return datetime_for_database(value)
+
+
 def publish_due_scheduled_articles(db) -> int:
-    """Publish scheduled articles whose publish_at has passed using server time."""
-    now = datetime.utcnow()
-    due_articles = (
+    """Publish scheduled articles whose publish_at has passed using server UTC time."""
+    current_time = current_server_utc()
+    now = datetime_for_database(current_time)
+    logger.info("Checking scheduled articles at %s", current_time.isoformat())
+    candidate_articles = (
         db.query(Article)
         .filter(
-            Article.status == "scheduled",
+            Article.status.in_(SCHEDULED_STATUS_VALUES),
             Article.publish_at.isnot(None),
-            Article.publish_at <= now,
         )
         .order_by(Article.publish_at.asc(), Article.id.asc())
         .all()
     )
+    due_articles = [article for article in candidate_articles if comparable_utc_datetime(article.publish_at) <= now]
+    logger.info("Due scheduled articles found: %s", len(due_articles))
     for article in due_articles:
         article.status = "published"
-        if not article.published_at:
-            article.published_at = article.publish_at
+        article.published_at = article.publish_at
         article.updated_at = now
-        message = f"Scheduled article auto-published: {article.id}"
+        message = f"Auto-published scheduled article id={article.id} publish_at={article.publish_at}"
         logger.info(message)
         db.add(FetchLog(level="INFO", message=message))
     if due_articles:
@@ -968,11 +992,20 @@ def publish_due_scheduled_articles(db) -> int:
     return len(due_articles)
 
 
+def run_scheduled_publish_check() -> int:
+    """Run the scheduled publishing check with its own database session."""
+    db = SessionLocal()
+    try:
+        return publish_due_scheduled_articles(db)
+    finally:
+        db.close()
+
+
 def public_article_visibility_filter(now: datetime | None = None):
-    current = now or datetime.utcnow()
+    current = datetime_for_database(now or current_server_utc())
     return or_(
         Article.status == "published",
-        (Article.status == "scheduled") & Article.publish_at.isnot(None) & (Article.publish_at <= current),
+        (Article.status.in_(SCHEDULED_STATUS_VALUES)) & Article.publish_at.isnot(None) & (Article.publish_at <= current),
     )
 
 
@@ -989,7 +1022,7 @@ def require_scheduled_publish_at(status: str, publish_at: datetime | None) -> bo
 
 
 def touch_sitemap_refresh(db) -> None:
-    save_setting(db, "sitemap_last_refreshed_at", datetime.utcnow().isoformat())
+    save_setting(db, "sitemap_last_refreshed_at", current_server_utc().isoformat())
 
 
 def article_translation_complete(article: Article, language: str) -> bool:
@@ -1148,7 +1181,9 @@ def admin_article_categories(db) -> list[str]:
 
 def filtered_admin_article_query(db, search: str = "", status: str = "all", category: str = "", language: str = "", date_from: str = "", date_to: str = ""):
     query = db.query(Article).options(selectinload(Article.translations))
-    if status in {"draft", "published", "scheduled"}:
+    if status == "scheduled":
+        query = query.filter(Article.status.in_(SCHEDULED_STATUS_VALUES))
+    elif status in {"draft", "published"}:
         query = query.filter(Article.status == status)
     if category:
         query = query.filter(Article.category == category)
@@ -1466,6 +1501,7 @@ def startup() -> None:
     db.close()
     scheduler.add_job(run_fetch_pipeline, "interval", minutes=max(13, min(17, settings.fetch_interval_min)), id="fetch_job", replace_existing=True)
     scheduler.add_job(generate_pending_narrations, "interval", seconds=45, id="narration_job", replace_existing=True)
+    scheduler.add_job(run_scheduled_publish_check, "interval", seconds=60, id="scheduled_publish_job", replace_existing=True)
     if not scheduler.running:
         scheduler.start()
 
@@ -1584,7 +1620,7 @@ def sitemap(db=Depends(get_db)):
 def news_sitemap(db=Depends(get_db)):
     publish_due_scheduled_articles(db)
     base_url = settings.site_url.rstrip("/")
-    news_cutoff = datetime.utcnow() - timedelta(days=2)
+    news_cutoff = datetime_for_database(current_server_utc() - timedelta(days=2))
     articles = db.query(Article).options(selectinload(Article.translations)).filter(public_article_visibility_filter(), public_article_datetime_expression() >= news_cutoff).order_by(public_article_datetime_expression().desc()).limit(1000).all()
     entries = []
     for article in articles:
@@ -1681,10 +1717,10 @@ def admin_dashboard(request: Request, db=Depends(get_db), _=Depends(require_auth
     publish_due_scheduled_articles(db)
     drafts = db.query(Article).filter(Article.status == 'draft').count()
     published = db.query(Article).filter(Article.status == 'published').count()
-    scheduled = db.query(Article).filter(Article.status == 'scheduled').count()
+    scheduled = db.query(Article).filter(Article.status.in_(SCHEDULED_STATUS_VALUES)).count()
     next_scheduled_article = (
         db.query(Article)
-        .filter(Article.status == 'scheduled', Article.publish_at.isnot(None))
+        .filter(Article.status.in_(SCHEDULED_STATUS_VALUES), Article.publish_at.isnot(None))
         .order_by(Article.publish_at.asc(), Article.created_at.asc(), Article.id.asc())
         .first()
     )
@@ -1735,6 +1771,19 @@ def admin_articles(
     categories = admin_article_categories(db)
     filters = {"q": q, "status": status, "category": category, "language": language, "date_from": date_from, "date_to": date_to, "sort": sort, "page": page, "per_page": per_page}
     return templates.TemplateResponse("admin/articles.html", {"request": request, "articles": articles, "status": status, "narration_map": narration_map, "translation_missing_map": translation_missing_map, "seo_score_map": seo_score_map, "languages": SUPPORTED_LANGUAGES, "language_labels": LANGUAGE_LABELS, "categories": categories, "filters": filters, "total": total, "total_pages": total_pages, "page": page, "per_page": per_page, "ai_translation_status": ai_translation_status()})
+
+
+
+def admin_publish_due_redirect(return_to: str, published_count: int) -> str:
+    target = return_to if return_to.startswith("/admin") else "/admin/articles"
+    separator = "&" if "?" in target else "?"
+    return f"{target}{separator}published_due={published_count}"
+
+
+@app.post('/admin/articles/publish-due')
+def admin_publish_due_scheduled_articles(request: Request, return_to: str = "/admin/articles", db=Depends(get_db), _=Depends(require_auth)):
+    published_count = publish_due_scheduled_articles(db)
+    return RedirectResponse(admin_publish_due_redirect(return_to, published_count), status_code=302)
 
 
 

@@ -15,7 +15,7 @@ from cms.auth.security import hash_password
 from config import settings
 from database.models import Article, ArticleTranslation, ArticleView, MediaAsset
 from database.session import SessionLocal, init_db
-from main import app, apply_schema_migrations, ensure_categories
+from main import app, apply_schema_migrations, ensure_categories, publish_due_scheduled_articles
 
 
 def seed_merge_feature_data():
@@ -248,7 +248,7 @@ def test_scheduled_articles_auto_publish_when_due_and_stay_hidden_before_publish
                 language="az",
             )
             db.add(future_article)
-        future_article.status = "scheduled"
+        future_article.status = "SCHEDULED"
         future_article.publish_at = future
         future_article.published_at = None
 
@@ -264,7 +264,7 @@ def test_scheduled_articles_auto_publish_when_due_and_stay_hidden_before_publish
                 language="az",
             )
             db.add(due_article)
-        due_article.status = "scheduled"
+        due_article.status = "Scheduled"
         due_article.publish_at = past
         due_article.published_at = None
         db.commit()
@@ -312,7 +312,50 @@ def test_scheduled_articles_auto_publish_when_due_and_stay_hidden_before_publish
             assert due.status == "published"
             assert due.published_at == due.publish_at
             assert due.updated_at is not None
-            assert future.status == "scheduled"
+            assert future.status == "SCHEDULED"
             assert future.published_at is None
         finally:
             db.close()
+
+
+def test_scheduled_publish_logging_and_manual_button(caplog):
+    seed_merge_feature_data()
+    db = SessionLocal()
+    try:
+        past = datetime.now(UTC) - timedelta(minutes=10)
+        article = db.query(Article).filter(Article.original_hash == "scheduled-manual").first()
+        if not article:
+            article = Article(
+                original_hash="scheduled-manual",
+                title="Manual due scheduled article",
+                slug="manual-due-scheduled-article",
+                summary="Manual due scheduled summary.",
+                content="Manual due scheduled body.",
+                category="Technology",
+                language="az",
+            )
+            db.add(article)
+        article.status = "SCHEDULED"
+        article.publish_at = past
+        article.published_at = None
+        db.commit()
+
+        caplog.set_level("INFO", logger="main")
+        published_count = publish_due_scheduled_articles(db)
+        db.refresh(article)
+
+        assert published_count == 1
+        assert article.status == "published"
+        assert article.published_at == article.publish_at
+        assert "Checking scheduled articles at" in caplog.text
+        assert "Due scheduled articles found: 1" in caplog.text
+        assert f"Auto-published scheduled article id={article.id} publish_at=" in caplog.text
+    finally:
+        db.close()
+
+    with TestClient(app) as client:
+        login(client)
+        articles = client.get("/admin/articles")
+        assert "Publish due scheduled articles now" in articles.text
+        dashboard = client.get("/admin")
+        assert "Publish due scheduled articles now" in dashboard.text

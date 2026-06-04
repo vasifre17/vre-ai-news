@@ -3,7 +3,8 @@
 {% set heading = 'Article management' %}
 {% block content %}
 <section class="panel">
-  <div class="panel-head wrap"><div><h2>Editorial articles</h2><p class="muted">Create, edit, publish, unpublish and delete newsroom content without loading the entire archive at once.</p></div><div class="actions"><form method="post" action="/admin/translations/generate-missing"><button class="btn" type="submit">Generate translations for all missing articles</button></form><a class="btn primary" href="/admin/articles/new">Create article</a></div></div>
+  <div class="panel-head wrap"><div><h2>Editorial articles</h2><p class="muted">Create, edit, publish, unpublish and delete newsroom content without loading the entire archive at once.</p></div><div class="actions"><form method="post" action="/admin/translations/generate-missing"><button class="btn" type="submit">Generate translations for all missing articles</button></form><form method="post" action="/admin/articles/publish-due?return_to=/admin/articles" class="inline-form"><button class="btn" type="submit">Publish due scheduled articles now</button></form><a class="btn primary" href="/admin/articles/new">Create article</a></div></div>
+  {% if request.query_params.get('published_due') is not none %}<div class="alert success">Published {{ request.query_params.get('published_due') }} due scheduled article(s).</div>{% endif %}
   {% if not ai_translation_status.configured %}<div class="alert danger">{{ ai_translation_status.message }}</div>{% endif %}
 
   <form class="article-filters" method="get" action="/admin/articles" id="articleFilters">

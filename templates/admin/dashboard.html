@@ -62,6 +62,10 @@
     <div class="workflow-row"><span>Draft review</span><strong>{{ drafts }} waiting</strong></div>
     <div class="workflow-row"><span>Published inventory</span><strong>{{ published }} live</strong></div>
     <div class="workflow-row"><span>Scheduled articles</span><strong>{{ scheduled }} queued</strong></div>
+    <form method="post" action="/admin/articles/publish-due?return_to=/admin" class="inline-form">
+      <button class="btn" type="submit">Publish due scheduled articles now</button>
+    </form>
+    {% if request.query_params.get('published_due') is not none %}<p class="muted">Published {{ request.query_params.get('published_due') }} due scheduled article(s).</p>{% endif %}
   </div>
   <div class="panel">
     <div class="panel-head"><h2>Next scheduled article</h2><a href="/admin/articles?status=scheduled">View scheduled</a></div>
