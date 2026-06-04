@@ -486,7 +486,7 @@ def format_admin_datetime(value):
 
 
 def datetime_local_value(value):
-    return value.strftime("%d.%m.%Y %H:%M") if value else ""
+    return value.strftime("%Y-%m-%dT%H:%M") if value else ""
 
 
 def is_uploaded_file(value) -> bool:
