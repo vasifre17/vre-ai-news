@@ -29,7 +29,7 @@
   <div class="panel">
     <div class="panel-head"><h2>Top 10 most viewed articles</h2><a href="/admin/articles?sort=most_viewed">Open report</a></div>
     <div class="table-wrap"><table><thead><tr><th>Title</th><th>Status</th><th>Views</th><th>Analytics</th></tr></thead><tbody>
-      {% for article in most_viewed_articles %}<tr><td><a href="/admin/articles/{{ article.id }}/edit">{{ article.title or 'Untitled' }}</a><small>{{ article.slug }}</small></td><td><span class="badge {{ article.status }}">{{ article.status }}</span></td><td><strong>{{ article.real_view_count or 0 }}</strong></td><td><a href="/admin/articles/{{ article.id }}/analytics">View details</a></td></tr>{% else %}<tr><td colspan="4">No article views recorded yet.</td></tr>{% endfor %}
+      {% for article in most_viewed_articles %}<tr><td><a href="/admin/articles/{{ article.id }}/edit">{{ article.title or 'Untitled' }}</a><small>{{ article.slug }}</small></td><td><span class="badge {{ article.status }}">{{ article.status|title }}</span></td><td><strong>{{ article.real_view_count or 0 }}</strong></td><td><a href="/admin/articles/{{ article.id }}/analytics">View details</a></td></tr>{% else %}<tr><td colspan="4">No article views recorded yet.</td></tr>{% endfor %}
     </tbody></table></div>
   </div>
   <div class="panel">
@@ -61,14 +61,17 @@
     <div class="workflow-row"><span>AI fetch pipeline</span><strong>Automated</strong></div>
     <div class="workflow-row"><span>Draft review</span><strong>{{ drafts }} waiting</strong></div>
     <div class="workflow-row"><span>Published inventory</span><strong>{{ published }} live</strong></div>
+    <div class="workflow-row"><span>Scheduled articles</span><strong>{{ scheduled }} queued</strong></div>
   </div>
   <div class="panel">
-    <h2>AI production tools</h2>
-    {% if not ai_translation_status.configured %}<div class="alert danger">{{ ai_translation_status.message }}</div>{% endif %}
-    <p class="muted">Translations and narration stay available while article management gains CMS-style reporting.</p>
-    <div class="tool-list">
-      <span>Automatic AZ → EN/RU/TR/ZH/ES translation</span><span>SEO field translation</span><span>Image-safe generation</span><span>Audio narration review</span>
-    </div>
+    <div class="panel-head"><h2>Next scheduled article</h2><a href="/admin/articles?status=scheduled">View scheduled</a></div>
+    {% if next_scheduled_article %}
+    <div class="workflow-row"><span>Article</span><strong><a href="/admin/articles/{{ next_scheduled_article.id }}/edit">{{ next_scheduled_article.title or 'Untitled' }}</a></strong></div>
+    <div class="workflow-row"><span>Publish at</span><strong>{{ next_scheduled_article.publish_at|format_admin_datetime }}</strong></div>
+    <p class="muted">Displayed in server time. The article remains hidden from public pages and feeds until this time.</p>
+    {% else %}
+    <p class="muted">No scheduled article is queued.</p>
+    {% endif %}
   </div>
 </section>
 
@@ -76,7 +79,7 @@
   <div class="panel">
     <div class="panel-head"><h2>Latest 10 articles</h2><a href="/admin/articles?sort=newest">Manage all</a></div>
     <div class="table-wrap"><table><thead><tr><th>Title</th><th>Status</th><th>Views</th><th>Created</th></tr></thead><tbody>
-      {% for article in latest_articles %}<tr><td><a href="/admin/articles/{{ article.id }}/edit">{{ article.title or 'Untitled' }}</a><small>{{ article.slug }}</small></td><td><span class="badge {{ article.status }}">{{ article.status }}</span></td><td>{{ article.real_view_count or 0 }}</td><td>{{ article.created_at|format_published_at }}</td></tr>{% else %}<tr><td colspan="4">No articles yet.</td></tr>{% endfor %}
+      {% for article in latest_articles %}<tr><td><a href="/admin/articles/{{ article.id }}/edit">{{ article.title or 'Untitled' }}</a><small>{{ article.slug }}</small></td><td><span class="badge {{ article.status }}">{{ article.status|title }}</span></td><td>{{ article.real_view_count or 0 }}</td><td>{{ article.created_at|format_published_at }}</td></tr>{% else %}<tr><td colspan="4">No articles yet.</td></tr>{% endfor %}
     </tbody></table></div>
   </div>
   <div class="panel">
