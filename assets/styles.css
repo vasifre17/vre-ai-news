@@ -395,6 +395,7 @@ img { display: block; max-width: 100%; }
 .footer-panel dd { margin: 0; }
 .footer-social-link { display: inline-flex; align-items: center; width: max-content; color: var(--soft); font-weight: 850; border: 1px solid rgba(84, 183, 255, .34); border-radius: 999px; padding: .28rem .62rem; background: linear-gradient(135deg, rgba(84, 183, 255, .16), rgba(141, 120, 255, .14)); transition: transform .2s ease; }
 .footer-social-link:hover { transform: translateY(-1px); }
+.footer-policy-links { display: flex; flex-wrap: wrap; gap: .5rem; }
 .footer-policy-link {
   display: inline-flex;
   align-items: center;

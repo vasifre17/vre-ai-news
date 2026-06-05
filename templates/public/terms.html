@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Privacy Policy — {{ site_name }}</title>
-  <meta name="description" content="Read the VREYC Privacy Policy covering cookies, Google AdSense, analytics, user privacy rights and contact information.">
+  <title>Terms of Use — {{ site_name }}</title>
+  <meta name="description" content="Read the VREYC Terms of Use covering content ownership, user responsibilities, copyright, disclaimers and contact information.">
   <meta name="robots" content="index,follow,max-image-preview:large">
   <link rel="stylesheet" href="/assets/styles.css?v={{ app_version }}">
   {% if verification_meta.google %}<meta name="google-site-verification" content="{{ verification_meta.google }}">{% endif %}{% if verification_meta.bing %}<meta name="msvalidate.01" content="{{ verification_meta.bing }}">{% endif %}
-  <link rel="canonical" href="{{ canonical }}"><link rel="alternate" hreflang="en" href="{{ site_url }}/privacy"><link rel="alternate" hreflang="x-default" href="{{ site_url }}/privacy">
-  <meta property="og:type" content="website"><meta property="og:site_name" content="{{ site_name }}"><meta property="og:title" content="Privacy Policy — {{ site_name }}"><meta property="og:description" content="How VREYC handles cookies, advertising, analytics and user privacy rights."><meta property="og:url" content="{{ canonical }}"><meta property="og:image" content="{{ site_url }}/assets/og-cover.jpg">
-  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Privacy Policy — {{ site_name }}"><meta name="twitter:description" content="How VREYC handles cookies, advertising, analytics and user privacy rights."><meta name="twitter:image" content="{{ site_url }}/assets/og-cover.jpg">
+  <link rel="canonical" href="{{ canonical }}"><link rel="alternate" hreflang="en" href="{{ site_url }}/terms"><link rel="alternate" hreflang="x-default" href="{{ site_url }}/terms">
+  <meta property="og:type" content="website"><meta property="og:site_name" content="{{ site_name }}"><meta property="og:title" content="Terms of Use — {{ site_name }}"><meta property="og:description" content="The terms for using VREYC content, services and website features."><meta property="og:url" content="{{ canonical }}"><meta property="og:image" content="{{ site_url }}/assets/og-cover.jpg">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Terms of Use — {{ site_name }}"><meta name="twitter:description" content="The terms for using VREYC content, services and website features."><meta name="twitter:image" content="{{ site_url }}/assets/og-cover.jpg">
   <script type="application/ld+json">{{ {"@context":"https://schema.org", "@graph": schema_graph}|tojson }}</script>
 </head>
 <body>
@@ -23,8 +23,8 @@
   <nav class="categories container" aria-label="{{ ui.news }}">
     <div class="primary-categories">{% for c in categories %}<a href="/en/?category={{ c.name }}" style="--cat-color: {{ c.color or '#48a6ff' }}">{{ category_labels.get(c.name, c.name) }}</a>{% endfor %}</div>
     {% if secondary_categories %}<div class="category-menu">
-      <button class="category-menu-button" type="button" aria-label="{{ ui.more_categories }}" aria-haspopup="true" aria-expanded="false" aria-controls="category-dropdown-privacy"><span aria-hidden="true">☰</span></button>
-      <div class="category-dropdown" id="category-dropdown-privacy" hidden>{% for c in categories %}{% if loop.index > 3 %}<a class="mobile-only-category" href="/en/?category={{ c.name }}" style="--cat-color: {{ c.color or '#48a6ff' }}">{{ category_labels.get(c.name, c.name) }}</a>{% endif %}{% endfor %}{% for c in secondary_categories %}<a href="/en/?category={{ c.name }}" style="--cat-color: {{ c.color or '#48a6ff' }}">{{ category_labels.get(c.name, c.name) }}</a>{% endfor %}</div>
+      <button class="category-menu-button" type="button" aria-label="{{ ui.more_categories }}" aria-haspopup="true" aria-expanded="false" aria-controls="category-dropdown-terms"><span aria-hidden="true">☰</span></button>
+      <div class="category-dropdown" id="category-dropdown-terms" hidden>{% for c in categories %}{% if loop.index > 3 %}<a class="mobile-only-category" href="/en/?category={{ c.name }}" style="--cat-color: {{ c.color or '#48a6ff' }}">{{ category_labels.get(c.name, c.name) }}</a>{% endif %}{% endfor %}{% for c in secondary_categories %}<a href="/en/?category={{ c.name }}" style="--cat-color: {{ c.color or '#48a6ff' }}">{{ category_labels.get(c.name, c.name) }}</a>{% endfor %}</div>
     </div>{% endif %}
   </nav>
 </header>
@@ -37,54 +37,48 @@
 </nav>
 <main class="section privacy-page">
   <section class="privacy-hero container glass">
-    <p class="eyebrow">Editorial transparency</p>
-    <h1>Privacy Policy</h1>
-    <p>VREYC respects reader privacy. This policy explains how we use cookies, advertising, analytics tools and basic operational data to deliver a professional news experience.</p>
+    <span class="eyebrow">Legal</span>
+    <h1>Terms of Use</h1>
+    <p>These Terms of Use explain the rules for accessing VREYC, using our news content and interacting with our website. By using this site, you agree to follow these terms.</p>
     <div class="privacy-updated">Last updated: June 5, 2026</div>
   </section>
   <div class="privacy-layout container">
-    <aside class="privacy-toc glass" aria-label="Privacy policy sections">
+    <aside class="privacy-toc glass" aria-label="Terms of Use sections">
       <strong>On this page</strong>
-      <a href="#information">Information we collect</a>
-      <a href="#cookies">Cookies policy</a>
-      <a href="#adsense">Google AdSense usage</a>
-      <a href="#analytics">Analytics usage</a>
-      <a href="#rights">User privacy rights</a>
+      <a href="#ownership">Content ownership</a>
+      <a href="#responsibilities">User responsibilities</a>
+      <a href="#copyright">Copyright notice</a>
+      <a href="#disclaimer">Disclaimer</a>
       <a href="#contact">Contact</a>
     </aside>
     <article class="privacy-card glass">
-      <section id="information" class="privacy-section">
-        <h2>Information we collect</h2>
-        <p>When you visit VREYC, we may process limited technical information such as browser type, device type, approximate location, pages viewed, referring pages, timestamps and interaction events. If you contact us directly, we may receive your email address and the information you choose to include in your message.</p>
-        <p>We use this information to operate the website, protect site security, understand audience engagement and improve editorial presentation.</p>
+      <section id="ownership" class="privacy-section">
+        <h2>Content ownership</h2>
+        <p>All articles, headlines, summaries, images, graphics, audio, design elements and other materials published on VREYC are owned by VREYC or used with permission from their respective owners.</p>
+        <p>You may read, share and link to VREYC pages for personal, non-commercial purposes. You may not copy, republish, sell, scrape, redistribute or create derivative works from our content without prior written permission.</p>
       </section>
-      <section id="cookies" class="privacy-section">
-        <h2>Cookies policy</h2>
-        <p>Cookies and similar technologies may be used to remember preferences, support security, measure performance, understand traffic patterns and personalize or measure advertising. You can control or delete cookies through your browser settings, though some site features may not work as expected if cookies are disabled.</p>
+      <section id="responsibilities" class="privacy-section">
+        <h2>User responsibilities</h2>
+        <p>When using VREYC, you agree to use the website lawfully and respectfully. You are responsible for how you access, share or rely on content available through this service.</p>
         <ul>
-          <li><strong>Essential cookies:</strong> help the site load, maintain basic functionality and protect against misuse.</li>
-          <li><strong>Preference cookies:</strong> may remember choices such as display or browsing preferences.</li>
-          <li><strong>Advertising and measurement cookies:</strong> may help deliver, limit, personalize and evaluate advertisements.</li>
+          <li>Do not attempt to disrupt, overload, reverse engineer or compromise the website or its systems.</li>
+          <li>Do not use automated tools to harvest content, metadata or user-facing information without permission.</li>
+          <li>Do not misuse VREYC content in a misleading, defamatory, fraudulent or unlawful manner.</li>
         </ul>
       </section>
-      <section id="adsense" class="privacy-section">
-        <h2>Google AdSense usage</h2>
-        <p>VREYC may display ads served by Google AdSense or related Google advertising services. Google and its partners may use cookies, device identifiers or similar technologies to serve ads, measure ad performance, prevent fraud and personalize advertising where permitted by law and your settings.</p>
-        <p>You can manage Google ad personalization through your Google account ad settings or browser privacy controls.</p>
+      <section id="copyright" class="privacy-section">
+        <h2>Copyright notice</h2>
+        <p>Copyright © 2026 VREYC. All rights reserved unless otherwise stated.</p>
+        <p>Third-party names, platforms, logos and materials remain the property of their respective owners. If you believe content on VREYC infringes your rights, please contact us with enough information to identify the material and your claim.</p>
       </section>
-      <section id="analytics" class="privacy-section">
-        <h2>Analytics usage</h2>
-        <p>We may use analytics services to understand how readers find and use the site. Analytics data helps us identify popular stories, improve navigation, measure page performance and maintain a reliable newsroom experience. Analytics providers may collect usage information through cookies, scripts or similar technologies.</p>
-        <p>Analytics information is reviewed in aggregate whenever practical and is not intended to identify individual readers directly.</p>
-      </section>
-      <section id="rights" class="privacy-section">
-        <h2>User privacy rights</h2>
-        <p>Depending on your location, you may have rights to request access, correction, deletion, restriction, objection or portability of personal information. You may also have the right to withdraw consent for certain processing or opt out of certain advertising and analytics technologies.</p>
-        <p>To exercise privacy rights, please contact us using the email below. We may need to verify your request before taking action.</p>
+      <section id="disclaimer" class="privacy-section">
+        <h2>Disclaimer</h2>
+        <p>VREYC provides news, analysis and informational content for general awareness. While we aim for accuracy and timely updates, we do not guarantee that every item will be complete, current or error-free.</p>
+        <p>Content on this site is not professional legal, financial, medical or investment advice. You should verify important information independently before making decisions based on any article or feature.</p>
       </section>
       <section id="contact" class="privacy-section privacy-contact-box">
         <h2>Contact</h2>
-        <p>For privacy questions, requests or concerns, contact VREYC at:</p>
+        <p>For questions about these Terms of Use, copyright permissions or rights concerns, contact VREYC at:</p>
         <a class="privacy-email" href="mailto:xtvaz123@gmail.com">xtvaz123@gmail.com</a>
       </section>
     </article>
