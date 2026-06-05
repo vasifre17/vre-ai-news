@@ -64,6 +64,24 @@ def seed_merge_feature_data():
                 tags="translation,seo",
             )
         )
+        db.add(
+            Article(
+                original_hash="utf8-feed-az",
+                source_title="UTF-8 source",
+                source_url="https://example.com/utf8-source",
+                title="Karyerada 45 yaş baryeri",
+                slug="karyerada-45-yaş-baryeri-əıöüşçğ",
+                summary="Azərbaycan hərfləri qorunur: ə, ı, ö, ü, ş, ç, ğ.",
+                content="UTF-8 feed encoding assertion body.",
+                seo_title="UTF-8 SEO title",
+                meta_description="Mətn latin1 və ya cp1252 kimi çevrilməməlidir.",
+                tags="utf8,azərbaycan",
+                category="Technology",
+                language="az",
+                status="published",
+                published_at=published_at + timedelta(minutes=1),
+            )
+        )
         db.add(MediaAsset(filename="merge-image.jpg", path="/uploads/images/missing-merge-image.jpg", content_type="image/jpeg", size_bytes=1024))
         for index in range(5):
             db.add(
@@ -111,16 +129,30 @@ def test_public_seo_feeds_and_admin_features_survive_main_merge():
 
         sitemap = client.get("/sitemap.xml")
         assert sitemap.status_code == 200
+        assert sitemap.headers["content-type"] == "application/xml; charset=utf-8"
+        assert sitemap.content.decode("utf-8") == sitemap.text
         assert "https://vreyc.com/en/translated-merge-seo-article" in sitemap.text
+        assert "https://vreyc.com/az/karyerada-45-yaş-baryeri-əıöüşçğ" in sitemap.text
+        assert "yaÅŸ" not in sitemap.text
 
         news_sitemap = client.get("/news-sitemap.xml")
         assert news_sitemap.status_code == 200
+        assert news_sitemap.headers["content-type"] == "application/xml; charset=utf-8"
+        assert news_sitemap.content.decode("utf-8") == news_sitemap.text
         assert "Main features and SEO article" in news_sitemap.text
+        assert "Karyerada 45 yaş baryeri" in news_sitemap.text
+        assert "yaÅŸ" not in news_sitemap.text
 
         rss = client.get("/rss.xml")
         assert rss.status_code == 200
+        assert rss.headers["content-type"] == "application/rss+xml; charset=utf-8"
+        assert rss.content.decode("utf-8") == rss.text
         assert "Main features and SEO article" in rss.text
         assert "main-features-seo-article" in rss.text
+        assert "Karyerada 45 yaş baryeri" in rss.text
+        assert "Azərbaycan hərfləri qorunur: ə, ı, ö, ü, ş, ç, ğ." in rss.text
+        assert "https://vreyc.com/az/karyerada-45-yaş-baryeri-əıöüşçğ" in rss.text
+        assert "yaÅŸ" not in rss.text
 
         login(client)
         dashboard = client.get("/admin")
