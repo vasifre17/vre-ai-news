@@ -1,7 +1,10 @@
 import os
+import sys
 import tempfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 os.environ.setdefault("SECRET_KEY", "merge-preservation-test-secret-key")
 os.environ.setdefault("ADMIN_USERNAME", "merge_admin")
@@ -391,3 +394,20 @@ def test_scheduled_publish_logging_and_manual_button(caplog):
         assert "Publish due scheduled articles now" in articles.text
         dashboard = client.get("/admin")
         assert "Publish due scheduled articles now" in dashboard.text
+
+
+def test_privacy_policy_page_and_footer_link_are_public():
+    seed_merge_feature_data()
+    with TestClient(app) as client:
+        home = client.get("/en/")
+        assert home.status_code == 200
+        assert 'href="/privacy"' in home.text
+        assert "Privacy Policy" in home.text
+
+        page = client.get("/privacy")
+        assert page.status_code == 200
+        assert "Cookies policy" in page.text
+        assert "Google AdSense usage" in page.text
+        assert "Analytics usage" in page.text
+        assert "User privacy rights" in page.text
+        assert "xtvaz123@gmail.com" in page.text
