@@ -29,6 +29,7 @@ class Settings(BaseModel):
     fetch_interval_min: int = int(os.getenv("FETCH_INTERVAL_MIN", "15"))
     pexels_api_key: str = os.getenv("PEXELS_API_KEY", "")
     site_url: str = os.getenv("SITE_URL", PRODUCTION_SITE_URL).rstrip("/")
+    google_analytics_id: str = os.getenv("GOOGLE_ANALYTICS_ID", "G-HHCSL6WB2H")
     # Uploaded article images must live outside the application tree so Docker rebuilds,
     # restarts, and git operations cannot remove them. Keep the public URL prefix stable
     # for existing article records.
