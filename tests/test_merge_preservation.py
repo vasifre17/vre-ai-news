@@ -417,4 +417,4 @@ def test_privacy_policy_page_and_footer_link_are_public():
         assert "Google AdSense usage" in page.text
         assert "Analytics usage" in page.text
         assert "User privacy rights" in page.text
-        assert "xtvaz123@gmail.com" in page.text
+        assert "vreyc.com@gmail.com" in page.text
