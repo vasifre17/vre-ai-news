@@ -87,3 +87,32 @@ document.querySelectorAll('img').forEach((image) => {
     image.replaceWith(buildVreycPlaceholder(compact));
   });
 });
+
+const nativeShareLinks = document.querySelectorAll('.js-native-share');
+const canUseNativeShare = () => (
+  typeof navigator !== 'undefined'
+  && typeof navigator.share === 'function'
+  && window.matchMedia('(max-width: 768px), (pointer: coarse)').matches
+);
+
+nativeShareLinks.forEach((link) => {
+  link.addEventListener('click', async (event) => {
+    if (!canUseNativeShare()) return;
+
+    const shareData = {
+      title: link.dataset.shareTitle || document.title,
+      text: link.dataset.shareText || '',
+      url: link.dataset.shareUrl || window.location.href,
+    };
+
+    if (typeof navigator.canShare === 'function' && !navigator.canShare(shareData)) return;
+
+    event.preventDefault();
+    try {
+      await navigator.share(shareData);
+    } catch (error) {
+      if (error && error.name === 'AbortError') return;
+      window.open(link.href, link.target || '_self', 'noopener');
+    }
+  });
+});

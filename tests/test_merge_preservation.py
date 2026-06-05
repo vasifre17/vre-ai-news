@@ -129,6 +129,13 @@ def test_public_seo_feeds_and_admin_features_survive_main_merge():
         assert "twitter:title" in article.text
         assert "hreflang=\"az\"" in article.text
         assert "loading=\"lazy\"" in article.text or "fetchpriority=\"high\"" in article.text
+        assert "share-row article-share-row" in article.text
+        assert "Facebook" in article.text
+        assert "WhatsApp" in article.text
+        assert "Telegram" in article.text
+        assert "X (Twitter)" in article.text
+        assert "js-native-share" in article.text
+        assert "data-share-url=\"https://vreyc.com/en/translated-merge-seo-article\"" in article.text
 
         sitemap = client.get("/sitemap.xml")
         assert sitemap.status_code == 200
