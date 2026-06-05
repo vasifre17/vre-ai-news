@@ -395,6 +395,124 @@ img { display: block; max-width: 100%; }
 .footer-panel dd { margin: 0; }
 .footer-social-link { display: inline-flex; align-items: center; width: max-content; color: var(--soft); font-weight: 850; border: 1px solid rgba(84, 183, 255, .34); border-radius: 999px; padding: .28rem .62rem; background: linear-gradient(135deg, rgba(84, 183, 255, .16), rgba(141, 120, 255, .14)); transition: transform .2s ease; }
 .footer-social-link:hover { transform: translateY(-1px); }
+.footer-policy-link {
+  display: inline-flex;
+  align-items: center;
+  width: max-content;
+  color: var(--soft);
+  border: 1px solid rgba(84, 183, 255, .34);
+  border-radius: 999px;
+  padding: .42rem .72rem;
+  background: linear-gradient(135deg, rgba(84, 183, 255, .16), rgba(141, 120, 255, .14));
+  font-size: .84rem;
+  font-weight: 850;
+}
+.footer-policy-link:hover { transform: translateY(-1px); }
+
+.privacy-page { padding-top: 1.4rem; }
+.privacy-hero {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(1.35rem, 3vw, 2.6rem);
+  margin-bottom: 1rem;
+}
+.privacy-hero:before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 84% 16%, rgba(84, 183, 255, .22), transparent 34%), radial-gradient(circle at 10% 85%, rgba(141, 120, 255, .20), transparent 32%);
+  pointer-events: none;
+}
+.privacy-hero > * { position: relative; z-index: 1; }
+.privacy-hero h1 {
+  margin: .35rem 0 .55rem;
+  max-width: 760px;
+  font-size: clamp(2.1rem, 5vw, 4.2rem);
+  line-height: .96;
+  letter-spacing: -.06em;
+}
+.privacy-hero p {
+  max-width: 760px;
+  margin: 0;
+  color: var(--soft);
+  font-size: clamp(1rem, 1.5vw, 1.15rem);
+  line-height: 1.65;
+}
+.privacy-updated {
+  display: inline-flex;
+  margin-top: 1rem;
+  padding: .48rem .76rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, .075);
+  font-size: .84rem;
+  font-weight: 850;
+}
+.privacy-layout {
+  display: grid;
+  grid-template-columns: minmax(190px, 270px) minmax(0, 820px);
+  justify-content: center;
+  gap: 1rem;
+  align-items: start;
+}
+.privacy-toc {
+  position: sticky;
+  top: 112px;
+  display: grid;
+  gap: .4rem;
+  padding: 1rem;
+}
+.privacy-toc strong { color: var(--text); margin-bottom: .25rem; }
+.privacy-toc a {
+  color: var(--muted);
+  border-top: 1px solid var(--border);
+  padding-top: .55rem;
+  font-size: .92rem;
+  font-weight: 780;
+}
+.privacy-toc a:hover { color: var(--soft); }
+.privacy-card { padding: clamp(1rem, 2vw, 1.6rem); }
+.privacy-section {
+  padding: 1.1rem 0;
+  border-top: 1px solid var(--border);
+}
+.privacy-section:first-child { border-top: 0; padding-top: 0; }
+.privacy-section h2 {
+  margin: 0 0 .65rem;
+  color: var(--text);
+  font-size: clamp(1.25rem, 2vw, 1.7rem);
+  letter-spacing: -.02em;
+}
+.privacy-section p,
+.privacy-section li {
+  color: var(--muted);
+  line-height: 1.75;
+  font-size: 1rem;
+}
+.privacy-section p { margin: 0 0 .8rem; }
+.privacy-section p:last-child { margin-bottom: 0; }
+.privacy-section ul { margin: .45rem 0 0; padding-left: 1.2rem; }
+.privacy-section strong { color: var(--soft); }
+.privacy-contact-box {
+  margin-top: 1rem;
+  padding: 1.1rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 36%, var(--border));
+  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(84, 183, 255, .12), rgba(141, 120, 255, .10));
+}
+.privacy-email {
+  display: inline-flex;
+  width: max-content;
+  max-width: 100%;
+  padding: .62rem .88rem;
+  border-radius: 999px;
+  color: var(--text);
+  background: linear-gradient(135deg, rgba(84, 183, 255, .26), rgba(141, 120, 255, .20));
+  border: 1px solid color-mix(in srgb, var(--accent) 52%, var(--border));
+  font-weight: 900;
+}
+
 
 .article-page { padding-bottom: 1.4rem; }
 .article-page .article-layout { padding-top: 0; padding-bottom: 0; }
@@ -494,6 +612,8 @@ img { display: block; max-width: 100%; }
   .category-menu-button span { font-size: 1.12rem; transform: none; }
   .category-dropdown { max-width: min(86vw, 320px); min-width: min(250px, calc(100vw - 2rem)); }
   .hero-news, .portal-layout, .article-layout, .footer, .hero, .cards, .two-col { grid-template-columns: 1fr; }
+  .privacy-layout { grid-template-columns: 1fr; }
+  .privacy-toc { position: static; }
   .trending-sidebar, .related { position: static; }
   .latest-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .hero-image img, .hero-image .image-placeholder { height: 320px; min-height: 240px; }
