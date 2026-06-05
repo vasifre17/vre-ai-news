@@ -1135,8 +1135,11 @@ def seo_verification_meta(settings_map: dict[str, str]) -> dict[str, str]:
     }
 
 
-def render_xml_response(content: str) -> Response:
-    return Response(content=content, media_type="application/xml")
+def render_xml_response(content: str, media_type: str = "application/xml") -> Response:
+    return Response(
+        content=content.encode("utf-8"),
+        headers={"Content-Type": f"{media_type}; charset=utf-8"},
+    )
 
 
 def save_setting(db, key: str, value: str) -> None:
@@ -1666,7 +1669,7 @@ def rss_feed(db=Depends(get_db)):
         )
     content = f'''<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0"><channel><title>VREYC Latest News</title><link>{xml_escape(base_url + '/')}</link><description>Latest VREYC news updates</description>{''.join(items)}</channel></rss>'''
-    return Response(content=content, media_type='application/rss+xml')
+    return render_xml_response(content, media_type="application/rss+xml")
 
 
 @app.get('/robots.txt')
