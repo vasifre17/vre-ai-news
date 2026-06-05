@@ -17,7 +17,7 @@
 {% import "public/_ad_macros.html" as ads %}
 <header class="site-header glass">
   <nav class="nav container">
-    <a class="logo" href="/{{language}}/"><span>VRE</span>YC</a>
+    <a class="logo brand-logo" href="/{{ language }}/" aria-label="Vasif REYC home"><img class="logo-avatar" src="{{ settings_map.get('organization_logo_url') or '/assets/profile-avatar.svg' }}" alt="Vasif REYC"><span class="logo-name">Vasif REYC</span></a>
     <form class="search-wrap" action="/{{ language }}/" role="search"><input type="search" name="q" value="{{q}}" placeholder="{{ ui.search_placeholder }}" aria-label="{{ ui.search }}"></form>
     <div class="header-actions"><div class="language-switcher">{% for lang in languages %}<a href="/{{lang}}/">{{lang|upper}}</a>{% endfor %}</div></div>
   </nav>

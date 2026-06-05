@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-labelledby="title desc">
+  <title id="title">Vasif REYC profile avatar</title>
+  <desc id="desc">Premium circular fallback avatar for Vasif REYC branding.</desc>
+  <defs>
+    <linearGradient id="bg" x1="12" y1="8" x2="84" y2="88" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#54B7FF"/>
+      <stop offset="0.52" stop-color="#8D78FF"/>
+      <stop offset="1" stop-color="#101827"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="34" cy="26" r="58" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF" stop-opacity="0.95"/>
+      <stop offset="0.45" stop-color="#FFFFFF" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#061126" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+  <circle cx="48" cy="48" r="44" fill="url(#bg)" filter="url(#shadow)"/>
+  <circle cx="48" cy="48" r="43" fill="url(#glow)"/>
+  <circle cx="48" cy="48" r="42" fill="none" stroke="#FFFFFF" stroke-opacity="0.48" stroke-width="2"/>
+  <text x="48" y="57" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="30" font-weight="900" letter-spacing="-1" fill="#FFFFFF">VR</text>
+</svg>
