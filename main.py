@@ -1587,6 +1587,39 @@ def privacy_policy(request: Request, db=Depends(get_db)):
     })
 
 
+@app.get("/terms", response_class=HTMLResponse)
+def terms_of_use(request: Request, db=Depends(get_db)):
+    language = "en"
+    ensure_categories(db)
+    categories = public_category_navigation(db)
+    category_labels = public_category_labels(language)
+    settings_map = get_settings_map(db)
+    canonical = canonical_url(request, "terms")
+    schema_graph = [
+        build_organization_schema(settings_map),
+        build_website_schema(settings_map, language),
+        build_breadcrumb_schema([("Home", f"{settings.site_url.rstrip('/')}/en/"), ("Terms of Use", canonical)]),
+    ]
+    return templates.TemplateResponse("public/terms.html", {
+        "request": request,
+        "categories": categories["primary"],
+        "secondary_categories": categories["secondary"],
+        "q": "",
+        "site_url": settings.site_url,
+        "canonical": canonical,
+        "language": language,
+        "languages": SUPPORTED_LANGUAGES,
+        "alt_links": {"en": "/terms"},
+        "ui": public_labels(language),
+        "category_labels": category_labels,
+        "settings_map": settings_map,
+        "verification_meta": seo_verification_meta(settings_map),
+        "schema_graph": schema_graph,
+        "site_name": site_name_from_settings(settings_map),
+        "app_version": APP_VERSION,
+    })
+
+
 def render_article_page(slug: str, request: Request, language: str = "az", db=Depends(get_db)):
     language = language if language in SUPPORTED_LANGUAGES else "az"
     publish_due_scheduled_articles(db)
@@ -1644,6 +1677,10 @@ def sitemap(db=Depends(get_db)):
     url_entries.extend(
         f"<url><loc>{xml_escape(base_url + '/' + lang + '/')}</loc><changefreq>hourly</changefreq><priority>0.9</priority></url>"
         for lang in SUPPORTED_LANGUAGES
+    )
+    url_entries.extend(
+        f"<url><loc>{xml_escape(base_url + path)}</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>"
+        for path in ("/privacy", "/terms")
     )
     articles = db.query(Article).options(selectinload(Article.translations)).filter(public_article_visibility_filter()).order_by(public_article_datetime_expression().desc()).all()
     for article in articles:
