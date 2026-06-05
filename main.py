@@ -40,6 +40,7 @@ app = FastAPI(title=settings.app_name)
 app.add_middleware(SessionMiddleware, secret_key=settings.secret_key)
 templates = Jinja2Templates(directory="templates")
 templates.env.globals["google_analytics_id"] = settings.google_analytics_id
+templates.env.globals["adsense_publisher_id"] = settings.adsense_publisher_id
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 scheduler = BackgroundScheduler()
