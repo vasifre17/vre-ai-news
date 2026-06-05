@@ -13,7 +13,7 @@
 </head>
 <body>
 <header class="site-header glass">
-  <nav class="nav container"><a class="logo" href="/{{language}}/"><span>VRE</span>YC</a><form class="search-wrap" action="/{{ language }}/" role="search"><input type="search" name="q" placeholder="{{ ui.search_placeholder }}" aria-label="{{ ui.search }}"></form><div class="header-actions"><div class="language-switcher">{% for lang in languages %}<a href="{{alt_links[lang]}}">{{lang|upper}}</a>{% endfor %}</div></div></nav>
+  <nav class="nav container"><a class="logo brand-logo" href="/{{ language }}/" aria-label="Vasif REYC home"><img class="logo-avatar" src="{{ settings_map.get('organization_logo_url') or '/assets/profile-avatar.svg' }}" alt="Vasif REYC"><span class="logo-name">Vasif REYC</span></a><form class="search-wrap" action="/{{ language }}/" role="search"><input type="search" name="q" placeholder="{{ ui.search_placeholder }}" aria-label="{{ ui.search }}"></form><div class="header-actions"><div class="language-switcher">{% for lang in languages %}<a href="{{alt_links[lang]}}">{{lang|upper}}</a>{% endfor %}</div></div></nav>
   <nav class="categories container" aria-label="{{ ui.news }}">
     <div class="primary-categories">{% for c in categories %}<a href="/{{ language }}/?category={{ c.name }}" style="--cat-color: {{ c.color or '#48a6ff' }}">{{ category_labels.get(c.name, c.name) }}</a>{% endfor %}</div>
     {% if secondary_categories %}<div class="category-menu">

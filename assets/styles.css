@@ -73,8 +73,33 @@ img { display: block; max-width: 100%; }
 }
 [data-theme="light"] .site-header { background: rgba(255, 255, 255, .86); }
 .nav { display: flex; gap: .85rem; align-items: center; padding: .82rem 0 .62rem; }
-.logo { flex: 0 0 auto; font-size: 1.28rem; font-weight: 950; letter-spacing: .08em; text-shadow: 0 0 22px rgba(84, 183, 255, .25); }
-.logo span { color: var(--accent); }
+.logo {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: .68rem;
+  min-width: 0;
+  color: var(--text);
+  font-size: 1.24rem;
+  font-weight: 950;
+  letter-spacing: .01em;
+  line-height: 1;
+  text-shadow: 0 0 22px rgba(84, 183, 255, .22);
+}
+.logo-avatar {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid color-mix(in srgb, var(--accent) 45%, rgba(255, 255, 255, .64));
+  background: linear-gradient(135deg, rgba(84, 183, 255, .32), rgba(141, 120, 255, .22));
+  box-shadow: 0 10px 26px rgba(0, 0, 0, .22), 0 0 0 4px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.logo-name { white-space: nowrap; }
+.logo:hover .logo-avatar,
+.logo:focus-visible .logo-avatar { box-shadow: 0 12px 30px rgba(0, 0, 0, .26), 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent); }
+.logo:focus-visible { border-radius: 999px; outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent); outline-offset: 4px; }
 .search-wrap { flex: 1 1 340px; min-width: 180px; }
 .search-wrap input {
   width: 100%;
@@ -488,7 +513,8 @@ img { display: block; max-width: 100%; }
   .ad-zone-footer { --ad-height: 120px; margin-bottom: .9rem; }
   .site-header { border-radius: 0 0 18px 18px; }
   .nav { display: grid; grid-template-columns: 1fr auto; gap: .55rem; align-items: center; padding: .62rem 0 .52rem; }
-  .logo { grid-column: 1; font-size: 1.12rem; }
+  .logo { grid-column: 1; gap: .55rem; font-size: 1.08rem; }
+  .logo-avatar { width: 40px; height: 40px; flex-basis: 40px; }
   .header-actions { grid-column: 2; justify-self: end; max-width: 58vw; gap: .28rem; }
   .theme-toggle { padding: .42rem .5rem; }
   .theme-text { display: none; }
@@ -549,7 +575,7 @@ img { display: block; max-width: 100%; }
   .ad-zone-top, .ad-zone-hero { --ad-height: 60px; }
   .section { padding-top: .78rem; }
   .nav { gap: .45rem; padding: .54rem 0 .45rem; }
-  .logo { font-size: 1.02rem; }
+  .logo { gap: .48rem; font-size: 1rem; }
   .header-actions { max-width: 62vw; }
   .language-switcher a { font-size: .61rem; padding: .22rem .32rem; }
   .search-wrap input { padding: .56rem .76rem; font-size: .9rem; }
