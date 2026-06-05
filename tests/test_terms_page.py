@@ -41,7 +41,7 @@ def test_terms_page_contains_required_sections_and_footer_link():
     assert "User responsibilities" in response.text
     assert "Copyright notice" in response.text
     assert "Disclaimer" in response.text
-    assert "xtvaz123@gmail.com" in response.text
+    assert "vreyc.com@gmail.com" in response.text
     assert '<a class="footer-policy-link" href="/terms">Terms of Use</a>' in response.text
 
 
