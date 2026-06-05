@@ -7,3 +7,6 @@
   gtag('config', {{ google_analytics_id|tojson }});
 </script>
 {% endif %}
+{% if adsense_publisher_id %}
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client={{ adsense_publisher_id|urlencode }}" crossorigin="anonymous"></script>
+{% endif %}
