@@ -50,6 +50,8 @@ LEGACY_UPLOAD_DIRS = (Path("uploads"), Path("static/uploads/images"), Path("/app
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 UPLOAD_IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
+MAX_UPLOAD_IMAGE_BYTES = 20 * 1024 * 1024
+UPLOAD_COPY_CHUNK_SIZE = 1024 * 1024
 IMAGE_VARIANT_WIDTHS = (480, 960, 1440)
 APP_VERSION = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
 logger = logging.getLogger(__name__)
@@ -589,18 +591,24 @@ def save_image_upload(file, alt_text: str = "") -> MediaAsset | None:
         return None
     content_type = file.content_type or ""
     if content_type not in ALLOWED_IMAGE_TYPES:
-        raise HTTPException(status_code=400, detail="Only JPG, PNG and WEBP images can be uploaded.")
+        raise HTTPException(status_code=400, detail="Only JPG, JPEG, PNG and WEBP images can be uploaded.")
     ensure_upload_dir()
     original_name = Path(file.filename or "image").name
     suffix = Path(original_name).suffix.lower() or ".jpg"
     if suffix not in UPLOAD_IMAGE_SUFFIXES:
-        raise HTTPException(status_code=400, detail="Only JPG, PNG and WEBP images can be uploaded.")
+        raise HTTPException(status_code=400, detail="Only JPG, JPEG, PNG and WEBP images can be uploaded.")
     target = UPLOAD_DIR / safe_media_filename(original_name)
     while target.exists():
         target = UPLOAD_DIR / safe_media_filename(original_name)
     safe_root = target.stem
+    bytes_written = 0
     with target.open("wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+        while chunk := file.file.read(UPLOAD_COPY_CHUNK_SIZE):
+            bytes_written += len(chunk)
+            if bytes_written > MAX_UPLOAD_IMAGE_BYTES:
+                target.unlink(missing_ok=True)
+                raise HTTPException(status_code=413, detail="Image uploads are limited to 20 MB.")
+            buffer.write(chunk)
     try:
         with Image.open(target) as img:
             img.verify()

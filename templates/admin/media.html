@@ -4,7 +4,7 @@
 {% block content %}
 {% if request.query_params.get('warning') == 'used' %}<div class="alert warning">This image is used by articles and cannot be deleted.</div>{% endif %}
 <section class="panel media-upload-panel">
-  <div class="panel-head wrap"><div><h2>Upload images</h2><p class="muted">Upload JPG, JPEG, PNG or WEBP assets. Files are stored in {{ upload_dir }} with safe unique filenames and responsive WEBP sizes.</p></div></div>
+  <div class="panel-head wrap"><div><h2>Upload images</h2><p class="muted">Upload JPG, JPEG, PNG or WEBP assets up to 20 MB each. Files are stored in {{ upload_dir }} with safe unique filenames and responsive WEBP sizes.</p></div></div>
   <form method="post" enctype="multipart/form-data" class="upload-box media-dropzone" id="mediaUploadForm">
     <label class="drop-area" id="mediaDropArea">
       <input id="mediaFiles" name="files" type="file" accept="image/jpeg,image/png,image/webp" multiple required>
