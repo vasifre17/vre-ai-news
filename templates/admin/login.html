@@ -1,23 +1,82 @@
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="az" data-theme="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>VREYC Admin Login</title>
+  <title>Vasif REYC Admin</title>
   <link rel="stylesheet" href="/assets/admin.css">
 </head>
-<body class="login-page">
-  <main class="login-card">
-    <div class="login-mark">V</div>
-    <p class="eyebrow">Secure admin access</p>
-    <h1>Welcome back</h1>
-    <p class="muted">Sign in to manage VREYC articles, media, translations and publishing operations.</p>
-    {% if error %}<div class="alert danger">{{ error }}</div>{% endif %}
-    <form method="post" class="stack">
-      <label>Username<input name="username" autocomplete="username" required></label>
-      <label>Password<input name="password" type="password" autocomplete="current-password" required></label>
-      <button class="btn primary full" type="submit">Login to dashboard</button>
-    </form>
+<body class="login-page premium-login-page">
+  <div class="login-orb login-orb-one" aria-hidden="true"></div>
+  <div class="login-orb login-orb-two" aria-hidden="true"></div>
+  <main class="premium-login-shell" aria-labelledby="admin-login-title">
+    <section class="login-hero-panel" aria-label="Vasif REYC admin console overview">
+      <div class="login-hero-brand">
+        <div class="login-mark premium-login-mark">V</div>
+        <div>
+          <p class="eyebrow">Premium Newsroom Console</p>
+          <h1 id="admin-login-title">Vasif REYC Admin</h1>
+        </div>
+      </div>
+      <p class="login-hero-tagline">Operativ • Dəqiq • Etibarlı</p>
+      <p class="muted login-hero-copy">Secure access for managing VREYC editorial operations, publishing workflows, and newsroom quality controls.</p>
+      <div class="login-status-grid" aria-label="System status">
+        <span class="login-status-badge"><i aria-hidden="true"></i>Server Online</span>
+        <span class="login-status-badge"><i aria-hidden="true"></i>SEO Active</span>
+        <span class="login-status-badge"><i aria-hidden="true"></i>Security Enabled</span>
+      </div>
+    </section>
+
+    <section class="login-card premium-login-card" aria-label="Admin login form">
+      <div class="login-card-head">
+        <div>
+          <p class="eyebrow">Secure admin access</p>
+          <h2>Welcome back</h2>
+        </div>
+        <div class="admin-language-switcher login-language-switcher" role="group" aria-label="Admin language" data-i18n-skip>
+          <button class="admin-language-option" type="button" data-admin-language-option="az" aria-pressed="true">🇦🇿 AZ</button>
+          <button class="admin-language-option" type="button" data-admin-language-option="en" aria-pressed="false">🇬🇧 EN</button>
+        </div>
+      </div>
+      <p class="muted login-form-intro">Sign in to continue to the premium newsroom console.</p>
+      {% if error %}<div class="alert danger login-error" role="alert">{{ error }}</div>{% endif %}
+      <form method="post" class="stack premium-login-form">
+        <label class="login-field">Username
+          <input name="username" autocomplete="username" placeholder="Username" required autofocus>
+        </label>
+        <label class="login-field">Password
+          <span class="password-field-wrap">
+            <input id="admin-password" name="password" type="password" autocomplete="current-password" placeholder="Password" required>
+            <button class="password-toggle" type="button" aria-label="Show password" aria-controls="admin-password" data-show-label="Show password" data-hide-label="Hide password">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5c5.2 0 8.7 4.4 9.7 5.9.2.3.2.8 0 1.1C20.7 13.6 17.2 18 12 18s-8.7-4.4-9.7-5.9a1 1 0 0 1 0-1.1C3.3 9.4 6.8 5 12 5Zm0 2C8.4 7 5.7 9.7 4.4 11.5 5.7 13.3 8.4 16 12 16s6.3-2.7 7.6-4.5C18.3 9.7 15.6 7 12 7Zm0 2a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5Z"/></svg>
+            </button>
+          </span>
+        </label>
+        <label class="remember-row"><input name="remember" type="checkbox" value="1"> <span>Remember me</span></label>
+        <button class="btn primary full login-submit" type="submit">Login</button>
+      </form>
+    </section>
   </main>
+  <script src="/assets/admin-i18n.js" defer></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const toggle = document.querySelector('.password-toggle');
+      const password = document.querySelector('#admin-password');
+      if (!toggle || !password) return;
+      const syncLabel = () => {
+        const hidden = password.type === 'password';
+        const source = hidden ? toggle.dataset.showLabel : toggle.dataset.hideLabel;
+        const label = window.VREYCAdminI18n?.translate(source, window.VREYCAdminI18n.getLanguage()) || source;
+        toggle.setAttribute('aria-label', label);
+        toggle.classList.toggle('is-visible', !hidden);
+      };
+      toggle.addEventListener('click', () => {
+        password.type = password.type === 'password' ? 'text' : 'password';
+        syncLabel();
+      });
+      window.addEventListener('admin-language-change', syncLabel);
+      syncLabel();
+    });
+  </script>
 </body>
 </html>
