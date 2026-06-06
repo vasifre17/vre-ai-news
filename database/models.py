@@ -49,6 +49,7 @@ class ArticleView(Base):
     device_type = Column(String(40), default="desktop", index=True)
     country_code = Column(String(8), default="XX", index=True)
     country_name = Column(String(120), default="Unknown", index=True)
+    is_admin_traffic = Column(Boolean, default=False, index=True)
 
     article = relationship("Article", back_populates="views")
 

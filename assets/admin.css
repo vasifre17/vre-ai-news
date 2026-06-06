@@ -582,3 +582,7 @@
   .premium-dashboard-card{background:linear-gradient(145deg,rgba(255,255,255,.94),rgba(232,245,255,.76))}
   .device-chart{box-shadow:inset 0 0 0 18px rgba(255,255,255,.82),0 18px 45px rgba(15,23,42,.12)}
 }
+.seo-fix-center-panel{background:linear-gradient(135deg,rgba(53,212,154,.12),rgba(72,166,255,.12)),var(--panel)}
+.seo-fix-actions{display:grid;grid-template-columns:1fr;gap:.65rem;margin-top:1rem}
+.seo-fix-actions form{margin:0}
+@media(min-width:1180px){.seo-fix-center-panel{grid-column:span 1}}

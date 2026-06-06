@@ -48,6 +48,9 @@
     setText('[data-analytics-value="online.last_5_min"]', formatNumber(payload.online_visitors?.last_5_min));
     setText('[data-analytics-value="online.last_15_min"]', formatNumber(payload.online_visitors?.last_15_min));
     setText('[data-analytics-value="online.last_60_min"]', formatNumber(payload.online_visitors?.last_60_min));
+    setText('[data-analytics-value="traffic.public_visitors"]', formatNumber(payload.traffic_quality?.public_visitors));
+    setText('[data-analytics-value="traffic.public_views"]', formatNumber(payload.traffic_quality?.public_views));
+    setText('[data-analytics-value="traffic.admin_traffic"]', formatNumber(payload.traffic_quality?.admin_traffic));
     setText('[data-analytics-value="generated_at"]', formatTime(payload.generated_at));
   };
 
