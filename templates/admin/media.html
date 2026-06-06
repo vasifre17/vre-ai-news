@@ -85,8 +85,12 @@
   document.querySelectorAll('.copy-path').forEach((button) => {
     button.addEventListener('click', async () => {
       await navigator.clipboard.writeText(button.dataset.url);
-      button.textContent = 'Copied';
-      setTimeout(() => { button.textContent = 'Copy URL'; }, 1200);
+      const language = window.VREYCAdminI18n?.getLanguage?.() || 'az';
+      button.textContent = window.VREYCAdminI18n?.translate?.('Copied', language) || 'Copied';
+      setTimeout(() => {
+        const nextLanguage = window.VREYCAdminI18n?.getLanguage?.() || language;
+        button.textContent = window.VREYCAdminI18n?.translate?.('Copy URL', nextLanguage) || 'Copy URL';
+      }, 1200);
     });
   });
 })();

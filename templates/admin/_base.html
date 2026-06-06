@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="az" data-theme="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -30,11 +30,16 @@
         <h1>{{ heading or title or 'Dashboard' }}</h1>
       </div>
       <div class="topbar-actions">
+        <div class="admin-language-switcher" role="group" aria-label="Admin language" data-i18n-skip>
+          <button class="admin-language-option" type="button" data-admin-language-option="az" aria-pressed="true">🇦🇿 AZ</button>
+          <button class="admin-language-option" type="button" data-admin-language-option="en" aria-pressed="false">🇬🇧 EN</button>
+        </div>
         <a class="btn ghost" href="/" target="_blank">View site</a>
         <form method="post" action="/admin/logout"><button class="btn danger" type="submit">Logout</button></form>
       </div>
     </header>
     {% block content %}{% endblock %}
   </div>
+  <script src="/assets/admin-i18n.js" defer></script>
 </body>
 </html>
