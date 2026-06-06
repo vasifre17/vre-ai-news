@@ -1786,7 +1786,7 @@ def login(request: Request, username: str = Form(...), password: str = Form(...)
     if username == settings.admin_username and settings.admin_password_hash and verify_password(password, settings.admin_password_hash):
         set_session(request, username)
         return RedirectResponse('/admin', status_code=302)
-    return templates.TemplateResponse('admin/login.html', {'request': request, 'error': 'Invalid credentials'}, status_code=401)
+    return templates.TemplateResponse('admin/login.html', {'request': request, 'error': 'Wrong username or password'}, status_code=401)
 
 
 @app.post('/admin/logout')
