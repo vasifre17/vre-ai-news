@@ -1,6 +1,6 @@
 {% extends "admin/_base.html" %}
-{% set title = 'Dashboard 2.0 | VREYC Admin' %}
-{% set heading = 'VREYC Admin Dashboard 2.0' %}
+{% set title = 'Dashboard 3.0 | VREYC Admin' %}
+{% set heading = 'VREYC Admin Dashboard 3.0' %}
 {% macro chart_block(title, rows) -%}
   <div class="analytics-chart dashboard-chart-card">
     <div class="chart-title"><strong>{{ title }}</strong><span>{{ rows|sum(attribute='views') }} views</span></div>
@@ -25,8 +25,8 @@
 <section class="dashboard-hero panel">
   <div>
     <p class="eyebrow">Premium newsroom command center</p>
-    <h2>Dashboard 2.0</h2>
-    <p class="muted">A cleaner desktop grid and mobile-first control center for analytics, SEO, system health, and editorial workflow.</p>
+    <h2>Dashboard 3.0</h2>
+    <p class="muted">A cleaner desktop grid and mobile-first control center for real-time analytics, SEO, system health, and editorial workflow.</p>
   </div>
   <div class="dashboard-hero-actions">
     <a class="btn primary" href="/admin/articles/new">New article</a>
@@ -45,6 +45,49 @@
   <article class="stat-card premium-stat-card accent-green"><span>SEO health score</span><strong>{{ dashboard_status.seo_health_score }}%</strong><small>Average article SEO audit</small></article>
   <article class="stat-card premium-stat-card accent-purple"><span>Google News status</span><strong>{{ dashboard_status.google_news_status }}</strong><small>Based on published SEO readiness</small></article>
   <article class="stat-card premium-stat-card accent-gold"><span>AdSense status</span><strong>{{ dashboard_status.adsense_status }}</strong><small>Publisher ID configuration</small></article>
+</section>
+
+<section class="dashboard-realtime-grid" data-dashboard-analytics aria-live="polite">
+  <article class="panel dashboard-panel premium-dashboard-card online-visitors-panel">
+    <div class="panel-head"><div><p class="eyebrow">Live audience</p><h2><span class="live-status-dot"></span>Real-time online visitors</h2><p class="muted">Refreshes automatically every 30 seconds.</p></div><span class="status-pill ok">Live</span></div>
+    <div class="online-visitor-hero">
+      <span>Current active visitors</span>
+      <strong data-analytics-value="online.current">—</strong>
+    </div>
+    <div class="online-window-grid">
+      <div><span>Last 5 min</span><strong data-analytics-value="online.last_5_min">—</strong></div>
+      <div><span>Last 15 min</span><strong data-analytics-value="online.last_15_min">—</strong></div>
+      <div><span>Last 60 min</span><strong data-analytics-value="online.last_60_min">—</strong></div>
+    </div>
+    <small class="muted">Last refreshed: <span data-analytics-value="generated_at">Loading…</span></small>
+  </article>
+
+  <article class="panel dashboard-panel premium-dashboard-card infrastructure-panel">
+    <div class="panel-head"><div><p class="eyebrow">Infrastructure</p><h2>VPS health monitor</h2></div><span class="health-badge" data-health-status>Checking</span></div>
+    <div class="health-metric-list">
+      <div><span>CPU usage</span><strong><span data-analytics-value="health.cpu">—</span>%</strong><span class="meter"><span data-meter="health.cpu"></span></span></div>
+      <div><span>RAM usage</span><strong><span data-analytics-value="health.ram">—</span>%</strong><span class="meter"><span data-meter="health.ram"></span></span></div>
+      <div><span>Disk usage</span><strong><span data-analytics-value="health.disk">—</span>%</strong><span class="meter"><span data-meter="health.disk"></span></span></div>
+      <div><span>Server uptime</span><strong data-analytics-value="health.uptime">—</strong></div>
+    </div>
+  </article>
+
+  <article class="panel dashboard-panel premium-dashboard-card device-panel">
+    <div class="panel-head"><div><p class="eyebrow">Devices</p><h2>Device statistics</h2></div></div>
+    <div class="device-chart" role="img" aria-label="Device traffic breakdown chart" data-device-chart></div>
+    <div class="device-legend" data-device-legend>
+      <div><span class="legend-dot mobile"></span><span>Mobile</span><strong data-device-percent="mobile">—%</strong></div>
+      <div><span class="legend-dot desktop"></span><span>Desktop</span><strong data-device-percent="desktop">—%</strong></div>
+      <div><span class="legend-dot tablet"></span><span>Tablet</span><strong data-device-percent="tablet">—%</strong></div>
+    </div>
+  </article>
+
+  <article class="panel dashboard-panel premium-dashboard-card countries-panel">
+    <div class="panel-head"><div><p class="eyebrow">Geography</p><h2>Top countries</h2></div></div>
+    <div class="country-list" data-country-list>
+      <p class="muted">Loading country traffic…</p>
+    </div>
+  </article>
 </section>
 
 <section class="dashboard-grid-v2">
@@ -153,4 +196,5 @@
     {% for log in logs %}<div><strong>{{ log.level }}</strong><p>{{ log.message }}</p><small>{{ log.created_at|format_published_at }}</small></div>{% else %}<p class="muted">No pipeline logs yet.</p>{% endfor %}
   </div>
 </section>
+<script src="/assets/dashboard-analytics.js" defer></script>
 {% endblock %}
