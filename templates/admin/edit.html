@@ -19,8 +19,8 @@
           <label>Title<input name="title_{{ lang }}" value="{{ item.title if item else '' }}" {% if lang == 'az' %}required{% endif %}></label>
           <label>Slug<input name="slug_{{ lang }}" value="{{ item.slug if item else '' }}" placeholder="seo-friendly-slug"></label>
         </div>
-        <label>SEO title<input name="seo_title_{{ lang }}" value="{{ item.seo_title if item else '' }}"></label>
-        <label>Meta description<textarea name="meta_description_{{ lang }}" rows="2">{{ item.meta_description if item else '' }}</textarea></label>
+        <label>SEO title<input id="seo_title_{{ lang }}" name="seo_title_{{ lang }}" value="{{ item.seo_title if item else '' }}"></label>
+        <label>Meta description<textarea id="meta_description_{{ lang }}" name="meta_description_{{ lang }}" rows="2">{{ item.meta_description if item else '' }}</textarea></label>
         <label>Summary<textarea name="summary_{{ lang }}" rows="3">{{ item.summary if item else '' }}</textarea></label>
         <label class="rich-editor-field">Content
           <textarea class="rich-editor-source" name="content_{{ lang }}" rows="10">{{ item.content if item else '' }}</textarea>

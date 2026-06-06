@@ -1,13 +1,20 @@
 {% extends "admin/_base.html" %}
-{% set title = 'Articles | VREYC Admin' %}
-{% set heading = 'Article management' %}
+{% set title = 'Articles 2.0 | VREYC Admin' %}
+{% set heading = 'Articles 2.0' %}
 {% block content %}
-<section class="panel">
-  <div class="panel-head wrap"><div><h2>Editorial articles</h2><p class="muted">Create, edit, publish, unpublish and delete newsroom content without loading the entire archive at once.</p></div><div class="actions"><form method="post" action="/admin/translations/generate-missing"><button class="btn" type="submit">Generate translations for all missing articles</button></form><form method="post" action="/admin/articles/publish-due?return_to=/admin/articles" class="inline-form"><button class="btn" type="submit">Publish due scheduled articles now</button></form><a class="btn primary" href="/admin/articles/new">Create article</a></div></div>
+<section class="panel articles-20-panel">
+  <div class="panel-head wrap articles-20-hero">
+    <div>
+      <p class="eyebrow">Editorial command center</p>
+      <h2>Articles 2.0</h2>
+      <p class="muted">Create, edit, publish, unpublish and delete newsroom content from a faster desktop grid and mobile card workflow.</p>
+    </div>
+    <div class="actions articles-20-actions"><form method="post" action="/admin/translations/generate-missing"><button class="btn" type="submit">Generate translations for all missing articles</button></form><form method="post" action="/admin/articles/publish-due?return_to=/admin/articles" class="inline-form"><button class="btn" type="submit">Publish due scheduled articles now</button></form><a class="btn primary" href="/admin/articles/new">Create article</a></div>
+  </div>
   {% if request.query_params.get('published_due') is not none %}<div class="alert success">Published {{ request.query_params.get('published_due') }} due scheduled article(s).</div>{% endif %}
   {% if not ai_translation_status.configured %}<div class="alert danger">{{ ai_translation_status.message }}</div>{% endif %}
 
-  <form class="article-filters" method="get" action="/admin/articles" id="articleFilters">
+  <form class="article-filters articles-20-filters" method="get" action="/admin/articles" id="articleFilters">
     <label class="search-field">Search articles
       <input id="articleSearch" name="q" value="{{ filters.q }}" placeholder="Instant search by title, slug or content" autocomplete="off">
     </label>
@@ -53,9 +60,9 @@
     <div class="filter-actions"><button class="btn primary" type="submit">Apply filters</button><a class="btn" href="/admin/articles">Reset</a></div>
   </form>
 
-  <div class="article-list-meta"><strong>{{ total }}</strong> article{{ '' if total == 1 else 's' }} found · Page {{ page }} of {{ total_pages }}</div>
+  <div class="article-list-meta articles-20-meta"><strong>{{ total }}</strong> article{{ '' if total == 1 else 's' }} found · Page {{ page }} of {{ total_pages }}</div>
 
-  <form id="bulkForm" class="bulk-actions" method="post" action="/admin/articles/bulk{% if request.url.query %}?{{ request.url.query }}{% endif %}" onsubmit="return confirmBulkAction(event)">
+  <form id="bulkForm" class="bulk-actions articles-20-bulk" method="post" action="/admin/articles/bulk{% if request.url.query %}?{{ request.url.query }}{% endif %}" onsubmit="return confirmBulkAction(event)">
     <select name="bulk_action" id="bulkAction" aria-label="Bulk action">
       <option value="">Bulk action…</option>
       <option value="publish">Bulk publish</option>
@@ -71,15 +78,37 @@
     <button class="btn danger" type="submit">Apply to selected</button>
   </form>
 
-  <div class="tabs"><a class="{{ 'active' if status == 'all' else '' }}" href="{{ request.url.include_query_params(status='all', page=1) }}">All</a><a class="{{ 'active' if status == 'draft' else '' }}" href="{{ request.url.include_query_params(status='draft', page=1) }}">Drafts</a><a class="{{ 'active' if status == 'scheduled' else '' }}" href="{{ request.url.include_query_params(status='scheduled', page=1) }}">Scheduled</a><a class="{{ 'active' if status == 'published' else '' }}" href="{{ request.url.include_query_params(status='published', page=1) }}">Published</a></div>
-  <div class="table-wrap"><table><thead><tr><th><input type="checkbox" id="selectAllArticles" aria-label="Select all articles on page"></th><th>Title</th><th>Category</th><th>Status</th><th>Publish at</th><th>Views</th><th>SEO</th><th>Updated</th><th>Homepage</th><th>Languages</th><th>Narration</th><th>Actions</th></tr></thead><tbody>
+  <div class="tabs articles-20-tabs"><a class="{{ 'active' if status == 'all' else '' }}" href="{{ request.url.include_query_params(status='all', page=1) }}">All</a><a class="{{ 'active' if status == 'draft' else '' }}" href="{{ request.url.include_query_params(status='draft', page=1) }}">Drafts</a><a class="{{ 'active' if status == 'scheduled' else '' }}" href="{{ request.url.include_query_params(status='scheduled', page=1) }}">Scheduled</a><a class="{{ 'active' if status == 'published' else '' }}" href="{{ request.url.include_query_params(status='published', page=1) }}">Published</a></div>
+  <div class="table-wrap articles-20-table-wrap"><table class="articles-20-table"><thead><tr><th><input type="checkbox" id="selectAllArticles" aria-label="Select all articles on page"></th><th>Thumbnail</th><th>Title</th><th>Category</th><th>Status</th><th>Publish date</th><th>Views</th><th>SEO score</th><th>Actions</th></tr></thead><tbody>
     {% for a in articles %}
+    {% set public_url = '/az/' ~ (a.slug or a.id) %}
+    {% set view_count = a.real_view_count or 0 %}
+    {% set view_tier = 'low' if view_count <= 20 else 'medium' if view_count <= 100 else 'high' %}
+    {% set publish_date = a.published_at or a.publish_at or a.created_at %}
+    {% set seo_score = seo_score_map.get(a.id, 0) %}
+    {% set seo_details = seo_detail_map.get(a.id, {}) %}
     <tr>
-      <td><input form="bulkForm" type="checkbox" name="article_ids" value="{{ a.id }}" class="article-select" aria-label="Select {{ a.title or 'Untitled' }}"></td>
-      <td><strong>{{ a.title or 'Untitled' }}</strong><small>{{ a.slug }}</small></td><td>{{ a.category or '—' }}</td><td><span class="badge {{ a.status }}">{{ a.status|title }}</span></td><td>{{ a.publish_at|format_admin_datetime if a.status == 'scheduled' else '—' }}</td><td>{{ a.real_view_count or 0 }}</td><td><span class="seo-score {{ 'good' if seo_score_map.get(a.id, 0) >= 90 else 'warn' if seo_score_map.get(a.id, 0) >= 70 else 'bad' }}">{{ seo_score_map.get(a.id, 0) }}%</span></td><td>{{ a.updated_at|format_published_at }}</td><td><form class="order-form" method="post" action="/admin/articles/{{ a.id }}/order"><input name="homepage_order" type="number" value="{{ a.homepage_order or 100 }}"><button class="btn small">Save</button></form><div class="homepage-flags"><form method="post" action="/admin/articles/{{ a.id }}/feature"><button class="btn small {{ 'primary' if a.is_featured else '' }}" type="submit">{{ 'Featured' if a.is_featured else 'Feature' }}</button></form><form method="post" action="/admin/articles/{{ a.id }}/trending"><button class="btn small {{ 'primary' if a.is_trending else '' }}" type="submit">{{ 'Trending' if a.is_trending else 'Trend' }}</button></form></div></td><td>AZ{% for t in a.translations %}, {{ t.language|upper }}{% endfor %}</td><td>{{ narration_map.get(a.id).status if narration_map.get(a.id) else 'pending' }}</td>
-      <td class="actions"><a class="btn small" href="/admin/articles/{{ a.id }}/edit">Edit</a><a class="btn small" href="/admin/articles/{{ a.id }}/analytics">Analytics</a><form method="post" action="/admin/articles/{{ a.id }}/translations/generate"><button class="btn small" type="submit">Generate missing translations</button></form>{% if a.status != 'published' %}<form method="post" action="/admin/articles/{{ a.id }}/publish"><button class="btn small primary">Publish</button></form>{% else %}<form method="post" action="/admin/articles/{{ a.id }}/unpublish"><button class="btn small">Unpublish</button></form>{% endif %}<form method="post" action="/admin/articles/{{ a.id }}/delete" onsubmit="return confirm('Delete this article? This cannot be undone.')"><button class="btn small danger">Delete</button></form></td>
+      <td data-label="Select"><input form="bulkForm" type="checkbox" name="article_ids" value="{{ a.id }}" class="article-select" aria-label="Select {{ a.title or 'Untitled' }}"></td>
+      <td data-label="Thumbnail" class="article-thumb-cell">{% if a.image_url|uploaded_image_exists %}<img class="article-thumb" src="{{ a.image_url|public_image_url }}" alt="{{ a.title or 'Article thumbnail' }}" loading="lazy">{% else %}<span class="article-thumb article-thumb-placeholder">V</span>{% endif %}</td>
+      <td data-label="Title" class="article-title-cell"><strong>{{ a.title or 'Untitled' }}</strong><small>{{ a.slug }}</small><div class="article-row-extras"><span>Updated: {{ a.updated_at|format_published_at }}</span><span>Languages: AZ{% for t in a.translations %}, {{ t.language|upper }}{% endfor %}</span><span>Narration: {{ narration_map.get(a.id).status if narration_map.get(a.id) else 'pending' }}</span></div></td>
+      <td data-label="Category">{{ a.category or '—' }}</td>
+      <td data-label="Status"><span class="badge {{ a.status }}">{{ a.status|title }}</span></td>
+      <td data-label="Publish date">{{ publish_date|format_admin_datetime if publish_date else '—' }}</td>
+      <td data-label="Views"><span class="view-badge {{ view_tier }}">{{ view_count }} <span>{{ view_tier }}</span></span></td>
+      <td data-label="SEO score" class="seo-detail-cell">
+        <details class="seo-popover">
+          <summary><span class="seo-score {{ 'good' if seo_score >= 90 else 'warn' if seo_score >= 70 else 'bad' }}">{{ seo_score }}%</span></summary>
+          <div class="seo-detail-grid">
+            {% for key, label in [('meta_title','Meta title'),('meta_description','Meta description'),('image_alt','Image alt'),('canonical','Canonical'),('schema','Schema'),('hreflang','Hreflang')] %}
+            {% set detail = seo_details.get(key, {}) %}
+            <div class="seo-detail-row"><span class="seo-check {{ 'ok' if detail.get('ok') else 'missing' }}">{{ '✓' if detail.get('ok') else '!' }}</span><div><strong>{{ label }}</strong><small>{{ detail.get('value') or 'Missing' }}</small></div></div>
+            {% endfor %}
+          </div>
+        </details>
+      </td>
+      <td data-label="Actions" class="actions article-actions"><a class="btn small" href="/admin/articles/{{ a.id }}/edit">Edit</a><a class="btn small" href="{{ public_url }}" target="_blank" rel="noopener">View</a><button class="btn small copy-url-button" type="button" data-copy-url="{{ public_url }}">Copy URL</button><a class="btn small primary" href="/admin/articles/{{ a.id }}/edit#seo_title_az">Improve SEO</a><a class="btn small" href="/admin/articles/{{ a.id }}/analytics">Analytics</a><form class="order-form article-order-inline" method="post" action="/admin/articles/{{ a.id }}/order"><input name="homepage_order" type="number" value="{{ a.homepage_order or 100 }}" aria-label="Homepage order"><button class="btn small">Save order</button></form><form method="post" action="/admin/articles/{{ a.id }}/feature"><button class="btn small {{ 'primary' if a.is_featured else '' }}" type="submit">{{ 'Featured' if a.is_featured else 'Feature' }}</button></form><form method="post" action="/admin/articles/{{ a.id }}/trending"><button class="btn small {{ 'primary' if a.is_trending else '' }}" type="submit">{{ 'Trending' if a.is_trending else 'Trend' }}</button></form><form method="post" action="/admin/articles/{{ a.id }}/translations/generate"><button class="btn small" type="submit">Generate missing translations</button></form>{% if a.status != 'published' %}<form method="post" action="/admin/articles/{{ a.id }}/publish"><button class="btn small primary">Publish</button></form>{% else %}<form method="post" action="/admin/articles/{{ a.id }}/unpublish"><button class="btn small">Unpublish</button></form>{% endif %}<form method="post" action="/admin/articles/{{ a.id }}/delete" onsubmit="return confirm('Delete this article? This cannot be undone.')"><button class="btn small danger">Delete</button></form></td>
     </tr>
-    {% else %}<tr><td colspan="12">No articles found for these filters.</td></tr>{% endfor %}
+    {% else %}<tr><td colspan="9">No articles found for these filters.</td></tr>{% endfor %}
   </tbody></table></div>
 
   <nav class="pagination" aria-label="Article pagination">
@@ -106,6 +135,18 @@
   const selectAll = document.getElementById('selectAllArticles');
   const checkboxes = Array.from(document.querySelectorAll('.article-select'));
   if (selectAll) selectAll.addEventListener('change', () => checkboxes.forEach(cb => cb.checked = selectAll.checked));
+  document.querySelectorAll('.copy-url-button').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const target = new URL(button.dataset.copyUrl || '/', window.location.origin).href;
+      try {
+        await navigator.clipboard.writeText(target);
+        button.textContent = 'Copied';
+        setTimeout(() => { button.textContent = 'Copy URL'; }, 1400);
+      } catch (error) {
+        window.prompt('Copy URL', target);
+      }
+    });
+  });
   window.confirmBulkAction = (event) => {
     const selected = checkboxes.filter(cb => cb.checked);
     const action = document.getElementById('bulkAction')?.value;

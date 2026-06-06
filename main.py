@@ -2288,10 +2288,30 @@ def admin_articles(
     articles = attach_real_view_counts(db, apply_admin_article_sort(query, sort).offset((page - 1) * per_page).limit(per_page).all())
     narration_map = {n.article_id: n for n in db.query(ArticleNarration).filter(ArticleNarration.article_id.in_([a.id for a in articles] or [0])).all()}
     translation_missing_map = {a.id: missing_translation_languages(a) for a in articles}
-    seo_score_map = {a.id: article_seo_audit(a, 'az')['score'] for a in articles}
+    article_image_urls = [public_image_url(a.image_url) for a in articles if public_image_url(a.image_url)]
+    media_alt_map = {
+        public_image_url(asset.url or asset.path): asset.alt_text
+        for asset in db.query(MediaAsset).filter(or_(MediaAsset.url.in_(article_image_urls or [""]), MediaAsset.path.in_(article_image_urls or [""]))).all()
+    }
+    seo_audit_map = {a.id: article_seo_audit(a, 'az') for a in articles}
+    seo_score_map = {article_id: audit['score'] for article_id, audit in seo_audit_map.items()}
+    seo_detail_map = {}
+    for article in articles:
+        audit = seo_audit_map.get(article.id, {})
+        checks = audit.get('checks', {})
+        view = localized_article_view(article, 'az')
+        image_public_url = public_image_url(article.image_url)
+        seo_detail_map[article.id] = {
+            "meta_title": {"ok": checks.get("meta_title", False), "value": view.seo_title or ""},
+            "meta_description": {"ok": checks.get("meta_description", False), "value": view.meta_description or ""},
+            "image_alt": {"ok": bool(media_alt_map.get(image_public_url)), "value": media_alt_map.get(image_public_url) or ""},
+            "canonical": {"ok": checks.get("canonical", False), "value": article_url('az', view.slug) if view.slug else ""},
+            "schema": {"ok": checks.get("schema", False), "value": "Ready" if checks.get("schema", False) else "Needs published date, title and image"},
+            "hreflang": {"ok": checks.get("hreflang", False), "value": ", ".join(SUPPORTED_LANGUAGES)},
+        }
     categories = admin_article_categories(db)
     filters = {"q": q, "status": status, "category": category, "language": language, "date_from": date_from, "date_to": date_to, "sort": sort, "page": page, "per_page": per_page}
-    return templates.TemplateResponse("admin/articles.html", {"request": request, "articles": articles, "status": status, "narration_map": narration_map, "translation_missing_map": translation_missing_map, "seo_score_map": seo_score_map, "languages": SUPPORTED_LANGUAGES, "language_labels": LANGUAGE_LABELS, "categories": categories, "filters": filters, "total": total, "total_pages": total_pages, "page": page, "per_page": per_page, "ai_translation_status": ai_translation_status()})
+    return templates.TemplateResponse("admin/articles.html", {"request": request, "articles": articles, "status": status, "narration_map": narration_map, "translation_missing_map": translation_missing_map, "seo_score_map": seo_score_map, "seo_detail_map": seo_detail_map, "languages": SUPPORTED_LANGUAGES, "language_labels": LANGUAGE_LABELS, "categories": categories, "filters": filters, "total": total, "total_pages": total_pages, "page": page, "per_page": per_page, "ai_translation_status": ai_translation_status()})
 
 
 
