@@ -1,22 +1,45 @@
 {% extends "admin/_base.html" %}
-{% set title = 'Articles 2.0 | VREYC Admin' %}
-{% set heading = 'Articles 2.0' %}
+{% set title = 'Articles 4.0 | VREYC Admin' %}
+{% set heading = 'Articles 4.0' %}
+{% set stat_cards = [
+  ('Total Articles', admin_article_stats.total, 'All newsroom records'),
+  ('Published', admin_article_stats.published, 'Live stories'),
+  ('Scheduled', admin_article_stats.scheduled, 'Queued for publish'),
+  ('Drafts', admin_article_stats.drafts, 'Needs editorial work'),
+  ('SEO Issues', admin_article_stats.seo_issues, 'Needs optimization'),
+  ('Google News Ready', admin_article_stats.google_news_ready, 'Ready for discovery')
+] %}
 {% block content %}
-<section class="panel articles-20-panel">
-  <div class="panel-head wrap articles-20-hero">
+<section class="panel articles-premium-panel">
+  <div class="panel-head wrap articles-premium-hero">
     <div>
       <p class="eyebrow">Editorial command center</p>
-      <h2>Articles 2.0</h2>
-      <p class="muted">Create, edit, publish, unpublish and delete newsroom content from a faster desktop grid and mobile card workflow.</p>
+      <h2>Articles 4.0</h2>
+      <p class="muted">Premium newsroom management for creation, editing, publishing, translations, SEO readiness, homepage placement and bulk workflows.</p>
     </div>
-    <div class="actions articles-20-actions"><form method="post" action="/admin/translations/generate-missing"><button class="btn" type="submit">Generate translations for all missing articles</button></form><form method="post" action="/admin/articles/publish-due?return_to=/admin/articles" class="inline-form"><button class="btn" type="submit">Publish due scheduled articles now</button></form><a class="btn primary" href="/admin/articles/new">Create article</a></div>
+    <div class="actions articles-premium-actions">
+      <form method="post" action="/admin/translations/generate-missing"><button class="btn" type="submit">Generate translations for all missing articles</button></form>
+      <form method="post" action="/admin/articles/publish-due?return_to=/admin/articles" class="inline-form"><button class="btn" type="submit">Publish due scheduled articles now</button></form>
+      <a class="btn primary" href="/admin/articles/new">Create article</a>
+    </div>
   </div>
   {% if request.query_params.get('published_due') is not none %}<div class="alert success">Published {{ request.query_params.get('published_due') }} due scheduled article(s).</div>{% endif %}
-  {% if not ai_translation_status.configured %}<div class="alert danger">{{ ai_translation_status.message }}</div>{% endif %}
+  {% if request.query_params.get('warning') == 'ai_not_configured' or not ai_translation_status.configured %}<div class="alert danger">{{ ai_translation_status.message }}</div>{% endif %}
+  {% if request.query_params.get('ai_action') %}<div class="alert success">AI bulk action queued for selected articles.</div>{% endif %}
 
-  <form class="article-filters articles-20-filters" method="get" action="/admin/articles" id="articleFilters">
-    <label class="search-field">Search articles
-      <input id="articleSearch" name="q" value="{{ filters.q }}" placeholder="Instant search by title, slug or content" autocomplete="off">
+  <div class="articles-premium-stats" aria-label="Article statistics">
+    {% for label, value, helper in stat_cards %}
+    <article class="articles-premium-stat-card">
+      <span>{{ label }}</span>
+      <strong>{{ value }}</strong>
+      <small>{{ helper }}</small>
+    </article>
+    {% endfor %}
+  </div>
+
+  <form class="article-filters articles-premium-filters" method="get" action="/admin/articles" id="articleFilters">
+    <label class="search-field">Search
+      <input id="articleSearch" name="q" value="{{ filters.q }}" placeholder="Search by title, slug or content" autocomplete="off">
     </label>
     <label>Category
       <select name="category">
@@ -38,10 +61,10 @@
         <option value="draft" {{ 'selected' if filters.status == 'draft' else '' }}>Draft</option>
       </select>
     </label>
-    <label>From
+    <label>Date from
       <input type="date" name="date_from" value="{{ filters.date_from }}">
     </label>
-    <label>To
+    <label>Date to
       <input type="date" name="date_to" value="{{ filters.date_to }}">
     </label>
     <label>Sort
@@ -52,7 +75,7 @@
         <option value="recently_updated" {{ 'selected' if filters.sort == 'recently_updated' else '' }}>Most recently updated</option>
       </select>
     </label>
-    <label>Per page
+    <label>Rows per page
       <select name="per_page">
         {% for size in [10, 25, 50, 100] %}<option value="{{ size }}" {{ 'selected' if per_page == size else '' }}>{{ size }}</option>{% endfor %}
       </select>
@@ -60,61 +83,71 @@
     <div class="filter-actions"><button class="btn primary" type="submit">Apply filters</button><a class="btn" href="/admin/articles">Reset</a></div>
   </form>
 
-  <div class="article-list-meta articles-20-meta"><strong>{{ total }}</strong> article{{ '' if total == 1 else 's' }} found · Page {{ page }} of {{ total_pages }}</div>
+  <div class="articles-premium-toolbar">
+    <div class="article-list-meta articles-premium-meta"><strong>{{ total }}</strong> article{{ '' if total == 1 else 's' }} found · Page {{ page }} of {{ total_pages }}</div>
+    <form id="bulkForm" class="bulk-actions articles-premium-bulk" method="post" action="/admin/articles/bulk{% if request.url.query %}?{{ request.url.query }}{% endif %}" onsubmit="return confirmBulkAction(event)">
+      <select name="bulk_action" id="bulkAction" aria-label="Bulk action">
+        <option value="">Bulk action…</option>
+        <option value="publish">Bulk publish</option>
+        <option value="unpublish">Bulk unpublish</option>
+        <option value="category">Bulk category change</option>
+        <option value="delete">Bulk delete</option>
+        <option value="ai_generate_meta" {{ 'disabled' if not ai_translation_status.configured else '' }}>Generate Meta</option>
+        <option value="ai_fix_seo" {{ 'disabled' if not ai_translation_status.configured else '' }}>Fix SEO</option>
+        <option value="ai_translate_missing" {{ 'disabled' if not ai_translation_status.configured else '' }}>Translate Missing Languages</option>
+        <option value="ai_generate_tags" {{ 'disabled' if not ai_translation_status.configured else '' }}>Generate Tags</option>
+        <option value="ai_generate_summary" {{ 'disabled' if not ai_translation_status.configured else '' }}>Generate Summary</option>
+      </select>
+      <select name="bulk_category" id="bulkCategory" aria-label="Bulk category">
+        <option value="">Choose category for category change</option>
+        {% for c in categories %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+      </select>
+      <input name="confirm_bulk_delete" id="bulkDeleteConfirm" placeholder="Type DELETE for bulk delete">
+      <button class="btn danger" type="submit">Apply to selected</button>
+    </form>
+  </div>
 
-  <form id="bulkForm" class="bulk-actions articles-20-bulk" method="post" action="/admin/articles/bulk{% if request.url.query %}?{{ request.url.query }}{% endif %}" onsubmit="return confirmBulkAction(event)">
-    <select name="bulk_action" id="bulkAction" aria-label="Bulk action">
-      <option value="">Bulk action…</option>
-      <option value="publish">Bulk publish</option>
-      <option value="unpublish">Bulk unpublish</option>
-      <option value="category">Bulk category change</option>
-      <option value="delete">Bulk delete</option>
-    </select>
-    <select name="bulk_category" id="bulkCategory" aria-label="Bulk category">
-      <option value="">Choose category for category change</option>
-      {% for c in categories %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
-    </select>
-    <input name="confirm_bulk_delete" id="bulkDeleteConfirm" placeholder="Type DELETE for bulk delete">
-    <button class="btn danger" type="submit">Apply to selected</button>
-  </form>
+  <div class="tabs articles-premium-tabs"><a class="{{ 'active' if status == 'all' else '' }}" href="{{ request.url.include_query_params(status='all', page=1) }}">All</a><a class="{{ 'active' if status == 'draft' else '' }}" href="{{ request.url.include_query_params(status='draft', page=1) }}">Drafts</a><a class="{{ 'active' if status == 'scheduled' else '' }}" href="{{ request.url.include_query_params(status='scheduled', page=1) }}">Scheduled</a><a class="{{ 'active' if status == 'published' else '' }}" href="{{ request.url.include_query_params(status='published', page=1) }}">Published</a></div>
 
-  <div class="tabs articles-20-tabs"><a class="{{ 'active' if status == 'all' else '' }}" href="{{ request.url.include_query_params(status='all', page=1) }}">All</a><a class="{{ 'active' if status == 'draft' else '' }}" href="{{ request.url.include_query_params(status='draft', page=1) }}">Drafts</a><a class="{{ 'active' if status == 'scheduled' else '' }}" href="{{ request.url.include_query_params(status='scheduled', page=1) }}">Scheduled</a><a class="{{ 'active' if status == 'published' else '' }}" href="{{ request.url.include_query_params(status='published', page=1) }}">Published</a></div>
-  <div class="table-wrap articles-20-table-wrap"><table class="articles-20-table"><thead><tr><th><input type="checkbox" id="selectAllArticles" aria-label="Select all articles on page"></th><th>Thumbnail</th><th>Title</th><th>Category</th><th>Status</th><th>Publish date</th><th>Views</th><th>SEO score</th><th>Actions</th></tr></thead><tbody>
+  <div class="table-wrap articles-premium-table-wrap"><table class="articles-premium-table"><thead><tr><th><input type="checkbox" id="selectAllArticles" aria-label="Select all articles on page"></th><th>Thumbnail</th><th>Article</th><th>Status</th><th>Languages</th><th>Homepage</th><th>Views</th><th>SEO</th><th>Google News</th><th>Health</th><th>AI Ready</th><th>Actions</th></tr></thead><tbody>
     {% for a in articles %}
     {% set public_url = '/az/' ~ (a.slug or a.id) %}
     {% set view_count = a.real_view_count or 0 %}
     {% set view_tier = 'low' if view_count <= 20 else 'medium' if view_count <= 100 else 'high' %}
     {% set publish_date = a.published_at or a.publish_at or a.created_at %}
     {% set seo_score = seo_score_map.get(a.id, 0) %}
+    {% set seo_label = 'Excellent' if seo_score >= 95 else 'Good' if seo_score >= 80 else 'Average' if seo_score >= 60 else 'Poor' %}
+    {% set seo_class = 'excellent' if seo_score >= 95 else 'good' if seo_score >= 80 else 'average' if seo_score >= 60 else 'poor' %}
     {% set seo_details = seo_detail_map.get(a.id, {}) %}
+    {% set google_news = google_news_map.get(a.id, {}) %}
+    {% set health = health_score_map.get(a.id, 0) %}
+    {% set language_status = language_status_map.get(a.id, {}) %}
+    {% set ai_ready = health >= 85 and seo_score >= 80 %}
     <tr>
       <td data-label="Select"><input form="bulkForm" type="checkbox" name="article_ids" value="{{ a.id }}" class="article-select" aria-label="Select {{ a.title or 'Untitled' }}"></td>
-      <td data-label="Thumbnail" class="article-thumb-cell">{% if a.image_url|uploaded_image_exists %}<img class="article-thumb" src="{{ a.image_url|public_image_url }}" alt="{{ a.title or 'Article thumbnail' }}" loading="lazy">{% else %}<span class="article-thumb article-thumb-placeholder">V</span>{% endif %}</td>
-      <td data-label="Title" class="article-title-cell"><strong>{{ a.title or 'Untitled' }}</strong><small>{{ a.slug }}</small><div class="article-row-extras"><span>Updated: {{ a.updated_at|format_published_at }}</span><span>Languages: AZ{% for t in a.translations %}, {{ t.language|upper }}{% endfor %}</span><span>Narration: {{ narration_map.get(a.id).status if narration_map.get(a.id) else 'pending' }}</span></div></td>
-      <td data-label="Category">{{ a.category or '—' }}</td>
+      <td data-label="Thumbnail" class="article-thumb-cell">{% if a.image_url|uploaded_image_exists %}<img class="article-thumb" src="{{ a.image_url|public_image_url }}" alt="{{ a.title or 'Article thumbnail' }}" width="120" height="68" loading="lazy">{% else %}<span class="article-thumb article-thumb-placeholder">V</span>{% endif %}</td>
+      <td data-label="Article" class="article-title-cell"><strong>{{ a.title or 'Untitled' }}</strong><small>{{ a.slug }}</small><div class="article-row-extras"><span>{{ a.category or '—' }}</span><span>Publish date: {{ publish_date|format_admin_datetime if publish_date else '—' }}</span><span>Updated: {{ a.updated_at|format_published_at }}</span><span>Narration: {{ narration_map.get(a.id).status if narration_map.get(a.id) else 'pending' }}</span></div></td>
       <td data-label="Status"><span class="badge {{ a.status }}">{{ a.status|title }}</span></td>
-      <td data-label="Publish date">{{ publish_date|format_admin_datetime if publish_date else '—' }}</td>
-      <td data-label="Views"><span class="view-badge {{ view_tier }}">{{ view_count }} <span>{{ view_tier }}</span></span></td>
-      <td data-label="SEO score" class="seo-detail-cell">
-        <details class="seo-popover">
-          <summary><span class="seo-score {{ 'good' if seo_score >= 90 else 'warn' if seo_score >= 70 else 'bad' }}">{{ seo_score }}%</span></summary>
-          <div class="seo-detail-grid">
-            {% for key, label in [('meta_title','Meta title'),('meta_description','Meta description'),('image_alt','Image alt'),('canonical','Canonical'),('schema','Schema'),('hreflang','Hreflang')] %}
-            {% set detail = seo_details.get(key, {}) %}
-            <div class="seo-detail-row"><span class="seo-check {{ 'ok' if detail.get('ok') else 'missing' }}">{{ '✓' if detail.get('ok') else '!' }}</span><div><strong>{{ label }}</strong><small>{{ detail.get('value') or 'Missing' }}</small></div></div>
-            {% endfor %}
-          </div>
-        </details>
-      </td>
-      <td data-label="Actions" class="actions article-actions"><a class="btn small" href="/admin/articles/{{ a.id }}/edit">Edit</a><a class="btn small" href="{{ public_url }}" target="_blank" rel="noopener">View</a><button class="btn small copy-url-button" type="button" data-copy-url="{{ public_url }}">Copy URL</button><a class="btn small primary" href="/admin/articles/{{ a.id }}/edit#seo_title_az">Improve SEO</a><a class="btn small" href="/admin/articles/{{ a.id }}/analytics">Analytics</a><form class="order-form article-order-inline" method="post" action="/admin/articles/{{ a.id }}/order"><input name="homepage_order" type="number" value="{{ a.homepage_order or 100 }}" aria-label="Homepage order"><button class="btn small">Save order</button></form><form method="post" action="/admin/articles/{{ a.id }}/feature"><button class="btn small {{ 'primary' if a.is_featured else '' }}" type="submit">{{ 'Featured' if a.is_featured else 'Feature' }}</button></form><form method="post" action="/admin/articles/{{ a.id }}/trending"><button class="btn small {{ 'primary' if a.is_trending else '' }}" type="submit">{{ 'Trending' if a.is_trending else 'Trend' }}</button></form><form method="post" action="/admin/articles/{{ a.id }}/translations/generate"><button class="btn small" type="submit">Generate missing translations</button></form>{% if a.status != 'published' %}<form method="post" action="/admin/articles/{{ a.id }}/publish"><button class="btn small primary">Publish</button></form>{% else %}<form method="post" action="/admin/articles/{{ a.id }}/unpublish"><button class="btn small">Unpublish</button></form>{% endif %}<form method="post" action="/admin/articles/{{ a.id }}/delete" onsubmit="return confirm('Delete this article? This cannot be undone.')"><button class="btn small danger">Delete</button></form></td>
+      <td data-label="Languages" class="language-cell"><div class="language-badges">{% for lang in languages %}<span class="language-badge {{ 'active' if lang in language_status.available else 'missing' }}">{{ lang|upper }}</span>{% endfor %}</div><span class="language-completeness {{ 'full' if language_status.full else 'partial' }}">{{ 'Full' if language_status.full else 'Partial' }}</span></td>
+      <td data-label="Homepage" class="homepage-cell"><div class="homepage-badges">{% if (a.homepage_order or 100) < 100 %}<span class="workflow-badge homepage">Homepage</span>{% endif %}{% if a.is_featured %}<span class="workflow-badge featured">Featured</span>{% endif %}{% if a.is_trending %}<span class="workflow-badge trend">Trend</span>{% endif %}{% if (a.homepage_order or 100) >= 100 and not a.is_featured and not a.is_trending %}<span class="muted">—</span>{% endif %}</div><form class="order-form article-order-inline" method="post" action="/admin/articles/{{ a.id }}/order"><input name="homepage_order" type="number" value="{{ a.homepage_order or 100 }}" aria-label="Homepage order"><button class="btn small">Save order</button></form></td>
+      <td data-label="Views"><span class="view-badge {{ view_tier }}">👁 {{ view_count }}</span></td>
+      <td data-label="SEO" class="seo-detail-cell"><details class="seo-popover"><summary><span class="seo-score {{ seo_class }}"><strong>{{ seo_score }}%</strong> {{ seo_label }}</span></summary><div class="seo-detail-grid">{% for key, label in [('meta_title','Meta title'),('meta_description','Meta description'),('image_alt','Image alt'),('canonical','Canonical'),('schema','Schema'),('hreflang','Hreflang')] %}{% set detail = seo_details.get(key, {}) %}<div class="seo-detail-row"><span class="seo-check {{ 'ok' if detail.get('ok') else 'missing' }}">{{ '✓' if detail.get('ok') else '!' }}</span><div><strong>{{ label }}</strong><small>{{ detail.get('value') or 'Missing' }}</small></div></div>{% endfor %}</div></details></td>
+      <td data-label="Google News"><span class="google-news-badge {{ google_news.status }}">{{ google_news.label }}</span><small class="status-helper">{{ google_news.helper }}</small></td>
+      <td data-label="Health"><span class="health-badge {{ 'good' if health >= 85 else 'warn' if health >= 65 else 'bad' }}">{{ health }}%</span></td>
+      <td data-label="AI Ready"><span class="ai-ready-badge {{ 'ready' if ai_ready else 'needs' }}">{{ 'Ready' if ai_ready else 'Needs Optimization' }}</span></td>
+      <td data-label="Actions" class="actions article-actions"><a class="btn small" href="/admin/articles/{{ a.id }}/edit" title="Edit">✏️ <span>Edit</span></a><a class="btn small" href="{{ public_url }}" target="_blank" rel="noopener" title="Preview">👁 <span>Preview</span></a><form method="post" action="/admin/articles/{{ a.id }}/duplicate"><button class="btn small" type="submit" title="Duplicate">⧉ <span>Duplicate</span></button></form><form method="post" action="/admin/articles/{{ a.id }}/translations/generate"><button class="btn small" type="submit" title="Translate">🌐 <span>Translate</span></button></form><a class="btn small primary" href="/admin/articles/{{ a.id }}/edit#seo_title_az" title="SEO">⚙️ <span>SEO</span></a><form method="post" action="/admin/articles/{{ a.id }}/feature"><button class="btn small {{ 'primary' if a.is_featured else '' }}" type="submit">⭐ <span>{{ 'Featured' if a.is_featured else 'Feature' }}</span></button></form><form method="post" action="/admin/articles/{{ a.id }}/trending"><button class="btn small {{ 'primary' if a.is_trending else '' }}" type="submit">🔥 <span>{{ 'Trending' if a.is_trending else 'Trend' }}</span></button></form>{% if a.status != 'published' %}<form method="post" action="/admin/articles/{{ a.id }}/publish"><button class="btn small primary">🚀 <span>Publish</span></button></form>{% else %}<form method="post" action="/admin/articles/{{ a.id }}/unpublish"><button class="btn small">⏸ <span>Unpublish</span></button></form>{% endif %}<button class="btn small copy-url-button" type="button" data-copy-url="{{ public_url }}">🔗 <span>Copy URL</span></button><form method="post" action="/admin/articles/{{ a.id }}/delete" onsubmit="return confirm('Delete this article? This cannot be undone.')"><button class="btn small danger">🗑 <span>Delete</span></button></form></td>
     </tr>
-    {% else %}<tr><td colspan="9">No articles found for these filters.</td></tr>{% endfor %}
+    {% else %}<tr><td colspan="12">No articles found for these filters.</td></tr>{% endfor %}
   </tbody></table></div>
 
-  <nav class="pagination" aria-label="Article pagination">
+  <nav class="pagination articles-premium-pagination" aria-label="Article pagination">
+    <a class="btn small {{ 'disabled' if page <= 1 else '' }}" href="{{ request.url.include_query_params(page=1) if page > 1 else '#' }}">First</a>
     <a class="btn small {{ 'disabled' if page <= 1 else '' }}" href="{{ request.url.include_query_params(page=page-1) if page > 1 else '#' }}">Previous</a>
-    <span>Page {{ page }} of {{ total_pages }}</span>
+    {% set start_page = 1 if page - 2 < 1 else page - 2 %}
+    {% set end_page = total_pages if page + 2 > total_pages else page + 2 %}
+    {% for number in range(start_page, end_page + 1) %}<a class="btn small {{ 'primary' if number == page else '' }}" href="{{ request.url.include_query_params(page=number) }}">{{ number }}</a>{% endfor %}
     <a class="btn small {{ 'disabled' if page >= total_pages else '' }}" href="{{ request.url.include_query_params(page=page+1) if page < total_pages else '#' }}">Next</a>
+    <a class="btn small {{ 'disabled' if page >= total_pages else '' }}" href="{{ request.url.include_query_params(page=total_pages) if page < total_pages else '#' }}">Last</a>
   </nav>
 </section>
 <script>
@@ -140,19 +173,20 @@
       const target = new URL(button.dataset.copyUrl || '/', window.location.origin).href;
       try {
         await navigator.clipboard.writeText(target);
-        button.textContent = 'Copied';
-        setTimeout(() => { button.textContent = 'Copy URL'; }, 1400);
+        button.querySelector('span').textContent = 'Copied';
+        setTimeout(() => { button.querySelector('span').textContent = 'Copy URL'; }, 1400);
       } catch (error) {
         window.prompt('Copy URL', target);
       }
     });
   });
-  window.confirmBulkAction = (event) => {
+  window.confirmBulkAction = () => {
     const selected = checkboxes.filter(cb => cb.checked);
     const action = document.getElementById('bulkAction')?.value;
     if (!selected.length) { alert('Select at least one article first.'); return false; }
     if (!action) { alert('Choose a bulk action first.'); return false; }
     if (action === 'category' && !document.getElementById('bulkCategory')?.value) { alert('Choose a category for the selected articles.'); return false; }
+    if (action.startsWith('ai_') && {{ 'false' if ai_translation_status.configured else 'true' }}) { alert('AI provider is not configured. Configure it in Settings before using AI bulk tools.'); return false; }
     if (action === 'delete') {
       const typed = document.getElementById('bulkDeleteConfirm')?.value.trim().toUpperCase();
       if (typed !== 'DELETE') { alert('Type DELETE in the confirmation field before bulk deletion.'); return false; }
