@@ -1,8 +1,8 @@
 {% extends "admin/_base.html" %}
-{% set title = 'Dashboard | VREYC Admin' %}
-{% set heading = 'VREYC Admin Dashboard' %}
+{% set title = 'Dashboard 2.0 | VREYC Admin' %}
+{% set heading = 'VREYC Admin Dashboard 2.0' %}
 {% macro chart_block(title, rows) -%}
-  <div class="analytics-chart">
+  <div class="analytics-chart dashboard-chart-card">
     <div class="chart-title"><strong>{{ title }}</strong><span>{{ rows|sum(attribute='views') }} views</span></div>
     <div class="bar-chart" role="img" aria-label="{{ title }} traffic chart">
       {% for row in rows %}
@@ -15,26 +15,102 @@
     </div>
   </div>
 {%- endmacro %}
+{% macro status_row(label, value, state='neutral') -%}
+  <div class="dashboard-status-row">
+    <span>{{ label }}</span>
+    <strong class="status-pill {{ state }}">{{ value }}</strong>
+  </div>
+{%- endmacro %}
 {% block content %}
-<section class="stats-grid dashboard-stats analytics-stats">
-  <article class="stat-card"><span>Total views</span><strong>{{ analytics.total_views }}</strong><small>Real tracked views</small></article>
-  <article class="stat-card"><span>Views today</span><strong>{{ analytics.views_today }}</strong><small>Since 00:00 UTC</small></article>
-  <article class="stat-card"><span>Views last 7 days</span><strong>{{ analytics.views_7_days }}</strong><small>Rolling weekly traffic</small></article>
-  <article class="stat-card"><span>Views last 30 days</span><strong>{{ analytics.views_30_days }}</strong><small>Rolling monthly traffic</small></article>
-  <article class="stat-card"><span>Unique visitors</span><strong>{{ analytics.unique_visitors }}</strong><small>Distinct visitor fingerprints</small></article>
-  <article class="stat-card"><span>Returning visitors</span><strong>{{ analytics.returning_visitors }}</strong><small>Visitors with 2+ article views</small></article>
+<section class="dashboard-hero panel">
+  <div>
+    <p class="eyebrow">Premium newsroom command center</p>
+    <h2>Dashboard 2.0</h2>
+    <p class="muted">A cleaner desktop grid and mobile-first control center for analytics, SEO, system health, and editorial workflow.</p>
+  </div>
+  <div class="dashboard-hero-actions">
+    <a class="btn primary" href="/admin/articles/new">New article</a>
+    <a class="btn" href="/admin/seo">SEO diagnostics</a>
+  </div>
 </section>
 
-<section class="panel-grid two">
-  <div class="panel">
-    <div class="panel-head"><h2>Top 10 most viewed articles</h2><a href="/admin/articles?sort=most_viewed">Open report</a></div>
+<section class="stats-grid dashboard-stats analytics-stats dashboard-stat-grid-v2">
+  <article class="stat-card premium-stat-card accent-blue"><span>Total articles</span><strong>{{ total_articles }}</strong><small>Editorial inventory</small></article>
+  <article class="stat-card premium-stat-card"><span>Total views</span><strong>{{ analytics.total_views }}</strong><small>Real tracked views</small></article>
+  <article class="stat-card premium-stat-card"><span>Views today</span><strong>{{ analytics.views_today }}</strong><small>Since 00:00 UTC</small></article>
+  <article class="stat-card premium-stat-card"><span>Views last 7 days</span><strong>{{ analytics.views_7_days }}</strong><small>Rolling weekly traffic</small></article>
+  <article class="stat-card premium-stat-card"><span>Views last 30 days</span><strong>{{ analytics.views_30_days }}</strong><small>Rolling monthly traffic</small></article>
+  <article class="stat-card premium-stat-card"><span>Unique visitors</span><strong>{{ analytics.unique_visitors }}</strong><small>Distinct visitor fingerprints</small></article>
+  <article class="stat-card premium-stat-card"><span>Returning visitors</span><strong>{{ analytics.returning_visitors }}</strong><small>Visitors with 2+ article views</small></article>
+  <article class="stat-card premium-stat-card accent-green"><span>SEO health score</span><strong>{{ dashboard_status.seo_health_score }}%</strong><small>Average article SEO audit</small></article>
+  <article class="stat-card premium-stat-card accent-purple"><span>Google News status</span><strong>{{ dashboard_status.google_news_status }}</strong><small>Based on published SEO readiness</small></article>
+  <article class="stat-card premium-stat-card accent-gold"><span>AdSense status</span><strong>{{ dashboard_status.adsense_status }}</strong><small>Publisher ID configuration</small></article>
+</section>
+
+<section class="dashboard-grid-v2">
+  <div class="panel dashboard-panel google-seo-panel">
+    <div class="panel-head"><div><p class="eyebrow">Google & SEO</p><h2>Google & SEO status panel</h2></div><a href="/admin/seo">Open diagnostics</a></div>
+    {{ status_row('XML sitemap status', dashboard_status.google_seo.xml_sitemap_status, 'ok') }}
+    {{ status_row('News sitemap status', dashboard_status.google_seo.news_sitemap_status, 'ok' if published else 'warn') }}
+    {{ status_row('RSS feed status', dashboard_status.google_seo.rss_feed_status, 'ok') }}
+    {{ status_row('Last sitemap refresh', dashboard_status.google_seo.last_sitemap_refresh) }}
+    {{ status_row('Missing meta descriptions', dashboard_status.google_seo.missing_meta_descriptions, 'ok' if dashboard_status.google_seo.missing_meta_descriptions == 0 else 'warn') }}
+    {{ status_row('Missing hreflang', dashboard_status.google_seo.missing_hreflang, 'ok' if dashboard_status.google_seo.missing_hreflang == 0 else 'warn') }}
+  </div>
+
+  <div class="panel dashboard-panel system-health-panel">
+    <div class="panel-head"><div><p class="eyebrow">Infrastructure</p><h2>System health panel</h2></div></div>
+    {{ status_row('Server status', dashboard_status.system_health.server_status, 'ok') }}
+    {{ status_row('Security status', dashboard_status.system_health.security_status, 'ok' if dashboard_status.system_health.security_status == 'Enabled' else 'warn') }}
+    {{ status_row('Upload limit', dashboard_status.system_health.upload_limit) }}
+    {{ status_row('Protected routes', dashboard_status.system_health.protected_routes, 'ok') }}
+  </div>
+
+  <div class="panel dashboard-panel editorial-panel ai-panel">
+    <div class="panel-head"><div><p class="eyebrow">Editorial</p><h2>Editorial workflow panel</h2></div><a class="btn primary" href="/admin/articles/new">New article</a></div>
+    {{ status_row('Published articles', dashboard_status.editorial.published_articles, 'ok') }}
+    {{ status_row('Draft articles', dashboard_status.editorial.draft_articles, 'warn' if drafts else 'ok') }}
+    {{ status_row('Scheduled articles', dashboard_status.editorial.scheduled_articles, 'neutral') }}
+    {{ status_row('Latest article date', dashboard_status.editorial.latest_article_date|format_admin_datetime) }}
+    <form method="post" action="/admin/articles/publish-due?return_to=/admin" class="inline-form dashboard-inline-action">
+      <button class="btn" type="submit">Publish due scheduled articles now</button>
+    </form>
+    {% if request.query_params.get('published_due') is not none %}<p class="muted">Published {{ request.query_params.get('published_due') }} due scheduled article(s).</p>{% endif %}
+  </div>
+
+  <div class="panel dashboard-panel latest-activity-panel">
+    <div class="panel-head"><div><p class="eyebrow">Activity</p><h2>Latest activity panel</h2></div></div>
+    <div class="activity-list premium-activity-list">
+      {% for item in dashboard_status.latest_activity %}
+      <div>
+        <strong>{{ item.label }}</strong>
+        <p>{{ item.detail }}</p>
+        <small>{{ item.timestamp|format_admin_datetime if item.timestamp else '' }}</small>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<section class="panel traffic-overview-panel">
+  <div class="panel-head"><div><p class="eyebrow">Traffic</p><h2>Traffic overview panel</h2><p class="muted">Daily views chart, weekly views chart, and monthly views chart from article analytics.</p></div></div>
+  <div class="traffic-chart-grid dashboard-traffic-grid">
+    {{ chart_block('Daily views', traffic_charts.daily) }}
+    {{ chart_block('Weekly views', traffic_charts.weekly) }}
+    {{ chart_block('Monthly views', traffic_charts.monthly) }}
+  </div>
+</section>
+
+<section class="panel-grid two dashboard-content-grid">
+  <div class="panel enhanced-table-panel">
+    <div class="panel-head"><div><p class="eyebrow">Audience</p><h2>Top 10 most viewed articles</h2></div><a href="/admin/articles?sort=most_viewed">Open report</a></div>
     <div class="table-wrap"><table><thead><tr><th>Title</th><th>Status</th><th>Views</th><th>Analytics</th></tr></thead><tbody>
       {% for article in most_viewed_articles %}<tr><td><a href="/admin/articles/{{ article.id }}/edit">{{ article.title or 'Untitled' }}</a><small>{{ article.slug }}</small></td><td><span class="badge {{ article.status }}">{{ article.status|title }}</span></td><td><strong>{{ article.real_view_count or 0 }}</strong></td><td><a href="/admin/articles/{{ article.id }}/analytics">View details</a></td></tr>{% else %}<tr><td colspan="4">No article views recorded yet.</td></tr>{% endfor %}
     </tbody></table></div>
   </div>
-  <div class="panel">
-    <h2>Top categories</h2>
-    <div class="category-analytics-list">
+  <div class="panel enhanced-category-panel">
+    <div class="panel-head"><div><p class="eyebrow">Categories</p><h2>Top categories</h2></div><a href="/admin/categories">Manage</a></div>
+    <div class="category-analytics-list premium-category-list">
       {% for category in top_categories %}
       <div class="category-analytics-row">
         <div><strong>{{ category.name }}</strong><small>{{ category.views }} views</small></div>
@@ -46,57 +122,33 @@
   </div>
 </section>
 
-<section class="panel">
-  <div class="panel-head"><div><h2>Traffic chart</h2><p class="muted">Daily, weekly, and monthly article view trends.</p></div></div>
-  <div class="traffic-chart-grid">
-    {{ chart_block('Daily views', traffic_charts.daily) }}
-    {{ chart_block('Weekly views', traffic_charts.weekly) }}
-    {{ chart_block('Monthly views', traffic_charts.monthly) }}
+<section class="panel-grid two dashboard-content-grid">
+  <div class="panel enhanced-table-panel">
+    <div class="panel-head"><div><p class="eyebrow">Recently created</p><h2>Latest 10 articles</h2></div><a href="/admin/articles?sort=newest">Manage all</a></div>
+    <div class="table-wrap"><table><thead><tr><th>Title</th><th>Status</th><th>Views</th><th>Created</th></tr></thead><tbody>
+      {% for article in latest_articles %}<tr><td><a href="/admin/articles/{{ article.id }}/edit">{{ article.title or 'Untitled' }}</a><small>{{ article.slug }}</small></td><td><span class="badge {{ article.status }}">{{ article.status|title }}</span></td><td>{{ article.real_view_count or 0 }}</td><td>{{ article.created_at|format_published_at }}</td></tr>{% else %}<tr><td colspan="4">No articles yet.</td></tr>{% endfor %}
+    </tbody></table></div>
   </div>
-</section>
-
-<section class="panel-grid two">
-  <div class="panel ai-panel">
-    <div class="panel-head"><h2>Editorial workflow</h2><a class="btn primary" href="/admin/articles/new">New article</a></div>
-    <div class="workflow-row"><span>AI fetch pipeline</span><strong>Automated</strong></div>
-    <div class="workflow-row"><span>Draft review</span><strong>{{ drafts }} waiting</strong></div>
-    <div class="workflow-row"><span>Published inventory</span><strong>{{ published }} live</strong></div>
-    <div class="workflow-row"><span>Scheduled articles</span><strong>{{ scheduled }} queued</strong></div>
-    <form method="post" action="/admin/articles/publish-due?return_to=/admin" class="inline-form">
-      <button class="btn" type="submit">Publish due scheduled articles now</button>
-    </form>
-    {% if request.query_params.get('published_due') is not none %}<p class="muted">Published {{ request.query_params.get('published_due') }} due scheduled article(s).</p>{% endif %}
-  </div>
-  <div class="panel">
-    <div class="panel-head"><h2>Next scheduled article</h2><a href="/admin/articles?status=scheduled">View scheduled</a></div>
+  <div class="panel visitor-stat-panel">
+    <div class="panel-head"><div><p class="eyebrow">Visitors</p><h2>Visitor statistics</h2></div></div>
+    <div class="visitor-stats premium-visitor-stats">
+      <article><span>Unique visitors</span><strong>{{ analytics.unique_visitors }}</strong><small>Distinct article readers</small></article>
+      <article><span>Returning visitors</span><strong>{{ analytics.returning_visitors }}</strong><small>Repeat article readers</small></article>
+      <article><span>Total views</span><strong>{{ analytics.total_views }}</strong><small>All tracked article views</small></article>
+      <article><span>Views today</span><strong>{{ analytics.views_today }}</strong><small>Current-day performance</small></article>
+    </div>
+    <div class="panel-head compact-next"><div><p class="eyebrow">Schedule</p><h2>Next scheduled article</h2></div><a href="/admin/articles?status=scheduled">View scheduled</a></div>
     {% if next_scheduled_article %}
     <div class="workflow-row"><span>Article</span><strong><a href="/admin/articles/{{ next_scheduled_article.id }}/edit">{{ next_scheduled_article.title or 'Untitled' }}</a></strong></div>
     <div class="workflow-row"><span>Publish at</span><strong>{{ next_scheduled_article.publish_at|format_admin_datetime }}</strong></div>
-    <p class="muted">Displayed in server time. The article remains hidden from public pages and feeds until this time.</p>
     {% else %}
     <p class="muted">No scheduled article is queued.</p>
     {% endif %}
   </div>
 </section>
 
-<section class="panel-grid two">
-  <div class="panel">
-    <div class="panel-head"><h2>Latest 10 articles</h2><a href="/admin/articles?sort=newest">Manage all</a></div>
-    <div class="table-wrap"><table><thead><tr><th>Title</th><th>Status</th><th>Views</th><th>Created</th></tr></thead><tbody>
-      {% for article in latest_articles %}<tr><td><a href="/admin/articles/{{ article.id }}/edit">{{ article.title or 'Untitled' }}</a><small>{{ article.slug }}</small></td><td><span class="badge {{ article.status }}">{{ article.status|title }}</span></td><td>{{ article.real_view_count or 0 }}</td><td>{{ article.created_at|format_published_at }}</td></tr>{% else %}<tr><td colspan="4">No articles yet.</td></tr>{% endfor %}
-    </tbody></table></div>
-  </div>
-  <div class="panel">
-    <h2>Visitor statistics</h2>
-    <div class="visitor-stats">
-      <article><span>Unique visitors</span><strong>{{ analytics.unique_visitors }}</strong><small>Distinct article readers</small></article>
-      <article><span>Returning visitors</span><strong>{{ analytics.returning_visitors }}</strong><small>Repeat article readers</small></article>
-    </div>
-  </div>
-</section>
-
 <section class="panel">
-  <h2>System activity</h2>
+  <div class="panel-head"><div><p class="eyebrow">Pipeline</p><h2>System activity</h2></div></div>
   <div class="activity-list">
     {% for log in logs %}<div><strong>{{ log.level }}</strong><p>{{ log.message }}</p><small>{{ log.created_at|format_published_at }}</small></div>{% else %}<p class="muted">No pipeline logs yet.</p>{% endfor %}
   </div>

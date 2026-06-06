@@ -22,7 +22,7 @@ from slowapi.util import get_remote_address
 from apscheduler.schedulers.background import BackgroundScheduler
 from bs4 import BeautifulSoup
 
-from config import settings
+from config import PLACEHOLDER_VALUES, settings
 from database.session import SessionLocal, init_db
 from database.models import Article, ArticleRevision, ArticleView, FetchLog, Setting, ArticleNarration, ArticleTranslation, Category, MediaAsset
 from cms.auth.security import is_authenticated, set_session, clear_session, verify_password
@@ -1320,6 +1320,60 @@ def analytics_summary(db) -> dict:
     }
 
 
+def format_bytes(value: int) -> str:
+    if value >= 1024 * 1024:
+        return f"{round(value / (1024 * 1024))} MB"
+    if value >= 1024:
+        return f"{round(value / 1024)} KB"
+    return f"{value} B"
+
+
+def dashboard_status_context(db, total_articles: int, published: int, drafts: int, scheduled: int) -> dict:
+    articles = db.query(Article).options(selectinload(Article.translations)).all()
+    audits = [article_seo_audit(article, 'az') for article in articles]
+    seo_health_score = round(sum(audit['score'] for audit in audits) / len(audits)) if audits else 100
+    missing_meta_descriptions = sum(1 for audit in audits if not audit['checks'].get('meta_description'))
+    missing_hreflang = sum(1 for audit in audits if not audit['checks'].get('hreflang'))
+    latest_article_date = db.query(func.max(Article.published_at)).filter(Article.status == 'published').scalar() or db.query(func.max(Article.created_at)).scalar()
+    latest_media_date = db.query(func.max(MediaAsset.created_at)).scalar()
+    settings_map = get_settings_map(db)
+    last_sitemap_refresh = settings_map.get('sitemap_last_refreshed_at') or 'Dynamic sitemap updates on every request'
+    google_news_ready = published > 0 and seo_health_score >= 80 and missing_meta_descriptions == 0
+    adsense_ready = bool((settings.adsense_publisher_id or '').strip())
+    security_ready = settings.secret_key not in PLACEHOLDER_VALUES and len(settings.secret_key) >= 32
+    return {
+        'seo_health_score': seo_health_score,
+        'google_news_status': 'Ready' if google_news_ready else 'Needs review',
+        'adsense_status': 'Configured' if adsense_ready else 'Missing',
+        'google_seo': {
+            'xml_sitemap_status': 'Active',
+            'news_sitemap_status': 'Active' if published else 'Waiting for published articles',
+            'rss_feed_status': 'Active',
+            'last_sitemap_refresh': last_sitemap_refresh,
+            'missing_meta_descriptions': missing_meta_descriptions,
+            'missing_hreflang': missing_hreflang,
+        },
+        'system_health': {
+            'server_status': 'Online',
+            'security_status': 'Enabled' if security_ready else 'Review secret key',
+            'upload_limit': format_bytes(MAX_UPLOAD_IMAGE_BYTES),
+            'protected_routes': '/admin, /admin/articles, /admin/media, /admin/seo, /admin/settings',
+        },
+        'editorial': {
+            'published_articles': published,
+            'draft_articles': drafts,
+            'scheduled_articles': scheduled,
+            'latest_article_date': latest_article_date,
+        },
+        'latest_activity': [
+            {'label': 'Article published', 'detail': f'{published} live article(s)', 'timestamp': latest_article_date},
+            {'label': 'Image uploaded', 'detail': 'Latest media library upload', 'timestamp': latest_media_date},
+            {'label': 'SEO scan completed', 'detail': f'SEO health score {seo_health_score}%', 'timestamp': current_server_utc()},
+            {'label': 'Sitemap refreshed', 'detail': last_sitemap_refresh, 'timestamp': None},
+        ],
+    }
+
+
 def top_category_rows(db, limit: int = 10) -> list[dict]:
     rows = (
         db.query(Article.category, func.count(ArticleView.id))
@@ -1822,7 +1876,8 @@ def admin_dashboard(request: Request, db=Depends(get_db), _=Depends(require_auth
     )
     most_viewed_articles = [setattr(article, "real_view_count", int(real_view_count or 0)) or article for article, real_view_count in most_viewed_articles]
     analytics = analytics_summary(db)
-    return templates.TemplateResponse('admin/dashboard.html', {'request': request, 'drafts': drafts, 'published': published, 'scheduled': scheduled, 'next_scheduled_article': next_scheduled_article, 'total_articles': total_articles, 'categories': categories, 'media_count': media_count, 'logs': logs, 'recent_articles': latest_articles, 'latest_articles': latest_articles, 'most_viewed_articles': most_viewed_articles, 'analytics': analytics, 'top_categories': top_category_rows(db), 'traffic_charts': traffic_charts(db), "languages": SUPPORTED_LANGUAGES, "ai_translation_status": ai_translation_status()})
+    dashboard_status = dashboard_status_context(db, total_articles, published, drafts, scheduled)
+    return templates.TemplateResponse('admin/dashboard.html', {'request': request, 'drafts': drafts, 'published': published, 'scheduled': scheduled, 'next_scheduled_article': next_scheduled_article, 'total_articles': total_articles, 'categories': categories, 'media_count': media_count, 'logs': logs, 'recent_articles': latest_articles, 'latest_articles': latest_articles, 'most_viewed_articles': most_viewed_articles, 'analytics': analytics, 'dashboard_status': dashboard_status, 'top_categories': top_category_rows(db), 'traffic_charts': traffic_charts(db), "languages": SUPPORTED_LANGUAGES, "ai_translation_status": ai_translation_status()})
 
 
 @app.get('/admin/articles', response_class=HTMLResponse)
