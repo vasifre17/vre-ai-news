@@ -1132,6 +1132,41 @@ def article_seo_audit(article: Article, language: str = "az") -> dict:
     return {"score": score, "issues": issues, "checks": checks, "missing_translations": article_missing_translation_languages(article)}
 
 
+def google_news_status_from_audit(audit: dict) -> dict:
+    checks = audit.get("checks", {})
+    required = ["meta_title", "meta_description", "image", "schema", "canonical", "hreflang", "translation"]
+    missing = [key for key in required if not checks.get(key)]
+    if not missing:
+        return {"status": "ready", "label": "Ready", "helper": "All discovery checks passed"}
+    if len(missing) <= 2:
+        return {"status": "warning", "label": "Warning", "helper": ", ".join(missing).replace("_", " ")}
+    return {"status": "error", "label": "Error", "helper": ", ".join(missing[:3]).replace("_", " ")}
+
+
+def article_language_status(article: Article) -> dict:
+    available = [lang for lang in SUPPORTED_LANGUAGES if article_translation_complete(article, lang)]
+    return {"available": available, "missing": [lang for lang in SUPPORTED_LANGUAGES if lang not in available], "full": len(available) == len(SUPPORTED_LANGUAGES)}
+
+
+def article_health_score(audit: dict, google_news_status: dict, language_status: dict) -> int:
+    checks = audit.get("checks", {})
+    meta_score = round((sum(1 for key in ["meta_title", "meta_description", "canonical", "schema"] if checks.get(key)) / 4) * 100)
+    image_score = 100 if checks.get("image") else 0
+    translation_score = round((len(language_status.get("available", [])) / max(1, len(SUPPORTED_LANGUAGES))) * 100)
+    google_score = 100 if google_news_status.get("status") == "ready" else 70 if google_news_status.get("status") == "warning" else 35
+    return round((audit.get("score", 0) * 0.4) + (meta_score * 0.2) + (image_score * 0.15) + (translation_score * 0.15) + (google_score * 0.1))
+
+
+def admin_article_statistics(db) -> SimpleNamespace:
+    total = db.query(Article).count()
+    published = db.query(Article).filter(Article.status == "published").count()
+    scheduled = db.query(Article).filter(Article.status.in_(SCHEDULED_STATUS_VALUES)).count()
+    drafts = db.query(Article).filter(Article.status == "draft").count()
+    seo_issues = db.query(Article).filter(or_(Article.seo_title.is_(None), Article.seo_title == "", Article.meta_description.is_(None), Article.meta_description == "", Article.image_url.is_(None), Article.image_url == "", Article.slug.is_(None), Article.slug == "")).count()
+    google_news_ready = db.query(Article).filter(Article.seo_title.isnot(None), Article.seo_title != "", Article.meta_description.isnot(None), Article.meta_description != "", Article.image_url.isnot(None), Article.image_url != "", Article.slug.isnot(None), Article.slug != "", Article.published_at.isnot(None)).count()
+    return SimpleNamespace(total=total, published=published, scheduled=scheduled, drafts=drafts, seo_issues=seo_issues, google_news_ready=google_news_ready)
+
+
 def build_organization_schema(settings_map: dict[str, str]) -> dict:
     return {
         "@context": "https://schema.org",
@@ -2295,6 +2330,9 @@ def admin_articles(
     }
     seo_audit_map = {a.id: article_seo_audit(a, 'az') for a in articles}
     seo_score_map = {article_id: audit['score'] for article_id, audit in seo_audit_map.items()}
+    google_news_map = {article_id: google_news_status_from_audit(audit) for article_id, audit in seo_audit_map.items()}
+    language_status_map = {article.id: article_language_status(article) for article in articles}
+    health_score_map = {article.id: article_health_score(seo_audit_map.get(article.id, {}), google_news_map.get(article.id, {}), language_status_map.get(article.id, {})) for article in articles}
     seo_detail_map = {}
     for article in articles:
         audit = seo_audit_map.get(article.id, {})
@@ -2311,7 +2349,7 @@ def admin_articles(
         }
     categories = admin_article_categories(db)
     filters = {"q": q, "status": status, "category": category, "language": language, "date_from": date_from, "date_to": date_to, "sort": sort, "page": page, "per_page": per_page}
-    return templates.TemplateResponse("admin/articles.html", {"request": request, "articles": articles, "status": status, "narration_map": narration_map, "translation_missing_map": translation_missing_map, "seo_score_map": seo_score_map, "seo_detail_map": seo_detail_map, "languages": SUPPORTED_LANGUAGES, "language_labels": LANGUAGE_LABELS, "categories": categories, "filters": filters, "total": total, "total_pages": total_pages, "page": page, "per_page": per_page, "ai_translation_status": ai_translation_status()})
+    return templates.TemplateResponse("admin/articles.html", {"request": request, "articles": articles, "status": status, "narration_map": narration_map, "translation_missing_map": translation_missing_map, "seo_score_map": seo_score_map, "seo_detail_map": seo_detail_map, "google_news_map": google_news_map, "health_score_map": health_score_map, "language_status_map": language_status_map, "admin_article_stats": admin_article_statistics(db), "languages": SUPPORTED_LANGUAGES, "language_labels": LANGUAGE_LABELS, "categories": categories, "filters": filters, "total": total, "total_pages": total_pages, "page": page, "per_page": per_page, "ai_translation_status": ai_translation_status()})
 
 
 
@@ -2363,7 +2401,19 @@ async def bulk_articles(request: Request, db=Depends(get_db), _=Depends(require_
             for article in articles:
                 article.category = new_category
                 article.updated_at = now
+    elif action.startswith('ai_'):
+        if not is_ai_translation_configured():
+            db.add(FetchLog(level="WARNING", message=AI_TRANSLATION_WARNING))
+            db.commit()
+            return RedirectResponse(f"{redirect_url}{'&' if '?' in redirect_url else '?'}warning=ai_not_configured", status_code=302)
+        for article in articles:
+            if action == 'ai_translate_missing':
+                scheduler.add_job(generate_missing_translations, args=[article.id], id=f"bulk_article_translation_{article.id}_{datetime.utcnow().timestamp()}", replace_existing=False)
+            else:
+                db.add(FetchLog(level="INFO", message=f"AI bulk action {action} requested for article {article.id}."))
     db.commit()
+    if action.startswith('ai_'):
+        return RedirectResponse(f"{redirect_url}{'&' if '?' in redirect_url else '?'}ai_action={action}", status_code=302)
     return RedirectResponse(redirect_url, status_code=302)
 
 
@@ -2573,6 +2623,56 @@ def update_homepage_order(article_id: int, request: Request, homepage_order: int
         article.updated_at = datetime.utcnow()
         db.commit()
     return RedirectResponse('/admin/articles', status_code=302)
+
+
+@app.post('/admin/articles/{article_id}/duplicate')
+def duplicate_article(article_id: int, request: Request, db=Depends(get_db), _=Depends(require_auth)):
+    source = db.query(Article).options(selectinload(Article.translations)).filter(Article.id == article_id).first()
+    if not source:
+        return RedirectResponse('/admin/articles', status_code=302)
+    now = datetime.utcnow()
+    duplicate = Article(
+        original_hash=f"duplicate-{source.id}-{uuid4()}",
+        source_title=source.source_title,
+        source_url=source.source_url,
+        title=f"{source.title or 'Untitled'} Copy",
+        slug=unique_article_slug(db, f"{source.slug or source.title or 'article'}-copy"),
+        summary=source.summary,
+        content=source.content,
+        seo_title=source.seo_title,
+        meta_description=source.meta_description,
+        tags=source.tags,
+        category=source.category,
+        image_url=source.image_url,
+        language=source.language,
+        status='draft',
+        narration_enabled=source.narration_enabled,
+        is_featured=False,
+        is_trending=False,
+        homepage_order=100,
+        publish_at=None,
+        published_at=None,
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(duplicate)
+    db.flush()
+    for translation in source.translations:
+        db.add(ArticleTranslation(
+            article_id=duplicate.id,
+            language=translation.language,
+            title=f"{translation.title or source.title or 'Untitled'} Copy",
+            slug=unique_translation_slug(db, translation.language, f"{translation.slug or translation.title or source.slug or 'article'}-copy"),
+            summary=translation.summary,
+            content=translation.content,
+            seo_title=translation.seo_title,
+            meta_description=translation.meta_description,
+            tags=translation.tags,
+            created_at=now,
+            updated_at=now,
+        ))
+    db.commit()
+    return RedirectResponse(f'/admin/articles/{duplicate.id}/edit?duplicated=1', status_code=302)
 
 
 @app.post('/admin/articles/{article_id}/delete')
