@@ -46,6 +46,9 @@ class ArticleView(Base):
     traffic_source = Column(String(120), default="Direct", index=True)
     path = Column(String(1000))
     language = Column(String(20), default="az", index=True)
+    device_type = Column(String(40), default="desktop", index=True)
+    country_code = Column(String(8), default="XX", index=True)
+    country_name = Column(String(120), default="Unknown", index=True)
 
     article = relationship("Article", back_populates="views")
 

@@ -1,6 +1,8 @@
 from datetime import UTC, datetime, timedelta
 import hashlib
 import logging
+import os
+import time
 from email.utils import format_datetime
 import html
 from types import SimpleNamespace
@@ -13,7 +15,7 @@ from sqlalchemy import func, or_, select, text
 from sqlalchemy.orm import selectinload
 from fastapi import FastAPI, Request, Depends, Form, HTTPException, UploadFile, File
 from PIL import Image, UnidentifiedImageError
-from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
@@ -43,6 +45,7 @@ templates.env.globals["google_analytics_id"] = settings.google_analytics_id
 templates.env.globals["adsense_publisher_id"] = settings.adsense_publisher_id
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
+app.state.dashboard_analytics_cache = {"expires_at": 0.0, "payload": None}
 scheduler = BackgroundScheduler()
 SUPPORTED_LANGUAGES = ["az", "en", "ru", "tr", "zh", "es"]
 LANGUAGE_LABELS = {"az": "Azerbaijani", "en": "English", "ru": "Russian", "tr": "Turkish", "zh": "Chinese", "es": "Spanish"}
@@ -1280,6 +1283,53 @@ def classify_traffic_source(referrer: str | None, request: Request) -> str:
     return "Referral"
 
 
+COUNTRY_NAMES = {
+    "AZ": "Azerbaijan",
+    "US": "United States",
+    "GB": "United Kingdom",
+    "TR": "Turkey",
+    "RU": "Russia",
+    "DE": "Germany",
+    "FR": "France",
+    "IN": "India",
+    "CN": "China",
+    "AE": "United Arab Emirates",
+    "GE": "Georgia",
+    "IR": "Iran",
+    "UA": "Ukraine",
+    "CA": "Canada",
+    "BR": "Brazil",
+}
+
+
+def country_flag(country_code: str) -> str:
+    code = (country_code or "XX").upper()
+    if len(code) != 2 or not code.isalpha() or code == "XX":
+        return "🌐"
+    return "".join(chr(ord(char) + 127397) for char in code)
+
+
+def visitor_country(request: Request) -> tuple[str, str]:
+    for header in ("cf-ipcountry", "x-vercel-ip-country", "x-country-code", "x-geo-country"):
+        value = (request.headers.get(header) or "").strip().upper()
+        if value and value != "XX":
+            code = re.sub(r"[^A-Z]", "", value)[:2] or "XX"
+            return code, COUNTRY_NAMES.get(code, code)
+    country_name = (request.headers.get("x-country-name") or "Unknown").strip() or "Unknown"
+    return "XX", country_name
+
+
+def visitor_device_type(request: Request) -> str:
+    user_agent = (request.headers.get("user-agent") or "").lower()
+    if any(token in user_agent for token in ("ipad", "tablet", "kindle", "silk", "playbook")):
+        return "tablet"
+    if "android" in user_agent and "mobile" not in user_agent:
+        return "tablet"
+    if any(token in user_agent for token in ("mobi", "iphone", "ipod", "phone", "blackberry", "opera mini", "windows phone")):
+        return "mobile"
+    return "desktop"
+
+
 def visitor_fingerprint(request: Request) -> str:
     raw = "|".join([
         get_remote_address(request) or "unknown",
@@ -1290,12 +1340,16 @@ def visitor_fingerprint(request: Request) -> str:
 
 def record_article_view(db, article: Article, request: Request, language: str) -> None:
     article.updated_at = article.updated_at or datetime.utcnow()
+    country_code, country_name = visitor_country(request)
     db.add(ArticleView(
         article_id=article.id,
         visitor_key=visitor_fingerprint(request),
         traffic_source=classify_traffic_source(request.headers.get("referer"), request),
         path=str(request.url.path),
         language=language,
+        device_type=visitor_device_type(request),
+        country_code=country_code,
+        country_name=country_name,
     ))
     db.commit()
 
@@ -1319,6 +1373,131 @@ def analytics_summary(db) -> dict:
         "returning_visitors": len(returning_rows),
     }
 
+
+def percent_rows(rows: list[tuple[str, int]], labels: list[str] | None = None) -> list[dict]:
+    counts = {str(name or "unknown").lower(): int(count or 0) for name, count in rows}
+    ordered_labels = labels or list(counts.keys())
+    total = sum(counts.values()) or 0
+    result = []
+    for label in ordered_labels:
+        value = counts.get(label.lower(), 0)
+        result.append({"label": label.title(), "key": label.lower(), "count": value, "percent": round((value / total) * 100) if total else 0})
+    return result
+
+
+def online_visitor_metrics(db) -> dict:
+    now = datetime.utcnow()
+    windows = {
+        "current": now - timedelta(seconds=90),
+        "last_5_min": now - timedelta(minutes=5),
+        "last_15_min": now - timedelta(minutes=15),
+        "last_60_min": now - timedelta(minutes=60),
+    }
+    metrics = {}
+    for key, start in windows.items():
+        metrics[key] = db.query(func.count(func.distinct(ArticleView.visitor_key))).filter(
+            ArticleView.viewed_at >= start,
+            ArticleView.visitor_key.isnot(None),
+            ArticleView.visitor_key != "",
+        ).scalar() or 0
+    return metrics
+
+
+def device_statistics(db) -> list[dict]:
+    rows = db.query(ArticleView.device_type, func.count(ArticleView.id)).group_by(ArticleView.device_type).all()
+    return percent_rows(rows, ["mobile", "desktop", "tablet"])
+
+
+def top_country_statistics(db, limit: int = 6) -> list[dict]:
+    rows = db.query(ArticleView.country_code, ArticleView.country_name, func.count(ArticleView.id)).group_by(
+        ArticleView.country_code,
+        ArticleView.country_name,
+    ).order_by(func.count(ArticleView.id).desc()).limit(limit).all()
+    total = sum(int(count or 0) for _, _, count in rows) or 0
+    countries = []
+    for code, name, count in rows:
+        safe_code = (code or "XX").upper()
+        safe_name = name or COUNTRY_NAMES.get(safe_code, "Unknown")
+        value = int(count or 0)
+        countries.append({
+            "code": safe_code,
+            "flag": country_flag(safe_code),
+            "name": safe_name,
+            "count": value,
+            "percent": round((value / total) * 100) if total else 0,
+        })
+    return countries
+
+
+def read_memory_usage_percent() -> int:
+    meminfo_path = Path("/proc/meminfo")
+    if not meminfo_path.exists():
+        return 0
+    values = {}
+    for line in meminfo_path.read_text().splitlines():
+        parts = line.split()
+        if len(parts) >= 2:
+            values[parts[0].rstrip(":")] = int(parts[1])
+    total = values.get("MemTotal", 0)
+    available = values.get("MemAvailable", 0)
+    return round(((total - available) / total) * 100) if total else 0
+
+
+def server_uptime_label() -> str:
+    uptime_path = Path("/proc/uptime")
+    if uptime_path.exists():
+        seconds = int(float(uptime_path.read_text().split()[0]))
+    else:
+        seconds = 0
+    days, remainder = divmod(seconds, 86400)
+    hours, remainder = divmod(remainder, 3600)
+    minutes, _ = divmod(remainder, 60)
+    if days:
+        return f"{days}d {hours}h {minutes}m"
+    if hours:
+        return f"{hours}h {minutes}m"
+    return f"{minutes}m"
+
+
+def vps_health_metrics() -> dict:
+    cpu_count = os.cpu_count() or 1
+    try:
+        load_1m = os.getloadavg()[0]
+    except OSError:
+        load_1m = 0
+    cpu_usage = min(100, round((load_1m / cpu_count) * 100))
+    disk_usage = shutil.disk_usage("/")
+    disk_percent = round((disk_usage.used / disk_usage.total) * 100) if disk_usage.total else 0
+    ram_percent = read_memory_usage_percent()
+    worst = max(cpu_usage, ram_percent, disk_percent)
+    status = "critical" if worst >= 90 else "warning" if worst >= 75 else "healthy"
+    return {
+        "cpu_usage": cpu_usage,
+        "ram_usage": ram_percent,
+        "disk_usage": disk_percent,
+        "uptime": server_uptime_label(),
+        "status": status,
+    }
+
+
+def dashboard_analytics_payload(db) -> dict:
+    return {
+        "online_visitors": online_visitor_metrics(db),
+        "vps_health": vps_health_metrics(),
+        "device_statistics": device_statistics(db),
+        "top_countries": top_country_statistics(db),
+        "generated_at": current_server_utc().isoformat(),
+    }
+
+
+def cached_dashboard_analytics(db) -> dict:
+    cache = getattr(app.state, "dashboard_analytics_cache", {"expires_at": 0.0, "payload": None})
+    now = time.monotonic()
+    if cache.get("payload") is not None and cache.get("expires_at", 0) > now:
+        return cache["payload"]
+    payload = dashboard_analytics_payload(db)
+    app.state.dashboard_analytics_cache = {"expires_at": now + 20, "payload": payload}
+    return payload
 
 def format_bytes(value: int) -> str:
     if value >= 1024 * 1024:
@@ -1524,6 +1703,9 @@ def apply_schema_migrations(db) -> None:
         "ALTER TABLE media_assets ADD COLUMN mime_type VARCHAR(120)",
         "ALTER TABLE media_assets ADD COLUMN width INTEGER",
         "ALTER TABLE media_assets ADD COLUMN height INTEGER",
+        "ALTER TABLE article_views ADD COLUMN device_type VARCHAR(40) DEFAULT 'desktop'",
+        "ALTER TABLE article_views ADD COLUMN country_code VARCHAR(8) DEFAULT 'XX'",
+        "ALTER TABLE article_views ADD COLUMN country_name VARCHAR(120) DEFAULT 'Unknown'",
     ]:
         try:
             db.execute(text(statement))
@@ -1542,6 +1724,8 @@ def apply_schema_migrations(db) -> None:
         "CREATE INDEX IF NOT EXISTS ix_article_views_viewed_at ON article_views (viewed_at)",
         "CREATE INDEX IF NOT EXISTS ix_article_views_visitor_key ON article_views (visitor_key)",
         "CREATE INDEX IF NOT EXISTS ix_article_views_traffic_source ON article_views (traffic_source)",
+        "CREATE INDEX IF NOT EXISTS ix_article_views_device_type ON article_views (device_type)",
+        "CREATE INDEX IF NOT EXISTS ix_article_views_country_code ON article_views (country_code)",
         "UPDATE media_assets SET url = path WHERE url IS NULL OR url = ''",
         "UPDATE media_assets SET mime_type = content_type WHERE mime_type IS NULL OR mime_type = ''",
     ]:
@@ -1847,6 +2031,11 @@ def login(request: Request, username: str = Form(...), password: str = Form(...)
 def logout(request: Request):
     clear_session(request)
     return RedirectResponse('/admin/login', status_code=302)
+
+
+@app.get('/admin/dashboard/analytics')
+def admin_dashboard_analytics(db=Depends(get_db), _=Depends(require_auth)):
+    return JSONResponse(cached_dashboard_analytics(db))
 
 
 @app.get('/admin', response_class=HTMLResponse)
