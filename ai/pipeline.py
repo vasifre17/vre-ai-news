@@ -39,6 +39,28 @@ class AIEngine:
         out["category"] = out.get("category") or self.categorize(f"{title} {content}")
         return out
 
+    def generate_meta_description(self, title: str, summary: str = "", content: str = "", language: str = "az") -> str:
+        source = " ".join(part.strip() for part in [summary, content] if part and part.strip())
+        fallback = (source or title or "VREYC news update").strip().replace("\n", " ")
+        if not self.client:
+            return fallback[:157].rstrip() + ("..." if len(fallback) > 157 else "")
+
+        prompt = (
+            "Write one concise SEO meta description for a news article. "
+            "Use the article language when possible, avoid quotation marks, and return JSON with key meta_description. "
+            "Keep it between 120 and 155 characters."
+        )
+        resp = self.client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": json.dumps({"language": language, "title": title, "summary": summary, "content": content[:2500]}, ensure_ascii=False)},
+            ],
+            response_format={"type": "json_object"},
+        )
+        out = json.loads(resp.choices[0].message.content)
+        return (out.get("meta_description") or fallback[:155]).strip()
+
     def categorize(self, text: str) -> str:
         t = text.lower()
         if any(k in t for k in ["government", "aliyev", "diplom", "official visit", "president"]):

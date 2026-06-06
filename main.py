@@ -73,6 +73,33 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 app.mount("/assets", StaticFiles(directory="assets"), name="assets")
 
 
+@app.middleware("http")
+async def track_authenticated_admin_traffic(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/admin") and is_authenticated(request) and request.url.path != "/admin/dashboard/analytics":
+        db = SessionLocal()
+        try:
+            country_code, country_name = visitor_country(request)
+            db.add(ArticleView(
+                article_id=None,
+                visitor_key=visitor_fingerprint(request),
+                traffic_source="Admin",
+                path=str(request.url.path),
+                language="admin",
+                device_type=visitor_device_type(request),
+                country_code=country_code,
+                country_name=country_name,
+                is_admin_traffic=True,
+            ))
+            db.commit()
+            app.state.dashboard_analytics_cache = {"expires_at": 0.0, "payload": None}
+        except Exception:
+            db.rollback()
+        finally:
+            db.close()
+    return response
+
+
 PUBLIC_LABELS = {
     "az": {
         "latest": "Son",
@@ -711,6 +738,24 @@ def article_url(language: str, slug: str) -> str:
     return f"/{language}/{slug}"
 
 
+def article_hreflang_links(article: Article) -> dict[str, str]:
+    """Build complete alternate-language URLs for every supported article page."""
+    return {lang: article_url(lang, localized_slug(article, lang)) for lang in SUPPORTED_LANGUAGES}
+
+
+def article_has_complete_hreflang(article: Article) -> bool:
+    links = article_hreflang_links(article)
+    return all((links.get(lang) or "").strip() for lang in SUPPORTED_LANGUAGES)
+
+
+def public_traffic_filter():
+    return or_(ArticleView.is_admin_traffic.is_(False), ArticleView.is_admin_traffic.is_(None))
+
+
+def admin_traffic_filter():
+    return ArticleView.is_admin_traffic.is_(True)
+
+
 def get_translation(article: Article, language: str):
     """Return the stored translation row for a public language, if one exists.
 
@@ -884,6 +929,7 @@ def real_article_view_count_subquery():
             ArticleView.article_id.label("article_id"),
             func.count(ArticleView.id).label("real_view_count"),
         )
+        .filter(public_traffic_filter())
         .group_by(ArticleView.article_id)
         .subquery()
     )
@@ -894,7 +940,7 @@ def article_view_count_map(db, article_ids: list[int]) -> dict[int, int]:
         return {}
     rows = (
         db.query(ArticleView.article_id, func.count(ArticleView.id))
-        .filter(ArticleView.article_id.in_(article_ids))
+        .filter(public_traffic_filter(), ArticleView.article_id.in_(article_ids))
         .group_by(ArticleView.article_id)
         .all()
     )
@@ -1059,7 +1105,7 @@ def article_seo_audit(article: Article, language: str = "az") -> dict:
         "image": image_exists,
         "schema": bool((view.title or "").strip() and article.published_at and image_exists),
         "canonical": bool((view.slug or "").strip()),
-        "hreflang": all(article_translation_complete(article, lang) for lang in SUPPORTED_LANGUAGES),
+        "hreflang": article_has_complete_hreflang(article),
         "translation": language == "az" or article_translation_complete(article, language),
         "slug": bool((view.slug or "").strip() and slugify(view.slug) == view.slug),
         "published_timestamp": bool(article.published_at),
@@ -1291,15 +1337,30 @@ COUNTRY_NAMES = {
     "RU": "Russia",
     "DE": "Germany",
     "FR": "France",
-    "IN": "India",
+    "ES": "Spain",
     "CN": "China",
-    "AE": "United Arab Emirates",
-    "GE": "Georgia",
+    "JP": "Japan",
+    "KR": "South Korea",
+    "IN": "India",
+    "PK": "Pakistan",
     "IR": "Iran",
+    "SA": "Saudi Arabia",
+    "AE": "United Arab Emirates",
+    "IL": "Israel",
+    "GE": "Georgia",
     "UA": "Ukraine",
+    "NL": "Netherlands",
+    "SE": "Sweden",
+    "NO": "Norway",
+    "FI": "Finland",
+    "PL": "Poland",
+    "IT": "Italy",
+    "PT": "Portugal",
     "CA": "Canada",
     "BR": "Brazil",
+    "MX": "Mexico",
 }
+LANGUAGE_COUNTRY_FALLBACKS = {"az": "AZ", "en": "US", "ru": "RU", "tr": "TR", "es": "ES", "zh": "CN"}
 
 
 def country_flag(country_code: str) -> str:
@@ -1310,22 +1371,42 @@ def country_flag(country_code: str) -> str:
 
 
 def visitor_country(request: Request) -> tuple[str, str]:
-    for header in ("cf-ipcountry", "x-vercel-ip-country", "x-country-code", "x-geo-country"):
+    for header in ("cf-ipcountry", "x-vercel-ip-country", "x-country-code", "x-geo-country", "x-appengine-country", "x-client-geo-location"):
         value = (request.headers.get(header) or "").strip().upper()
         if value and value != "XX":
             code = re.sub(r"[^A-Z]", "", value)[:2] or "XX"
             return code, COUNTRY_NAMES.get(code, code)
-    country_name = (request.headers.get("x-country-name") or "Unknown").strip() or "Unknown"
-    return "XX", country_name
+    country_name = (request.headers.get("x-country-name") or "").strip()
+    if country_name:
+        for code, name in COUNTRY_NAMES.items():
+            if name.lower() == country_name.lower():
+                return code, name
+    accept_language = (request.headers.get("accept-language") or "").lower()
+    locale_match = re.search(r"[-_]([a-z]{2})(?:[;,]|$)", accept_language)
+    if locale_match:
+        code = locale_match.group(1).upper()
+        if code in COUNTRY_NAMES:
+            return code, COUNTRY_NAMES[code]
+    language_match = re.match(r"([a-z]{2})", accept_language)
+    if language_match:
+        code = LANGUAGE_COUNTRY_FALLBACKS.get(language_match.group(1))
+        if code:
+            return code, COUNTRY_NAMES.get(code, code)
+    return "XX", "Unknown"
 
 
 def visitor_device_type(request: Request) -> str:
     user_agent = (request.headers.get("user-agent") or "").lower()
-    if any(token in user_agent for token in ("ipad", "tablet", "kindle", "silk", "playbook")):
+    client_hints_mobile = (request.headers.get("sec-ch-ua-mobile") or "").strip().lower()
+    if client_hints_mobile == "?1":
+        return "mobile"
+    tablet_tokens = ("ipad", "tablet", "kindle", "silk", "playbook", "nexus 7", "nexus 9", "sm-t", "tab ")
+    mobile_tokens = ("mobi", "iphone", "ipod", "phone", "blackberry", "opera mini", "windows phone", "android")
+    if any(token in user_agent for token in tablet_tokens):
         return "tablet"
     if "android" in user_agent and "mobile" not in user_agent:
         return "tablet"
-    if any(token in user_agent for token in ("mobi", "iphone", "ipod", "phone", "blackberry", "opera mini", "windows phone")):
+    if any(token in user_agent for token in mobile_tokens):
         return "mobile"
     return "desktop"
 
@@ -1350,6 +1431,7 @@ def record_article_view(db, article: Article, request: Request, language: str) -
         device_type=visitor_device_type(request),
         country_code=country_code,
         country_name=country_name,
+        is_admin_traffic=False,
     ))
     db.commit()
 
@@ -1358,12 +1440,12 @@ def analytics_summary(db) -> dict:
     today = utc_start_of_day()
     last_7_days = today - timedelta(days=6)
     last_30_days = today - timedelta(days=29)
-    total_views = db.query(func.count(ArticleView.id)).scalar() or 0
-    views_today = db.query(func.count(ArticleView.id)).filter(ArticleView.viewed_at >= today).scalar() or 0
-    views_7 = db.query(func.count(ArticleView.id)).filter(ArticleView.viewed_at >= last_7_days).scalar() or 0
-    views_30 = db.query(func.count(ArticleView.id)).filter(ArticleView.viewed_at >= last_30_days).scalar() or 0
-    unique_visitors = db.query(func.count(func.distinct(ArticleView.visitor_key))).filter(ArticleView.visitor_key.isnot(None), ArticleView.visitor_key != "").scalar() or 0
-    returning_rows = db.query(ArticleView.visitor_key).filter(ArticleView.visitor_key.isnot(None), ArticleView.visitor_key != "").group_by(ArticleView.visitor_key).having(func.count(ArticleView.id) > 1).all()
+    total_views = db.query(func.count(ArticleView.id)).filter(public_traffic_filter()).scalar() or 0
+    views_today = db.query(func.count(ArticleView.id)).filter(public_traffic_filter(), ArticleView.viewed_at >= today).scalar() or 0
+    views_7 = db.query(func.count(ArticleView.id)).filter(public_traffic_filter(), ArticleView.viewed_at >= last_7_days).scalar() or 0
+    views_30 = db.query(func.count(ArticleView.id)).filter(public_traffic_filter(), ArticleView.viewed_at >= last_30_days).scalar() or 0
+    unique_visitors = db.query(func.count(func.distinct(ArticleView.visitor_key))).filter(public_traffic_filter(), ArticleView.visitor_key.isnot(None), ArticleView.visitor_key != "").scalar() or 0
+    returning_rows = db.query(ArticleView.visitor_key).filter(public_traffic_filter(), ArticleView.visitor_key.isnot(None), ArticleView.visitor_key != "").group_by(ArticleView.visitor_key).having(func.count(ArticleView.id) > 1).all()
     return {
         "total_views": total_views,
         "views_today": views_today,
@@ -1371,6 +1453,8 @@ def analytics_summary(db) -> dict:
         "views_30_days": views_30,
         "unique_visitors": unique_visitors,
         "returning_visitors": len(returning_rows),
+        "admin_traffic": db.query(func.count(ArticleView.id)).filter(admin_traffic_filter()).scalar() or 0,
+        "public_visitors": unique_visitors,
     }
 
 
@@ -1396,6 +1480,7 @@ def online_visitor_metrics(db) -> dict:
     metrics = {}
     for key, start in windows.items():
         metrics[key] = db.query(func.count(func.distinct(ArticleView.visitor_key))).filter(
+            public_traffic_filter(),
             ArticleView.viewed_at >= start,
             ArticleView.visitor_key.isnot(None),
             ArticleView.visitor_key != "",
@@ -1404,16 +1489,16 @@ def online_visitor_metrics(db) -> dict:
 
 
 def device_statistics(db) -> list[dict]:
-    rows = db.query(ArticleView.device_type, func.count(ArticleView.id)).group_by(ArticleView.device_type).all()
+    rows = db.query(ArticleView.device_type, func.count(ArticleView.id)).filter(public_traffic_filter()).group_by(ArticleView.device_type).all()
     return percent_rows(rows, ["mobile", "desktop", "tablet"])
 
 
 def top_country_statistics(db, limit: int = 6) -> list[dict]:
-    rows = db.query(ArticleView.country_code, ArticleView.country_name, func.count(ArticleView.id)).group_by(
+    rows = db.query(ArticleView.country_code, ArticleView.country_name, func.count(ArticleView.id)).filter(public_traffic_filter()).group_by(
         ArticleView.country_code,
         ArticleView.country_name,
     ).order_by(func.count(ArticleView.id).desc()).limit(limit).all()
-    total = sum(int(count or 0) for _, _, count in rows) or 0
+    total = db.query(func.count(ArticleView.id)).filter(public_traffic_filter()).scalar() or 0
     countries = []
     for code, name, count in rows:
         safe_code = (code or "XX").upper()
@@ -1481,11 +1566,17 @@ def vps_health_metrics() -> dict:
 
 
 def dashboard_analytics_payload(db) -> dict:
+    public_summary = analytics_summary(db)
     return {
         "online_visitors": online_visitor_metrics(db),
         "vps_health": vps_health_metrics(),
         "device_statistics": device_statistics(db),
         "top_countries": top_country_statistics(db),
+        "traffic_quality": {
+            "public_views": public_summary["total_views"],
+            "public_visitors": public_summary["public_visitors"],
+            "admin_traffic": public_summary["admin_traffic"],
+        },
         "generated_at": current_server_utc().isoformat(),
     }
 
@@ -1511,8 +1602,9 @@ def dashboard_status_context(db, total_articles: int, published: int, drafts: in
     articles = db.query(Article).options(selectinload(Article.translations)).all()
     audits = [article_seo_audit(article, 'az') for article in articles]
     seo_health_score = round(sum(audit['score'] for audit in audits) / len(audits)) if audits else 100
-    missing_meta_descriptions = sum(1 for audit in audits if not audit['checks'].get('meta_description'))
-    missing_hreflang = sum(1 for audit in audits if not audit['checks'].get('hreflang'))
+    fix_center = seo_fix_center_context(db)
+    missing_meta_descriptions = fix_center['missing_meta_descriptions']
+    missing_hreflang = fix_center['missing_hreflang']
     latest_article_date = db.query(func.max(Article.published_at)).filter(Article.status == 'published').scalar() or db.query(func.max(Article.created_at)).scalar()
     latest_media_date = db.query(func.max(MediaAsset.created_at)).scalar()
     settings_map = get_settings_map(db)
@@ -1531,6 +1623,10 @@ def dashboard_status_context(db, total_articles: int, published: int, drafts: in
             'last_sitemap_refresh': last_sitemap_refresh,
             'missing_meta_descriptions': missing_meta_descriptions,
             'missing_hreflang': missing_hreflang,
+            'total_pages_with_hreflang': fix_center['total_pages_with_hreflang'],
+            'total_hreflang_pages': fix_center['total_hreflang_pages'],
+            'missing_open_graph': fix_center['missing_open_graph'],
+            'missing_canonical': fix_center['missing_canonical'],
         },
         'system_health': {
             'server_status': 'Online',
@@ -1553,10 +1649,84 @@ def dashboard_status_context(db, total_articles: int, published: int, drafts: in
     }
 
 
+
+def generate_article_meta_description(article: Article, language: str = "az") -> str:
+    view = localized_article_view(article, language)
+    engine = AIEngine()
+    return engine.generate_meta_description(
+        title=view.title or article.title or "VREYC news update",
+        summary=view.summary or "",
+        content=view.content or article.content or "",
+        language=language,
+    )
+
+
+def fix_missing_meta_descriptions(db) -> int:
+    articles = db.query(Article).options(selectinload(Article.translations)).all()
+    updated = 0
+    for article in articles:
+        if not (article.meta_description or "").strip():
+            article.meta_description = generate_article_meta_description(article, "az")
+            article.updated_at = datetime.utcnow()
+            updated += 1
+        for translation in getattr(article, "translations", []) or []:
+            language = (translation.language or "").lower()
+            if language in SUPPORTED_LANGUAGES and not (translation.meta_description or "").strip():
+                translation.meta_description = generate_article_meta_description(article, language)
+                translation.updated_at = datetime.utcnow()
+                updated += 1
+    if updated:
+        db.commit()
+    return updated
+
+
+def fix_missing_canonical_slugs(db) -> int:
+    updated = 0
+    articles = db.query(Article).options(selectinload(Article.translations)).all()
+    for article in articles:
+        if not (article.slug or "").strip():
+            article.slug = unique_article_slug(db, article.title or f"article-{article.id}", article.id)
+            article.updated_at = datetime.utcnow()
+            updated += 1
+        for translation in getattr(article, "translations", []) or []:
+            if not (translation.slug or "").strip():
+                translation.slug = unique_translation_slug(db, translation.language or "az", translation.title or article.title or f"article-{article.id}", translation.id)
+                translation.updated_at = datetime.utcnow()
+                updated += 1
+    if updated:
+        db.commit()
+    return updated
+
+
+def seo_fix_center_context(db) -> dict:
+    articles = db.query(Article).options(selectinload(Article.translations)).all()
+    audits = [article_seo_audit(article, "az") for article in articles]
+    total_hreflang_pages = len(articles) * len(SUPPORTED_LANGUAGES)
+    pages_with_hreflang = sum(len(article_hreflang_links(article)) for article in articles if article_has_complete_hreflang(article))
+    missing_meta_descriptions = sum(1 for article in articles if not (article.meta_description or "").strip())
+    missing_meta_descriptions += sum(
+        1
+        for article in articles
+        for translation in getattr(article, "translations", []) or []
+        if (translation.language or "").lower() in SUPPORTED_LANGUAGES and not (translation.meta_description or "").strip()
+    )
+    missing_hreflang = max(total_hreflang_pages - pages_with_hreflang, 0)
+    missing_canonical = sum(1 for audit in audits if not audit["checks"].get("canonical"))
+    missing_open_graph = sum(1 for audit in audits if not (audit["checks"].get("meta_description") and audit["checks"].get("image")))
+    return {
+        "total_pages_with_hreflang": pages_with_hreflang,
+        "total_hreflang_pages": total_hreflang_pages,
+        "missing_meta_descriptions": missing_meta_descriptions,
+        "missing_hreflang": missing_hreflang,
+        "missing_open_graph": missing_open_graph,
+        "missing_canonical": missing_canonical,
+    }
+
 def top_category_rows(db, limit: int = 10) -> list[dict]:
     rows = (
         db.query(Article.category, func.count(ArticleView.id))
         .join(ArticleView, ArticleView.article_id == Article.id)
+        .filter(public_traffic_filter())
         .group_by(Article.category)
         .order_by(func.count(ArticleView.id).desc())
         .limit(limit)
@@ -1621,7 +1791,7 @@ def traffic_charts(db, article_id: int | None = None) -> dict:
     start_daily = today - timedelta(days=13)
     start_weekly = today - timedelta(days=7 * 7)
     start_monthly = today - timedelta(days=190)
-    query = db.query(ArticleView).filter(ArticleView.viewed_at >= start_monthly)
+    query = db.query(ArticleView).filter(public_traffic_filter(), ArticleView.viewed_at >= start_monthly)
     if article_id is not None:
         query = query.filter(ArticleView.article_id == article_id)
     rows = query.order_by(ArticleView.viewed_at.asc()).all()
@@ -1633,19 +1803,19 @@ def traffic_charts(db, article_id: int | None = None) -> dict:
 
 
 def article_analytics_context(db, article: Article) -> dict:
-    history = db.query(ArticleView).filter(ArticleView.article_id == article.id).order_by(ArticleView.viewed_at.desc()).limit(100).all()
-    sources = db.query(ArticleView.traffic_source, func.count(ArticleView.id)).filter(ArticleView.article_id == article.id).group_by(ArticleView.traffic_source).order_by(func.count(ArticleView.id).desc()).all()
+    history = db.query(ArticleView).filter(public_traffic_filter(), ArticleView.article_id == article.id).order_by(ArticleView.viewed_at.desc()).limit(100).all()
+    sources = db.query(ArticleView.traffic_source, func.count(ArticleView.id)).filter(public_traffic_filter(), ArticleView.article_id == article.id).group_by(ArticleView.traffic_source).order_by(func.count(ArticleView.id).desc()).all()
     publish_start = article.published_at or article.created_at or datetime.utcnow()
     first_24h_end = publish_start + timedelta(days=1)
-    first_24h_views = db.query(func.count(ArticleView.id)).filter(ArticleView.article_id == article.id, ArticleView.viewed_at >= publish_start, ArticleView.viewed_at < first_24h_end).scalar() or 0
-    last_7_views = db.query(func.count(ArticleView.id)).filter(ArticleView.article_id == article.id, ArticleView.viewed_at >= utc_start_of_day() - timedelta(days=6)).scalar() or 0
-    unique_visitors = db.query(func.count(func.distinct(ArticleView.visitor_key))).filter(ArticleView.article_id == article.id, ArticleView.visitor_key.isnot(None), ArticleView.visitor_key != "").scalar() or 0
+    first_24h_views = db.query(func.count(ArticleView.id)).filter(public_traffic_filter(), ArticleView.article_id == article.id, ArticleView.viewed_at >= publish_start, ArticleView.viewed_at < first_24h_end).scalar() or 0
+    last_7_views = db.query(func.count(ArticleView.id)).filter(public_traffic_filter(), ArticleView.article_id == article.id, ArticleView.viewed_at >= utc_start_of_day() - timedelta(days=6)).scalar() or 0
+    unique_visitors = db.query(func.count(func.distinct(ArticleView.visitor_key))).filter(public_traffic_filter(), ArticleView.article_id == article.id, ArticleView.visitor_key.isnot(None), ArticleView.visitor_key != "").scalar() or 0
     return {
         "history": history,
         "sources": [{"name": source or "Direct", "views": int(count or 0)} for source, count in sources],
         "charts": traffic_charts(db, article.id),
         "publish_performance": {
-            "total_views": db.query(func.count(ArticleView.id)).filter(ArticleView.article_id == article.id).scalar() or 0,
+            "total_views": db.query(func.count(ArticleView.id)).filter(public_traffic_filter(), ArticleView.article_id == article.id).scalar() or 0,
             "first_24h_views": first_24h_views,
             "last_7_views": last_7_views,
             "unique_visitors": unique_visitors,
@@ -1706,6 +1876,7 @@ def apply_schema_migrations(db) -> None:
         "ALTER TABLE article_views ADD COLUMN device_type VARCHAR(40) DEFAULT 'desktop'",
         "ALTER TABLE article_views ADD COLUMN country_code VARCHAR(8) DEFAULT 'XX'",
         "ALTER TABLE article_views ADD COLUMN country_name VARCHAR(120) DEFAULT 'Unknown'",
+        "ALTER TABLE article_views ADD COLUMN is_admin_traffic BOOLEAN DEFAULT false",
     ]:
         try:
             db.execute(text(statement))
@@ -1726,6 +1897,7 @@ def apply_schema_migrations(db) -> None:
         "CREATE INDEX IF NOT EXISTS ix_article_views_traffic_source ON article_views (traffic_source)",
         "CREATE INDEX IF NOT EXISTS ix_article_views_device_type ON article_views (device_type)",
         "CREATE INDEX IF NOT EXISTS ix_article_views_country_code ON article_views (country_code)",
+        "CREATE INDEX IF NOT EXISTS ix_article_views_is_admin_traffic ON article_views (is_admin_traffic)",
         "UPDATE media_assets SET url = path WHERE url IS NULL OR url = ''",
         "UPDATE media_assets SET mime_type = content_type WHERE mime_type IS NULL OR mime_type = ''",
     ]:
@@ -1870,7 +2042,7 @@ def render_article_page(slug: str, request: Request, language: str = "az", db=De
     article.real_view_count = article_view_count_map(db, [article.id]).get(article.id, 0)
     view = localized_article_view(article, language)
     narration = db.query(ArticleNarration).filter(ArticleNarration.article_id == article.id, ArticleNarration.language == language).first()
-    alt_links = {lang: article_url(lang, localized_slug(article, lang)) for lang in SUPPORTED_LANGUAGES}
+    alt_links = article_hreflang_links(article)
     related = db.query(Article).options(selectinload(Article.translations)).filter(public_article_visibility_filter(), Article.id != article.id, Article.category == article.category).order_by(public_article_datetime_expression().desc(), Article.created_at.desc()).limit(3).all()
     if len(related) < 3:
         related = related + db.query(Article).options(selectinload(Article.translations)).filter(public_article_visibility_filter(), Article.id != article.id, Article.category != article.category).order_by(public_article_datetime_expression().desc(), Article.created_at.desc()).limit(3 - len(related)).all()
@@ -2038,6 +2210,27 @@ def admin_dashboard_analytics(db=Depends(get_db), _=Depends(require_auth)):
     return JSONResponse(cached_dashboard_analytics(db))
 
 
+@app.post('/admin/seo/generate-missing-meta-descriptions')
+def admin_generate_missing_meta_descriptions(db=Depends(get_db), _=Depends(require_auth)):
+    updated = fix_missing_meta_descriptions(db)
+    app.state.dashboard_analytics_cache = {"expires_at": 0.0, "payload": None}
+    return RedirectResponse(f'/admin?meta_descriptions_generated={updated}', status_code=302)
+
+
+@app.post('/admin/seo/fix-canonical-urls')
+def admin_fix_canonical_urls(db=Depends(get_db), _=Depends(require_auth)):
+    updated = fix_missing_canonical_slugs(db)
+    return RedirectResponse(f'/admin?canonical_fixed={updated}', status_code=302)
+
+
+@app.post('/admin/seo/generate-hreflang-translations')
+def admin_generate_hreflang_translations(db=Depends(get_db), _=Depends(require_auth)):
+    if not is_ai_translation_configured():
+        return RedirectResponse('/admin?warning=ai_not_configured', status_code=302)
+    result = generate_all_missing_translations()
+    return RedirectResponse(f'/admin?hreflang_translations_generated={result.get("generated", 0)}', status_code=302)
+
+
 @app.get('/admin', response_class=HTMLResponse)
 def admin_dashboard(request: Request, db=Depends(get_db), _=Depends(require_auth)):
     publish_due_scheduled_articles(db)
@@ -2058,6 +2251,7 @@ def admin_dashboard(request: Request, db=Depends(get_db), _=Depends(require_auth
     most_viewed_articles = (
         db.query(Article, func.count(ArticleView.id).label("real_view_count"))
         .join(ArticleView, ArticleView.article_id == Article.id)
+        .filter(public_traffic_filter())
         .group_by(Article.id)
         .order_by(func.count(ArticleView.id).desc(), Article.published_at.desc(), Article.created_at.desc(), Article.id.desc())
         .limit(10)

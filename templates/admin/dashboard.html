@@ -36,7 +36,8 @@
 
 <section class="stats-grid dashboard-stats analytics-stats dashboard-stat-grid-v2">
   <article class="stat-card premium-stat-card accent-blue"><span>Total articles</span><strong>{{ total_articles }}</strong><small>Editorial inventory</small></article>
-  <article class="stat-card premium-stat-card"><span>Total views</span><strong>{{ analytics.total_views }}</strong><small>Real tracked views</small></article>
+  <article class="stat-card premium-stat-card"><span>Public views</span><strong>{{ analytics.total_views }}</strong><small>Real tracked views — admin traffic excluded</small></article>
+  <article class="stat-card premium-stat-card"><span>Admin traffic</span><strong>{{ analytics.admin_traffic }}</strong><small>Separated internal visits</small></article>
   <article class="stat-card premium-stat-card"><span>Views today</span><strong>{{ analytics.views_today }}</strong><small>Since 00:00 UTC</small></article>
   <article class="stat-card premium-stat-card"><span>Views last 7 days</span><strong>{{ analytics.views_7_days }}</strong><small>Rolling weekly traffic</small></article>
   <article class="stat-card premium-stat-card"><span>Views last 30 days</span><strong>{{ analytics.views_30_days }}</strong><small>Rolling monthly traffic</small></article>
@@ -58,6 +59,11 @@
       <div><span>Last 5 min</span><strong data-analytics-value="online.last_5_min">—</strong></div>
       <div><span>Last 15 min</span><strong data-analytics-value="online.last_15_min">—</strong></div>
       <div><span>Last 60 min</span><strong data-analytics-value="online.last_60_min">—</strong></div>
+    </div>
+    <div class="online-window-grid traffic-quality-grid">
+      <div><span>Public visitors</span><strong data-analytics-value="traffic.public_visitors">—</strong></div>
+      <div><span>Public views</span><strong data-analytics-value="traffic.public_views">—</strong></div>
+      <div><span>Admin traffic</span><strong data-analytics-value="traffic.admin_traffic">—</strong></div>
     </div>
     <small class="muted">Last refreshed: <span data-analytics-value="generated_at">Loading…</span></small>
   </article>
@@ -98,7 +104,25 @@
     {{ status_row('RSS feed status', dashboard_status.google_seo.rss_feed_status, 'ok') }}
     {{ status_row('Last sitemap refresh', dashboard_status.google_seo.last_sitemap_refresh) }}
     {{ status_row('Missing meta descriptions', dashboard_status.google_seo.missing_meta_descriptions, 'ok' if dashboard_status.google_seo.missing_meta_descriptions == 0 else 'warn') }}
+    {{ status_row('Total pages with hreflang', dashboard_status.google_seo.total_pages_with_hreflang ~ ' / ' ~ dashboard_status.google_seo.total_hreflang_pages, 'ok') }}
     {{ status_row('Missing hreflang', dashboard_status.google_seo.missing_hreflang, 'ok' if dashboard_status.google_seo.missing_hreflang == 0 else 'warn') }}
+  </div>
+
+  <div class="panel dashboard-panel seo-fix-center-panel">
+    <div class="panel-head"><div><p class="eyebrow">SEO Fix Center</p><h2>SEO Fix Center</h2><p class="muted">One-click repairs for Dashboard 3.1 SEO stabilization.</p></div><a href="/admin/seo">Details</a></div>
+    {{ status_row('Missing Meta Descriptions', dashboard_status.google_seo.missing_meta_descriptions, 'ok' if dashboard_status.google_seo.missing_meta_descriptions == 0 else 'warn') }}
+    {{ status_row('Missing Hreflang', dashboard_status.google_seo.missing_hreflang, 'ok' if dashboard_status.google_seo.missing_hreflang == 0 else 'warn') }}
+    {{ status_row('Missing Open Graph Tags', dashboard_status.google_seo.missing_open_graph, 'ok' if dashboard_status.google_seo.missing_open_graph == 0 else 'warn') }}
+    {{ status_row('Missing Canonical URLs', dashboard_status.google_seo.missing_canonical, 'ok' if dashboard_status.google_seo.missing_canonical == 0 else 'warn') }}
+    <div class="seo-fix-actions">
+      <form method="post" action="/admin/seo/generate-missing-meta-descriptions"><button class="btn primary full" type="submit">Generate Missing Meta Descriptions</button></form>
+      <form method="post" action="/admin/seo/fix-canonical-urls"><button class="btn full" type="submit">Fix Canonical URLs</button></form>
+      <form method="post" action="/admin/seo/generate-hreflang-translations"><button class="btn full" type="submit">Generate Missing Hreflang Translations</button></form>
+    </div>
+    {% if request.query_params.get('meta_descriptions_generated') is not none %}<p class="muted">Generated {{ request.query_params.get('meta_descriptions_generated') }} missing meta description(s).</p>{% endif %}
+    {% if request.query_params.get('canonical_fixed') is not none %}<p class="muted">Fixed {{ request.query_params.get('canonical_fixed') }} canonical URL(s).</p>{% endif %}
+    {% if request.query_params.get('hreflang_translations_generated') is not none %}<p class="muted">Generated {{ request.query_params.get('hreflang_translations_generated') }} translation field set(s).</p>{% endif %}
+    {% if request.query_params.get('warning') == 'ai_not_configured' %}<p class="muted">AI provider is not configured, so hreflang translation generation was skipped.</p>{% endif %}
   </div>
 
   <div class="panel dashboard-panel system-health-panel">
@@ -177,7 +201,8 @@
     <div class="visitor-stats premium-visitor-stats">
       <article><span>Unique visitors</span><strong>{{ analytics.unique_visitors }}</strong><small>Distinct article readers</small></article>
       <article><span>Returning visitors</span><strong>{{ analytics.returning_visitors }}</strong><small>Repeat article readers</small></article>
-      <article><span>Total views</span><strong>{{ analytics.total_views }}</strong><small>All tracked article views</small></article>
+      <article><span>Public views</span><strong>{{ analytics.total_views }}</strong><small>Admin visits excluded</small></article>
+      <article><span>Admin traffic</span><strong>{{ analytics.admin_traffic }}</strong><small>Internal visits separated</small></article>
       <article><span>Views today</span><strong>{{ analytics.views_today }}</strong><small>Current-day performance</small></article>
     </div>
     <div class="panel-head compact-next"><div><p class="eyebrow">Schedule</p><h2>Next scheduled article</h2></div><a href="/admin/articles?status=scheduled">View scheduled</a></div>
