@@ -708,6 +708,29 @@ def media_assets_for_display(db, query, page: int, per_page: int):
     return total, rows
 
 
+def media_library_stats(db) -> dict:
+    assets = db.query(MediaAsset).all()
+    week_start = datetime.utcnow() - timedelta(days=7)
+    unused_count = sum(1 for asset in assets if media_usage_count(db, asset) == 0)
+    storage_used = sum((asset.size_bytes or 0) for asset in assets)
+    images_this_week = sum(1 for asset in assets if asset.created_at and asset.created_at >= week_start)
+    return {
+        "total_images": len(assets),
+        "storage_used": format_bytes(storage_used),
+        "images_this_week": images_this_week,
+        "unused_images": unused_count,
+    }
+
+
+def media_asset_article_values(asset: MediaAsset) -> set[str]:
+    public_path = media_asset_public_path(asset)
+    raw_values = [getattr(asset, "path", None), getattr(asset, "url", None)]
+    values = {public_path, media_asset_absolute_url(asset)}
+    values.update(value for value in raw_values if value)
+    values.update(public_image_url(value) for value in raw_values if value)
+    return {value for value in values if value}
+
+
 templates.env.filters["format_published_at"] = format_published_at
 templates.env.filters["format_admin_datetime"] = format_admin_datetime
 templates.env.filters["datetime_local_value"] = datetime_local_value
@@ -2865,12 +2888,22 @@ def delete_category(category_id: int, request: Request, db=Depends(get_db), _=De
 
 
 @app.get('/admin/media', response_class=HTMLResponse)
-def media_page(request: Request, q: str = '', date_from: str = '', date_to: str = '', sort: str = 'newest', page: int = 1, db=Depends(get_db), _=Depends(require_auth)):
+def media_page(request: Request, q: str = '', article_q: str = '', date_from: str = '', date_to: str = '', image_type: str = 'all', sort: str = 'newest', page: int = 1, db=Depends(get_db), _=Depends(require_auth)):
     page = max(1, page)
     per_page = 24
     query = db.query(MediaAsset)
     if q.strip():
         query = query.filter(MediaAsset.filename.ilike(f"%{q.strip()}%"))
+    if article_q.strip():
+        matching_articles = db.query(Article.image_url).filter(or_(Article.title.ilike(f"%{article_q.strip()}%"), Article.source_title.ilike(f"%{article_q.strip()}%"))).all()
+        article_image_urls = {value for (value,) in matching_articles if value}
+        matching_asset_ids = [asset.id for asset in db.query(MediaAsset).all() if media_asset_article_values(asset) & article_image_urls]
+        query = query.filter(MediaAsset.id.in_(matching_asset_ids or [0]))
+    if image_type in {"jpg", "png", "webp"}:
+        if image_type == "jpg":
+            query = query.filter(or_(MediaAsset.filename.ilike("%.jpg"), MediaAsset.filename.ilike("%.jpeg"), MediaAsset.content_type == "image/jpeg", MediaAsset.mime_type == "image/jpeg"))
+        else:
+            query = query.filter(or_(MediaAsset.filename.ilike(f"%.{image_type}"), MediaAsset.content_type == f"image/{image_type}", MediaAsset.mime_type == f"image/{image_type}"))
     if date_from.strip():
         try:
             query = query.filter(MediaAsset.created_at >= datetime.fromisoformat(date_from.strip()))
@@ -2884,8 +2917,8 @@ def media_page(request: Request, q: str = '', date_from: str = '', date_to: str 
     query = query.order_by(MediaAsset.created_at.asc() if sort == 'oldest' else MediaAsset.created_at.desc())
     total, media_rows = media_assets_for_display(db, query, page, per_page)
     total_pages = max(1, (total + per_page - 1) // per_page)
-    filters = {'q': q, 'date_from': date_from, 'date_to': date_to, 'sort': sort}
-    return templates.TemplateResponse('admin/media.html', {'request': request, 'media_rows': media_rows, 'assets': [row.asset for row in media_rows], 'filters': filters, 'page': page, 'per_page': per_page, 'total': total, 'total_pages': total_pages, 'upload_dir': str(UPLOAD_DIR)})
+    filters = {'q': q, 'article_q': article_q, 'date_from': date_from, 'date_to': date_to, 'image_type': image_type, 'sort': sort}
+    return templates.TemplateResponse('admin/media.html', {'request': request, 'media_rows': media_rows, 'assets': [row.asset for row in media_rows], 'filters': filters, 'page': page, 'per_page': per_page, 'total': total, 'total_pages': total_pages, 'upload_dir': str(UPLOAD_DIR), 'media_stats': media_library_stats(db)})
 
 
 @app.post('/admin/media')
