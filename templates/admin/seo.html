@@ -1,29 +1,143 @@
 {% extends "admin/_base.html" %}
 {% set title = 'SEO Diagnostics | VREYC Admin' %}
-{% set heading = 'Google News & SEO readiness' %}
-{% block content %}
-<section class="stats-grid">
-  {% for label, count in issue_counts.items() %}
-  <div class="stat-card"><span>{{ label }}</span><strong>{{ count }}</strong><small>{{ 'Needs attention' if count else 'Ready' }}</small></div>
-  {% endfor %}
-</section>
-<section class="panel">
-  <div class="panel-head wrap">
-    <div><h2>Article eligibility diagnostics</h2><p class="muted">Checks metadata, images, schema prerequisites, canonical slugs, hreflang coverage and translations for Google News indexing readiness.</p></div>
-    <div class="actions"><a class="btn" href="/sitemap.xml" target="_blank">XML sitemap</a><a class="btn" href="/news-sitemap.xml" target="_blank">News sitemap</a><a class="btn" href="/rss.xml" target="_blank">RSS feed</a></div>
+{% set heading = 'SEO Diagnostics' %}
+{% macro readiness_badge(label, level='ready') -%}
+  <span class="seo-2026-badge {{ level }}">{{ label }}</span>
+{%- endmacro %}
+{% macro metric_card(label, value, helper, level='ready') -%}
+  <article class="seo-2026-status-card {{ level }}">
+    <div class="seo-2026-status-top">
+      <span>{{ label }}</span>
+      {{ readiness_badge('Ready' if level == 'ready' else 'Needs attention' if level == 'warning' else 'Critical', level) }}
+    </div>
+    <strong>{{ value }}</strong>
+    <small>{{ helper }}</small>
+  </article>
+{%- endmacro %}
+{% macro readiness_row(label, value, level='ready') -%}
+  <div class="seo-2026-readiness-row {{ level }}">
+    <span>{{ label }}</span>
+    <strong>{{ value }}</strong>
   </div>
-  <div class="workflow-row"><span>Last automatic sitemap refresh</span><strong>{{ settings_map.get('sitemap_last_refreshed_at', 'Dynamic sitemap updates on every request') }}</strong></div>
-  <div class="table-wrap"><table><thead><tr><th>Article</th><th>Status</th><th>SEO score</th><th>Missing / warnings</th><th>Missing translations</th><th>Actions</th></tr></thead><tbody>
+{%- endmacro %}
+{% macro fix_card(label, count, helper, level='ready') -%}
+  <article class="seo-2026-fix-card {{ level }}">
+    <div>
+      <span>{{ label }}</span>
+      <strong>{{ count }}</strong>
+      <small>{{ helper }}</small>
+    </div>
+    {{ readiness_badge('Ready' if level == 'ready' else 'Needs attention' if level == 'warning' else 'Critical', level) }}
+  </article>
+{%- endmacro %}
+{% block content %}
+<section class="seo-2026-hero panel">
+  <div>
+    <p class="eyebrow">Google News & AdSense readiness center</p>
+    <h2>SEO Diagnostics</h2>
+    <p class="seo-2026-subtitle">Check Google News, AdSense, sitemap and indexing readiness.</p>
+  </div>
+  <div class="seo-2026-hero-actions">
+    <a class="btn" href="/sitemap.xml" target="_blank" rel="noopener">XML sitemap</a>
+    <a class="btn" href="/news-sitemap.xml" target="_blank" rel="noopener">News sitemap</a>
+    <a class="btn" href="/rss.xml" target="_blank" rel="noopener">RSS feed</a>
+  </div>
+</section>
+
+<section class="seo-2026-card-grid" aria-label="SEO status cards">
+  {{ metric_card('SEO Health Score', seo_overview.health_score ~ '%', seo_overview.total_articles ~ ' article(s) scanned', 'ready' if seo_overview.health_score >= 90 else 'warning' if seo_overview.health_score >= 70 else 'critical') }}
+  {{ metric_card('Missing Meta Descriptions', seo_overview.missing_meta_descriptions, 'Pages without search snippets', 'ready' if seo_overview.missing_meta_descriptions == 0 else 'warning') }}
+  {{ metric_card('Missing Hreflang', seo_overview.missing_hreflang, 'Language alternates requiring coverage', 'ready' if seo_overview.missing_hreflang == 0 else 'warning') }}
+  {{ metric_card('Missing Canonical', seo_overview.missing_canonical, 'Articles without canonical slugs', 'ready' if seo_overview.missing_canonical == 0 else 'critical') }}
+  {{ metric_card('Missing Images', seo_overview.missing_images, 'Articles missing discoverable images', 'ready' if seo_overview.missing_images == 0 else 'critical') }}
+  {{ metric_card('Missing Schema', seo_overview.missing_schema, 'Structured data prerequisites not met', 'ready' if seo_overview.missing_schema == 0 else 'critical') }}
+</section>
+
+<section class="seo-2026-dashboard-grid">
+  <article class="panel seo-2026-readiness-panel">
+    <div class="panel-head wrap">
+      <div>
+        <p class="eyebrow">Google readiness</p>
+        <h2>Google readiness panel</h2>
+        <p class="muted">Live publishing infrastructure checks for News, AdSense, feeds and index discovery.</p>
+      </div>
+      {{ readiness_badge(google_readiness.overall_label, google_readiness.overall_level) }}
+    </div>
+    <div class="seo-2026-readiness-list">
+      {{ readiness_row('XML Sitemap status', google_readiness.xml_sitemap_status, 'ready') }}
+      {{ readiness_row('News Sitemap status', google_readiness.news_sitemap_status, 'ready' if google_readiness.news_sitemap_ready else 'warning') }}
+      {{ readiness_row('RSS Feed status', google_readiness.rss_feed_status, 'ready') }}
+      {{ readiness_row('Last sitemap refresh', google_readiness.last_sitemap_refresh, 'ready') }}
+      {{ readiness_row('Google News readiness', google_readiness.google_news_readiness, google_readiness.google_news_level) }}
+      {{ readiness_row('AdSense readiness', google_readiness.adsense_readiness, google_readiness.adsense_level) }}
+    </div>
+  </article>
+
+  <article class="panel seo-2026-fix-panel">
+    <div class="panel-head wrap">
+      <div>
+        <p class="eyebrow">SEO Fix Center</p>
+        <h2>SEO Fix Center</h2>
+        <p class="muted">Prioritized warnings for high-impact Google News and social discovery repairs.</p>
+      </div>
+    </div>
+    <div class="seo-2026-fix-grid">
+      {{ fix_card('Missing meta descriptions', seo_fix_center.missing_meta_descriptions, 'Meta descriptions improve snippets and AdSense quality signals.', 'ready' if seo_fix_center.missing_meta_descriptions == 0 else 'warning') }}
+      {{ fix_card('Missing hreflang', seo_fix_center.missing_hreflang, 'Complete alternate-language coverage for international indexing.', 'ready' if seo_fix_center.missing_hreflang == 0 else 'warning') }}
+      {{ fix_card('Missing Open Graph tags', seo_fix_center.missing_open_graph, 'Social previews need descriptions and images.', 'ready' if seo_fix_center.missing_open_graph == 0 else 'warning') }}
+      {{ fix_card('Missing canonical URLs', seo_fix_center.missing_canonical, 'Canonical slugs protect index consistency.', 'ready' if seo_fix_center.missing_canonical == 0 else 'critical') }}
+    </div>
+    <div class="seo-2026-fix-actions">
+      <form method="post" action="/admin/seo/generate-missing-meta-descriptions"><button class="btn primary full" type="submit">Generate Missing Meta Descriptions</button></form>
+      <form method="post" action="/admin/seo/fix-canonical-urls"><button class="btn full" type="submit">Fix Canonical URLs</button></form>
+      <form method="post" action="/admin/seo/generate-hreflang-translations"><button class="btn full" type="submit">Generate Missing Hreflang Translations</button></form>
+    </div>
+    {% if request.query_params.get('meta_descriptions_generated') is not none %}<p class="muted">Generated {{ request.query_params.get('meta_descriptions_generated') }} missing meta description(s).</p>{% endif %}
+    {% if request.query_params.get('canonical_fixed') is not none %}<p class="muted">Fixed {{ request.query_params.get('canonical_fixed') }} canonical URL(s).</p>{% endif %}
+    {% if request.query_params.get('hreflang_translations_generated') is not none %}<p class="muted">Generated {{ request.query_params.get('hreflang_translations_generated') }} translation field set(s).</p>{% endif %}
+    {% if request.query_params.get('warning') == 'ai_not_configured' %}<p class="muted">AI provider is not configured, so hreflang translation generation was skipped.</p>{% endif %}
+  </article>
+</section>
+
+<section class="panel seo-2026-articles-panel">
+  <div class="panel-head wrap">
+    <div>
+      <p class="eyebrow">Indexing diagnostics</p>
+      <h2>Article eligibility diagnostics</h2>
+      <p class="muted">Checks metadata, images, schema prerequisites, canonical slugs, hreflang coverage and translations for Google News indexing readiness.</p>
+    </div>
+  </div>
+  <div class="seo-2026-article-list">
     {% for row in rows %}
-    <tr>
-      <td><strong>{{ row.article.title or 'Untitled' }}</strong><small>{{ row.article.slug or 'no-slug' }}</small></td>
-      <td><span class="badge {{ row.article.status }}">{{ row.article.status }}</span></td>
-      <td><span class="seo-score {{ 'good' if row.audit.score >= 90 else 'warn' if row.audit.score >= 70 else 'bad' }}">{{ row.audit.score }}%</span></td>
-      <td>{% if row.audit.issues %}<div class="tool-list">{% for issue in row.audit.issues %}<span>{{ issue }}</span>{% endfor %}</div>{% else %}<span class="badge published">Ready</span>{% endif %}</td>
-      <td>{% if row.audit.missing_translations %}{{ row.audit.missing_translations|join(', ')|upper }}{% else %}<span class="badge published">Complete</span>{% endif %}</td>
-      <td class="actions"><a class="btn small" href="/admin/articles/{{ row.article.id }}/edit">Edit</a>{% if row.article.status == 'published' and row.article.slug %}<a class="btn small" href="/az/{{ row.article.slug }}" target="_blank">View</a>{% endif %}</td>
-    </tr>
-    {% else %}<tr><td colspan="6">No articles found.</td></tr>{% endfor %}
-  </tbody></table></div>
+    {% set level = 'ready' if row.audit.score >= 90 and not row.audit.issues else 'warning' if row.audit.score >= 70 else 'critical' %}
+    {% set status_label = 'Ready' if level == 'ready' else 'Needs attention' if level == 'warning' else 'Critical' %}
+    <article class="seo-2026-article-card {{ level }}">
+      <div class="seo-2026-article-main">
+        <span class="seo-2026-kicker">{{ row.article.status|capitalize }} · {{ row.article.slug or 'no-slug' }}</span>
+        <h3>{{ row.article.title or 'Untitled' }}</h3>
+        <div class="seo-2026-mobile-actions">
+          <a class="btn small" href="/admin/articles/{{ row.article.id }}/edit">Edit</a>
+          {% if row.article.slug %}<a class="btn small" href="/az/{{ row.article.slug }}" target="_blank" rel="noopener">View</a>{% endif %}
+        </div>
+      </div>
+      <div class="seo-2026-article-status">{{ readiness_badge(status_label, level) }}<small>Status</small></div>
+      <div class="seo-2026-article-score"><span class="seo-score {{ 'good' if row.audit.score >= 90 else 'warn' if row.audit.score >= 70 else 'bad' }}">{{ row.audit.score }}%</span><small>SEO score</small></div>
+      <div class="seo-2026-article-issues">
+        {% if row.audit.issues %}<div class="tool-list">{% for issue in row.audit.issues %}<span>{{ issue }}</span>{% endfor %}</div>{% else %}{{ readiness_badge('Ready', 'ready') }}{% endif %}
+        <small>Missing warnings</small>
+      </div>
+      <div class="seo-2026-article-translations">
+        {% if row.audit.missing_translations %}<div class="tool-list">{% for language in row.audit.missing_translations %}<span>{{ language|upper }}</span>{% endfor %}</div>{% else %}{{ readiness_badge('Complete', 'ready') }}{% endif %}
+        <small>Missing translations</small>
+      </div>
+      <div class="actions seo-2026-article-actions">
+        <a class="btn small" href="/admin/articles/{{ row.article.id }}/edit">Edit</a>
+        {% if row.article.slug %}<a class="btn small" href="/az/{{ row.article.slug }}" target="_blank" rel="noopener">View</a>{% endif %}
+      </div>
+    </article>
+    {% else %}
+    <div class="empty-state-card">No articles found.</div>
+    {% endfor %}
+  </div>
 </section>
 {% endblock %}

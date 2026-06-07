@@ -2977,7 +2977,38 @@ def admin_seo_diagnostics(request: Request, db=Depends(get_db), _=Depends(requir
                 issue_counts['Missing hreflang'] += 1
         rows.append({'article': article, 'audit': audit})
     settings_map = get_settings_map(db)
-    return templates.TemplateResponse('admin/seo.html', {'request': request, 'rows': rows, 'issue_counts': issue_counts, 'settings_map': settings_map, 'languages': SUPPORTED_LANGUAGES, 'ai_translation_status': ai_translation_status()})
+    seo_fix_center = seo_fix_center_context(db)
+    total_articles = len(rows)
+    health_score = round(sum(row['audit']['score'] for row in rows) / total_articles) if total_articles else 100
+    published_count = sum(1 for article in articles if article.status == 'published')
+    google_news_ready = published_count > 0 and health_score >= 80 and seo_fix_center['missing_meta_descriptions'] == 0 and issue_counts['Missing schema'] == 0
+    adsense_ready = bool((settings.adsense_publisher_id or '').strip())
+    google_readiness_level = 'ready' if google_news_ready else 'warning' if published_count else 'critical'
+    adsense_level = 'ready' if adsense_ready else 'warning'
+    overall_level = 'ready' if google_news_ready and adsense_ready else 'warning' if published_count else 'critical'
+    seo_overview = {
+        'health_score': health_score,
+        'total_articles': total_articles,
+        'missing_meta_descriptions': seo_fix_center['missing_meta_descriptions'],
+        'missing_hreflang': seo_fix_center['missing_hreflang'],
+        'missing_canonical': seo_fix_center['missing_canonical'],
+        'missing_images': issue_counts['Missing image'],
+        'missing_schema': issue_counts['Missing schema'],
+    }
+    google_readiness = {
+        'xml_sitemap_status': 'Active',
+        'news_sitemap_status': 'Active' if published_count else 'Waiting for published articles',
+        'news_sitemap_ready': published_count > 0,
+        'rss_feed_status': 'Active',
+        'last_sitemap_refresh': settings_map.get('sitemap_last_refreshed_at') or 'Dynamic sitemap updates on every request',
+        'google_news_readiness': 'Ready' if google_news_ready else 'Needs attention' if published_count else 'Critical',
+        'google_news_level': google_readiness_level,
+        'adsense_readiness': 'Ready' if adsense_ready else 'Needs attention',
+        'adsense_level': adsense_level,
+        'overall_label': 'Ready' if overall_level == 'ready' else 'Needs attention' if overall_level == 'warning' else 'Critical',
+        'overall_level': overall_level,
+    }
+    return templates.TemplateResponse('admin/seo.html', {'request': request, 'rows': rows, 'issue_counts': issue_counts, 'settings_map': settings_map, 'seo_overview': seo_overview, 'google_readiness': google_readiness, 'seo_fix_center': seo_fix_center, 'languages': SUPPORTED_LANGUAGES, 'ai_translation_status': ai_translation_status()})
 
 
 @app.get('/admin/settings', response_class=HTMLResponse)
