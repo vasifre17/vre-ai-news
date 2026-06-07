@@ -1,5 +1,5 @@
 {% extends "admin/_base.html" %}
-{% set title = 'Media Library Pro 2.0 | VREYC Admin' %}
+{% set title = 'Media Library Pro 2.1 | VREYC Admin' %}
 {% set heading = 'Media Library' %}
 {% block content %}
 {% if request.query_params.get('warning') == 'used' %}<div class="alert warning">This image is used by articles and cannot be deleted.</div>{% endif %}
@@ -7,32 +7,34 @@
 <section class="dashboard-hero media-pro-hero panel">
   <div>
     <p class="eyebrow">Premium newsroom media manager</p>
-    <h2><span>AZ: Media Kitabxanası</span><span>EN: Media Library</span></h2>
-    <p class="muted">Manage newsroom images with advanced search, responsive previews, reusable public URLs and safe deletion checks without changing existing upload storage.</p>
+    <h2>Media Library</h2>
+    <p class="muted">Upload, manage and reuse newsroom media assets.</p>
   </div>
   <div class="dashboard-hero-actions">
-    <span class="version-pill media-version-badge">Media Library Pro 2.0</span>
+    <span class="version-pill media-version-badge">Media Library Pro 2.1</span>
   </div>
 </section>
 
 <section class="stats-grid media-pro-stats dashboard-stats dashboard-stat-grid-v2">
-  <article class="stat-card premium-stat-card accent-blue"><span>Total Images</span><strong>{{ media_stats.total_images }}</strong><small>All uploaded media assets</small></article>
-  <article class="stat-card premium-stat-card accent-purple"><span>Storage Used</span><strong>{{ media_stats.storage_used }}</strong><small>Total original file size</small></article>
-  <article class="stat-card premium-stat-card accent-green"><span>Images This Week</span><strong>{{ media_stats.images_this_week }}</strong><small>Uploaded in the last 7 days</small></article>
-  <article class="stat-card premium-stat-card accent-gold"><span>Unused Images</span><strong>{{ media_stats.unused_images }}</strong><small>Safe candidates for cleanup</small></article>
+  <article class="stat-card premium-stat-card media-stat-card accent-blue"><span>Total assets</span><strong>{{ media_stats.total_images }}</strong><small>All uploaded media assets</small></article>
+  <article class="stat-card premium-stat-card media-stat-card accent-purple"><span>Storage used</span><strong>{{ media_stats.storage_used }}</strong><small>Total original file size</small></article>
+  <article class="stat-card premium-stat-card media-stat-card accent-green"><span>Used images</span><strong>{{ media_stats.total_images - media_stats.unused_images }}</strong><small>Currently attached to articles</small></article>
+  <article class="stat-card premium-stat-card media-stat-card accent-gold"><span>Unused images</span><strong>{{ media_stats.unused_images }}</strong><small>Safe candidates for cleanup</small></article>
 </section>
 
 <section class="panel media-upload-panel media-pro-upload-panel">
-  <div class="panel-head wrap"><div><p class="eyebrow">Upload workspace</p><h2>Upload images</h2><p class="muted">Upload JPG, JPEG, PNG or WEBP assets up to 20 MB each. Files are stored in {{ upload_dir }} with safe unique filenames and responsive WEBP sizes.</p></div></div>
+  <div class="panel-head wrap"><div><p class="eyebrow">Upload workspace</p><h2>Upload images</h2><p class="muted">Add JPG, JPEG, PNG or WEBP assets up to 20 MB each.</p></div></div>
   <form method="post" enctype="multipart/form-data" class="upload-box media-dropzone media-pro-dropzone" id="mediaUploadForm">
     <label class="drop-area media-pro-drop-area" id="mediaDropArea">
       <input id="mediaFiles" name="files" type="file" accept="image/jpeg,image/png,image/webp" multiple required>
-      <span>Drag & drop upload area</span>
-      <small>Drop JPG, PNG or WEBP files here, or click to select multiple images.</small>
+      <span>Drop images here</span>
+      <small>Drag files into this compact zone or click to select multiple images.</small>
     </label>
-    <input name="alt_text" placeholder="Alt text / caption for uploaded images">
-    <button class="btn primary" type="submit">Upload selected images</button>
-    <p class="upload-hint" id="mediaFileSummary">No files selected.</p>
+    <div class="media-upload-controls">
+      <label>Alt text<input name="alt_text" placeholder="Alt text / caption for uploaded images"></label>
+      <button class="btn primary" type="submit">Upload selected images</button>
+      <p class="upload-hint" id="mediaFileSummary">No files selected.</p>
+    </div>
   </form>
 </section>
 
@@ -61,20 +63,19 @@
       {% if is_image and row.public_path|uploaded_image_exists %}{% set media_srcset = row.public_path|image_srcset %}<img src="{{ row.public_path }}" {% if media_srcset %}srcset="{{ media_srcset }}" sizes="320px"{% endif %} alt="{{ asset.alt_text or asset.filename }}" loading="lazy">{% elif is_image %}<div class="image-placeholder compact">VREYC</div>{% else %}<span>{{ asset.mime_type or asset.content_type or 'file' }}</span>{% endif %}
     </button>
     <div class="media-card-body media-pro-card-body">
-      <strong title="{{ asset.filename }}">{{ asset.filename }}</strong>
+      <strong class="media-file-name" title="{{ asset.filename }}">{{ asset.filename }}</strong>
       <dl class="media-meta media-pro-meta">
-        <div><dt>Upload date</dt><dd>{{ asset.created_at|format_published_at }}</dd></div>
-        <div><dt>File size</dt><dd>{{ display_size }}</dd></div>
-        <div><dt>Resolution</dt><dd>{{ resolution }}</dd></div>
-        <div><dt>Usage</dt><dd>Used in {{ row.usage_count }} article{{ '' if row.usage_count == 1 else 's' }}</dd></div>
+        <div><dt>Size</dt><dd>{{ display_size }}</dd></div>
+        <div><dt>Dimensions</dt><dd>{{ resolution }}</dd></div>
+        <div><dt>Uploaded date</dt><dd>{{ asset.created_at|format_published_at }}</dd></div>
+        <div><dt>Usage status</dt><dd><span class="media-usage-pill {{ 'is-used' if row.usage_count > 0 else 'is-unused' }}">{{ 'Used' if row.usage_count > 0 else 'Unused' }}</span></dd></div>
       </dl>
-      <label class="public-url-label">Public URL<input readonly value="{{ row.absolute_url }}" aria-label="Public URL for {{ asset.filename }}"></label>
       {% if is_image and not row.public_path|uploaded_image_exists %}<p class="alert warning compact">File is missing from uploads.</p>{% endif %}
       {% if row.usage_count > 0 %}<p class="media-delete-warning">This image is used by articles and cannot be deleted.</p>{% endif %}
     </div>
     <div class="actions media-actions media-pro-actions">
-      <button class="btn small copy-path" type="button" data-url="{{ row.absolute_url }}">Copy URL</button>
       <button class="btn small preview-media-button" type="button" data-preview-url="{{ row.absolute_url }}" data-preview-src="{{ row.public_path }}" data-preview-title="{{ asset.filename }}" data-preview-date="{{ asset.created_at|format_published_at }}" data-preview-size="{{ display_size }}" data-preview-resolution="{{ resolution }}">Preview</button>
+      <button class="btn small copy-path" type="button" data-url="{{ row.absolute_url }}">Copy URL</button>
       {% if row.usage_count > 0 %}
       <button class="btn small danger disabled" type="button" title="This image is used by articles and cannot be deleted.">Delete</button>
       {% else %}
@@ -121,10 +122,15 @@
     return window.VREYCAdminI18n?.translate?.(text, language) || text;
   };
   const updateSummary = () => {
+    if (!fileInput || !summary) return;
     const files = Array.from(fileInput.files || []);
-    summary.textContent = files.length ? `${files.length} file${files.length === 1 ? '' : 's'} selected: ${files.map((file) => file.name).join(', ')}` : translate('No files selected.');
+    const language = window.VREYCAdminI18n?.getLanguage?.() || 'az';
+    summary.textContent = files.length
+      ? (language === 'az' ? `${files.length} fayl seçildi: ${files.map((file) => file.name).join(', ')}` : `${files.length} file${files.length === 1 ? '' : 's'} selected: ${files.map((file) => file.name).join(', ')}`)
+      : translate('No files selected.');
   };
   if (fileInput) fileInput.addEventListener('change', updateSummary);
+  window.addEventListener('admin-language-change', updateSummary);
   if (dropArea && fileInput) {
     ['dragenter', 'dragover'].forEach((eventName) => dropArea.addEventListener(eventName, (event) => { event.preventDefault(); dropArea.classList.add('is-dragging'); }));
     ['dragleave', 'drop'].forEach((eventName) => dropArea.addEventListener(eventName, (event) => { event.preventDefault(); dropArea.classList.remove('is-dragging'); }));
