@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="VREYC favicon">
+  <defs>
+    <linearGradient id="vreyc-favicon-bg" x1="8" y1="8" x2="56" y2="56" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#48a6ff"/>
+      <stop offset="0.5" stop-color="#7c3aed"/>
+      <stop offset="1" stop-color="#f97316"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="#07111f"/>
+  <rect x="6" y="6" width="52" height="52" rx="13" fill="url(#vreyc-favicon-bg)"/>
+  <path d="M17 19h8l7 19 7-19h8L35.8 45h-7.6L17 19Z" fill="#ffffff"/>
+  <path d="M19 49h26" stroke="#ffffff" stroke-width="4" stroke-linecap="round" opacity="0.9"/>
+</svg>

@@ -7,6 +7,7 @@
   <meta name="description" content="Read the VREYC Terms of Use covering content ownership, user responsibilities, copyright, disclaimers and contact information.">
   <meta name="robots" content="index,follow,max-image-preview:large">
   <link rel="stylesheet" href="/assets/styles.css?v={{ app_version }}">
+  {% include "public/_brand_assets.html" %}
   {% if verification_meta.google %}<meta name="google-site-verification" content="{{ verification_meta.google }}">{% endif %}{% if verification_meta.bing %}<meta name="msvalidate.01" content="{{ verification_meta.bing }}">{% endif %}
   <link rel="canonical" href="{{ canonical }}"><link rel="alternate" hreflang="en" href="{{ site_url }}/terms"><link rel="alternate" hreflang="x-default" href="{{ site_url }}/terms">
   <meta property="og:type" content="website"><meta property="og:site_name" content="{{ site_name }}"><meta property="og:title" content="Terms of Use — {{ site_name }}"><meta property="og:description" content="The terms for using VREYC content, services and website features."><meta property="og:url" content="{{ canonical }}"><meta property="og:image" content="{{ site_url }}/assets/og-cover.jpg">

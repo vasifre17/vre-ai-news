@@ -10,6 +10,7 @@
   {% if narration and narration.status == 'ready' and narration.audio_path %}<meta itemprop="audio" content="{{site_url}}{{narration.audio_path}}">{% endif %}
   <script type="application/ld+json">{{ {"@context":"https://schema.org", "@graph": schema_graph}|tojson }}</script>
   <link rel="stylesheet" href="/assets/styles.css?v={{ app_version }}">
+  {% include "public/_brand_assets.html" %}
   {% include "public/_analytics.html" %}
 </head>
 <body>
