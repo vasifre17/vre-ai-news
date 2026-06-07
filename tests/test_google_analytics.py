@@ -113,3 +113,18 @@ def test_admin_pages_do_not_load_adsense_verification_script():
     assert response.status_code == 200
     assert "pagead2.googlesyndication.com/pagead/js/adsbygoogle.js" not in response.text
     assert "ca-pub-1323022477437742" not in response.text
+
+
+def test_public_pages_emit_svg_favicon_links_and_search_logo_schema():
+    prepare_public_pages()
+    client = TestClient(app)
+
+    response = client.get("/en/")
+
+    assert response.status_code == 200
+    assert 'rel="icon" type="image/svg+xml" href="https://vreyc.com/assets/favicon.svg' in response.text
+    assert 'rel="apple-touch-icon" href="https://vreyc.com/assets/vreyc-search-logo.svg' in response.text
+    assert '"@type": "ImageObject"' in response.text
+    assert '"url": "https://vreyc.com/assets/vreyc-search-logo.svg"' in response.text
+    assert '"width": 512' in response.text
+    assert '"height": 512' in response.text

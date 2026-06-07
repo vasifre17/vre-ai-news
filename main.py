@@ -1174,7 +1174,12 @@ def build_organization_schema(settings_map: dict[str, str]) -> dict:
         "@id": f"{settings.site_url.rstrip('/')}/#organization",
         "name": site_name_from_settings(settings_map),
         "url": f"{settings.site_url.rstrip('/')}/",
-        "logo": public_absolute_url(seo_setting(settings_map, "organization_logo_url", "/assets/og-cover.jpg")),
+        "logo": {
+            "@type": "ImageObject",
+            "url": public_absolute_url(seo_setting(settings_map, "organization_logo_url", "/assets/vreyc-search-logo.svg")),
+            "width": 512,
+            "height": 512,
+        },
         "sameAs": [url for url in [seo_setting(settings_map, "youtube_url", "https://www.youtube.com/@vasifreyc"), seo_setting(settings_map, "tiktok_url", "https://www.tiktok.com/@vasifreyc")] if url],
     }
 
