@@ -1,10 +1,92 @@
 {% extends "admin/_base.html" %}
-{% set title = 'Categories | VREYC Admin' %}
-{% set heading = 'Category management' %}
+{% set title = 'Categories Premium 2.0 | VREYC Admin' %}
+{% set heading = 'Category Management' %}
 {% block content %}
-<section class="panel-grid two">
-  <div class="panel"><h2>Add category</h2><form method="post" class="stack"><label>Name<input name="name" required></label><label>Description<textarea name="description" rows="4"></textarea></label><label>Accent color<input name="color" type="color" value="#48a6ff"></label><button class="btn primary" type="submit">Create category</button></form></div>
-  <div class="panel ai-panel"><p class="eyebrow">Taxonomy assistant</p><h2>AI category suggestions</h2><p class="muted">Placeholder panel for clustering drafts and recommending editorial taxonomy.</p></div>
+<section class="categories-premium-hero">
+  <div>
+    <p class="eyebrow">Categories Premium 2.0</p>
+    <h2>Category Management</h2>
+    <p class="muted">Premium newsroom taxonomy manager for category strategy, SEO readiness, audience performance and editorial governance.</p>
+  </div>
+  <span class="version-pill">Categories Premium 2.0</span>
 </section>
-<section class="panel"><div class="panel-head"><h2>Existing categories</h2></div><div class="category-list">{% for c in categories %}<form class="category-row" method="post" action="/admin/categories/{{ c.id }}/edit"><input name="name" value="{{ c.name }}"><input name="description" value="{{ c.description or '' }}"><input name="color" type="color" value="{{ c.color or '#48a6ff' }}"><span class="badge">{{ counts.get(c.name, 0) }} articles</span><button class="btn small" type="submit">Save</button><button class="btn small danger" type="submit" form="delete-category-{{ c.id }}">Delete</button></form><form id="delete-category-{{ c.id }}" method="post" action="/admin/categories/{{ c.id }}/delete" onsubmit="return confirm('Delete category?')"></form>{% else %}<p class="muted">No categories yet. Add your first category above.</p>{% endfor %}</div></section>
+
+<section class="categories-premium-stats" aria-label="Category statistics">
+  <article class="stat-card category-stat-card"><span>Total categories</span><strong>{{ category_stats.total_categories }}</strong><small>Active taxonomy records</small></article>
+  <article class="stat-card category-stat-card"><span>Total articles across categories</span><strong>{{ category_stats.total_articles }}</strong><small>Assigned newsroom stories</small></article>
+  <article class="stat-card category-stat-card"><span>Most viewed category</span><strong>{{ category_stats.most_viewed_category.name }}</strong><small>{{ category_stats.most_viewed_category.views }} views</small></article>
+  <article class="stat-card category-stat-card"><span>Fastest growing category</span><strong>{{ category_stats.fastest_growing_category.name }}</strong><small>{{ category_stats.fastest_growing_category.growth }} new articles in 30 days</small></article>
+</section>
+
+<section class="panel-grid two categories-premium-grid">
+  <div class="panel categories-create-panel">
+    <div class="panel-head"><div><p class="eyebrow">Creation workflow</p><h2>Add category</h2><p class="muted">Create a newsroom category with URL, visual identity and SEO planning fields while preserving the existing category database.</p></div></div>
+    <form method="post" class="category-premium-form">
+      <label>Name<input name="name" required placeholder="Politics"></label>
+      <label>Description<textarea name="description" rows="4" placeholder="Describe the editorial scope for this category."></textarea></label>
+      <label>Slug<input name="slug" placeholder="politics"></label>
+      <label>Accent color picker<input name="color" type="color" value="#48a6ff"></label>
+      <label>Category icon picker<select name="icon"><option value="newspaper">📰 Newspaper</option><option value="globe">🌐 Globe</option><option value="briefcase">💼 Business</option><option value="bolt">⚡ Breaking</option><option value="culture">🎭 Culture</option><option value="technology">🤖 Technology</option><option value="sports">🏟️ Sports</option></select></label>
+      <label>SEO title<input name="seo_title" placeholder="Category SEO title"></label>
+      <label class="wide">SEO description<textarea name="seo_description" rows="3" placeholder="Search-friendly category description."></textarea></label>
+      <button class="btn primary wide" type="submit">Create category</button>
+    </form>
+  </div>
+
+  <div class="panel ai-panel categories-ai-panel">
+    <div class="panel-head"><div><p class="eyebrow">Taxonomy assistant</p><h2>AI category suggestions</h2><p class="muted">Insight panel derived from existing articles, slugs and taxonomy coverage.</p></div></div>
+    <div class="taxonomy-suggestion-grid">
+      <article><h3>Recommended categories based on existing articles</h3>{% for item in ai_suggestions.recommended %}<span class="suggestion-chip">{{ item }}</span>{% else %}<p class="muted">No new recommendations yet.</p>{% endfor %}</article>
+      <article><h3>Missing categories</h3>{% for item in ai_suggestions.missing %}<span class="suggestion-chip warn">{{ item }}</span>{% else %}<p class="muted">No missing category records detected.</p>{% endfor %}</article>
+      <article><h3>Category merge suggestions</h3>{% for item in ai_suggestions.merge %}<p class="suggestion-line">{{ item }}</p>{% else %}<p class="muted">No merge candidates detected.</p>{% endfor %}</article>
+      <article><h3>Duplicate category warnings</h3>{% for item in ai_suggestions.duplicates %}<p class="suggestion-line danger">{{ item }}</p>{% else %}<p class="muted">No duplicate warnings.</p>{% endfor %}</article>
+    </div>
+  </div>
+</section>
+
+<section class="panel categories-performance-panel">
+  <div class="panel-head"><div><p class="eyebrow">Performance</p><h2>Category performance section</h2><p class="muted">Compare category demand, article inventory and low-performing taxonomy segments.</p></div></div>
+  <div class="category-performance-grid">
+    <article><h3>Top categories by views</h3>{% for item in performance.top_by_views %}<div class="performance-row"><span>{{ item.name }}</span><strong>{{ item.views }}</strong></div>{% else %}<p class="muted">View performance will appear after readers visit articles.</p>{% endfor %}</article>
+    <article><h3>Top categories by article count</h3>{% for item in performance.top_by_articles %}<div class="performance-row"><span>{{ item.name }}</span><strong>{{ item.article_count }}</strong></div>{% else %}<p class="muted">Article inventory will appear after categories are used.</p>{% endfor %}</article>
+    <article><h3>Lowest performing categories</h3>{% for item in performance.lowest %}<div class="performance-row low"><span>{{ item.name }}</span><strong>{{ item.views }} views</strong></div>{% else %}<p class="muted">No low-performing categories yet.</p>{% endfor %}</article>
+  </div>
+</section>
+
+<section class="panel categories-card-panel">
+  <div class="panel-head wrap"><div><p class="eyebrow">Taxonomy library</p><h2>Existing categories</h2><p class="muted">Responsive category cards with SEO, views and latest article signals.</p></div></div>
+  <div class="category-card-grid">
+    {% for item in category_cards %}
+    <article class="category-premium-card" style="--category-accent: {{ item.color }}">
+      <div class="category-card-top">
+        <span class="category-color-dot" aria-label="Accent color"></span>
+        <div><h3>{{ item.name }}</h3><small>{{ item.slug }}</small></div>
+        <span class="seo-score {{ item.seo_class }}">{{ item.seo_score }} SEO</span>
+      </div>
+      <p>{{ item.description or 'No description yet.' }}</p>
+      <div class="category-metric-grid">
+        <span><small>Total articles count</small><strong>{{ item.article_count }}</strong></span>
+        <span><small>Total category views</small><strong>{{ item.views }}</strong></span>
+        <span><small>Last article date</small><strong>{{ item.last_article_date|format_admin_datetime if item.last_article_date else 'No articles' }}</strong></span>
+        <span><small>Accent color</small><strong>{{ item.color }}</strong></span>
+      </div>
+      <details class="category-edit-details">
+        <summary class="btn small">Edit</summary>
+        <form class="category-edit-form" method="post" action="/admin/categories/{{ item.id }}/edit">
+          <label>Name<input name="name" value="{{ item.name }}" required></label>
+          <label>Description<textarea name="description" rows="3">{{ item.description or '' }}</textarea></label>
+          <label>Slug<input name="slug" value="{{ item.slug }}"></label>
+          <label>Accent color picker<input name="color" type="color" value="{{ item.color }}"></label>
+          <button class="btn primary small" type="submit">Save</button>
+        </form>
+      </details>
+      <form method="post" action="/admin/categories/{{ item.id }}/delete" onsubmit="return confirm('Delete category?')">
+        <button class="btn small danger" type="submit">Delete</button>
+      </form>
+    </article>
+    {% else %}
+    <p class="muted">No categories yet. Add your first category above.</p>
+    {% endfor %}
+  </div>
+</section>
 {% endblock %}
