@@ -2690,31 +2690,165 @@ def delete_article(article_id: int, request: Request, db=Depends(get_db), _=Depe
     return RedirectResponse(f'/admin/articles?status={status}', status_code=302)
 
 
+def unique_category_slug(db, value: str, category_id: int | None = None) -> str:
+    base = slugify(value) or "category"
+    candidate = base
+    suffix = 2
+    query = db.query(Category).filter(Category.slug == candidate)
+    if category_id is not None:
+        query = query.filter(Category.id != category_id)
+    while query.first():
+        candidate = f"{base}-{suffix}"
+        suffix += 1
+        query = db.query(Category).filter(Category.slug == candidate)
+        if category_id is not None:
+            query = query.filter(Category.id != category_id)
+    return candidate
+
+
+def category_seo_score(category: Category, article_count: int, latest_article_date: datetime | None) -> int:
+    checks = [
+        bool((category.name or "").strip()),
+        bool((category.slug or "").strip() and slugify(category.slug) == category.slug),
+        bool((category.description or "").strip()),
+        bool((category.color or "").strip()),
+        article_count > 0,
+        latest_article_date is not None,
+    ]
+    return round((sum(1 for passed in checks if passed) / len(checks)) * 100)
+
+
+def seo_score_class(score: int) -> str:
+    if score >= 90:
+        return "excellent"
+    if score >= 70:
+        return "good"
+    if score >= 50:
+        return "average"
+    return "poor"
+
+
+def category_management_context(db) -> dict:
+    categories = db.query(Category).order_by(Category.name.asc()).all()
+    article_rows = db.query(Article.category, func.count(Article.id)).group_by(Article.category).all()
+    counts = {name or "Uncategorized": int(count or 0) for name, count in article_rows}
+    latest_rows = db.query(Article.category, func.max(func.coalesce(Article.published_at, Article.publish_at, Article.created_at))).group_by(Article.category).all()
+    latest_dates = {name or "Uncategorized": latest for name, latest in latest_rows}
+    view_rows = (
+        db.query(Article.category, func.count(ArticleView.id))
+        .join(ArticleView, ArticleView.article_id == Article.id)
+        .filter(public_traffic_filter())
+        .group_by(Article.category)
+        .all()
+    )
+    views = {name or "Uncategorized": int(count or 0) for name, count in view_rows}
+    category_names = {c.name for c in categories}
+    cards = []
+    for category in categories:
+        count = counts.get(category.name, 0)
+        latest = latest_dates.get(category.name)
+        score = category_seo_score(category, count, latest)
+        cards.append(SimpleNamespace(
+            id=category.id,
+            name=category.name,
+            slug=category.slug or slugify(category.name),
+            description=category.description,
+            color=category.color or "#48a6ff",
+            article_count=count,
+            views=views.get(category.name, 0),
+            last_article_date=latest,
+            seo_score=score,
+            seo_class=seo_score_class(score),
+        ))
+
+    total_articles = sum(counts.get(c.name, 0) for c in categories)
+    most_viewed = max(cards, key=lambda item: item.views, default=None)
+    today = utc_start_of_day()
+    recent_rows = db.query(Article.category, func.count(Article.id)).filter(Article.created_at >= today - timedelta(days=29)).group_by(Article.category).all()
+    recent_counts = {name or "Uncategorized": int(count or 0) for name, count in recent_rows}
+    fastest = max(cards, key=lambda item: recent_counts.get(item.name, 0), default=None)
+
+    top_by_views = sorted(cards, key=lambda item: item.views, reverse=True)[:5]
+    top_by_articles = sorted(cards, key=lambda item: item.article_count, reverse=True)[:5]
+    lowest = sorted([item for item in cards if item.article_count or item.views], key=lambda item: (item.views, item.article_count))[:5]
+
+    article_only_categories = sorted(name for name in counts if name and name not in category_names and name != "Uncategorized")
+    default_missing = [item["name"] for item in DEFAULT_CATEGORIES if item["name"] not in category_names]
+    recommended = []
+    for name, count in sorted(counts.items(), key=lambda row: row[1], reverse=True):
+        if name not in category_names and name != "Uncategorized":
+            recommended.append(f"{name} ({count} articles)")
+    recommended.extend(name for name in default_missing if name not in recommended)
+
+    slug_groups: dict[str, list[str]] = {}
+    normalized_groups: dict[str, list[str]] = {}
+    for category in categories:
+        slug_groups.setdefault(slugify(category.name), []).append(category.name)
+        normalized_groups.setdefault(re.sub(r"[^a-z0-9]+", "", slugify(category.name)), []).append(category.name)
+    merge = [" + ".join(names) for names in slug_groups.values() if len(names) > 1]
+    duplicates = [" / ".join(names) for names in normalized_groups.values() if len(names) > 1]
+    if article_only_categories:
+        merge.extend(f"Create or merge article-only category: {name}" for name in article_only_categories[:3])
+
+    return {
+        "categories": categories,
+        "counts": {c.name: counts.get(c.name, 0) for c in categories},
+        "category_cards": cards,
+        "category_stats": SimpleNamespace(
+            total_categories=len(categories),
+            total_articles=total_articles,
+            most_viewed_category=SimpleNamespace(name=most_viewed.name if most_viewed else "None", views=most_viewed.views if most_viewed else 0),
+            fastest_growing_category=SimpleNamespace(name=fastest.name if fastest else "None", growth=recent_counts.get(fastest.name, 0) if fastest else 0),
+        ),
+        "ai_suggestions": SimpleNamespace(
+            recommended=recommended[:6],
+            missing=(article_only_categories + default_missing)[:6],
+            merge=merge[:6],
+            duplicates=duplicates[:6],
+        ),
+        "performance": SimpleNamespace(top_by_views=top_by_views, top_by_articles=top_by_articles, lowest=lowest),
+    }
+
+
 @app.get('/admin/categories', response_class=HTMLResponse)
 def categories_page(request: Request, db=Depends(get_db), _=Depends(require_auth)):
-    categories = db.query(Category).order_by(Category.name.asc()).all()
-    counts = {c.name: db.query(Article).filter(Article.category == c.name).count() for c in categories}
-    return templates.TemplateResponse('admin/categories.html', {'request': request, 'categories': categories, 'counts': counts})
+    context = category_management_context(db)
+    context['request'] = request
+    return templates.TemplateResponse('admin/categories.html', context)
 
 
 @app.post('/admin/categories')
-def create_category(request: Request, name: str = Form(...), description: str = Form(''), color: str = Form('#48a6ff'), db=Depends(get_db), _=Depends(require_auth)):
+def create_category(
+    request: Request,
+    name: str = Form(...),
+    description: str = Form(''),
+    slug: str = Form(''),
+    color: str = Form('#48a6ff'),
+    icon: str = Form(''),
+    seo_title: str = Form(''),
+    seo_description: str = Form(''),
+    db=Depends(get_db),
+    _=Depends(require_auth),
+):
     name = name.strip()
     if name and not db.query(Category).filter(Category.name == name).first():
-        db.add(Category(name=name, slug=slugify(name), description=description, color=color))
+        db.add(Category(name=name, slug=unique_category_slug(db, slug or name), description=description, color=color))
         db.commit()
     return RedirectResponse('/admin/categories', status_code=302)
 
 
 @app.post('/admin/categories/{category_id}/edit')
-def update_category(category_id: int, request: Request, name: str = Form(...), description: str = Form(''), color: str = Form('#48a6ff'), db=Depends(get_db), _=Depends(require_auth)):
+def update_category(category_id: int, request: Request, name: str = Form(...), description: str = Form(''), slug: str = Form(''), color: str = Form('#48a6ff'), db=Depends(get_db), _=Depends(require_auth)):
     category = db.query(Category).get(category_id)
-    if category:
+    name = name.strip()
+    duplicate_name = db.query(Category).filter(Category.name == name, Category.id != category_id).first() if name else None
+    if category and name and not duplicate_name:
         old_name = category.name
-        category.name = name.strip()
-        category.slug = slugify(name)
+        category.name = name
+        category.slug = unique_category_slug(db, slug or name, category_id)
         category.description = description
         category.color = color
+        category.updated_at = datetime.utcnow()
         for article in db.query(Article).filter(Article.category == old_name).all():
             article.category = category.name
         db.commit()
