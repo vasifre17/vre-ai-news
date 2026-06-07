@@ -3011,24 +3011,55 @@ def admin_seo_diagnostics(request: Request, db=Depends(get_db), _=Depends(requir
     return templates.TemplateResponse('admin/seo.html', {'request': request, 'rows': rows, 'issue_counts': issue_counts, 'settings_map': settings_map, 'seo_overview': seo_overview, 'google_readiness': google_readiness, 'seo_fix_center': seo_fix_center, 'languages': SUPPORTED_LANGUAGES, 'ai_translation_status': ai_translation_status()})
 
 
+def settings_system_status(db) -> dict[str, bool]:
+    database_connected = True
+    try:
+        db.execute(text("SELECT 1"))
+    except Exception:
+        database_connected = False
+    return {
+        "backup_script_ready": Path("scripts/backup_db.sh").exists(),
+        "upload_dir_ready": UPLOAD_DIR.exists() and os.access(UPLOAD_DIR, os.W_OK),
+        "persistent_uploads_ready": UPLOAD_DIR.is_absolute() and not str(UPLOAD_DIR).startswith(str(Path.cwd())),
+        "database_connected": database_connected,
+    }
+
+
 @app.get('/admin/settings', response_class=HTMLResponse)
 def settings_page(request: Request, db=Depends(get_db), _=Depends(require_auth)):
     admin_settings = get_settings_map(db)
-    return templates.TemplateResponse('admin/settings.html', {'request': request, 'settings_map': admin_settings, 'config': settings, 'languages': SUPPORTED_LANGUAGES, 'ai_translation_status': ai_translation_status()})
+    return templates.TemplateResponse('admin/settings.html', {'request': request, 'settings_map': admin_settings, 'config': settings, 'languages': SUPPORTED_LANGUAGES, 'ai_translation_status': ai_translation_status(), 'settings_system_status': settings_system_status(db)})
 
 
 @app.post('/admin/settings')
-def save_settings(request: Request, site_name: str = Form('VREYC'), editor_name: str = Form('Editor'), publish_mode: str = Form('manual'), default_language: str = Form('az'), google_search_console_verification: str | None = Form(None), bing_webmaster_verification: str | None = Form(None), organization_logo_url: str | None = Form(None), youtube_url: str | None = Form(None), tiktok_url: str | None = Form(None), db=Depends(get_db), _=Depends(require_auth)):
+def save_settings(request: Request, site_name: str = Form('VREYC'), editor_name: str = Form('Editor'), publish_mode: str = Form('manual'), default_language: str = Form('az'), site_description: str | None = Form(None), contact_email: str | None = Form(None), logo_url: str | None = Form(None), favicon_url: str | None = Form(None), organization_logo_url: str | None = Form(None), watermark_url: str | None = Form(None), facebook_url: str | None = Form(None), youtube_url: str | None = Form(None), tiktok_url: str | None = Form(None), instagram_url: str | None = Form(None), telegram_url: str | None = Form(None), mailru_url: str | None = Form(None), google_search_console_verification: str | None = Form(None), bing_webmaster_verification: str | None = Form(None), google_analytics_id: str | None = Form(None), google_tag_manager_id: str | None = Form(None), adsense_publisher_id: str | None = Form(None), ads_txt_status: str | None = Form(None), auto_ads_status: str | None = Form(None), header_ad_slot: str | None = Form(None), sidebar_ad_slot: str | None = Form(None), article_ad_slot: str | None = Form(None), db=Depends(get_db), _=Depends(require_auth)):
     values = {
         'site_name': site_name,
         'editor_name': editor_name,
         'publish_mode': publish_mode,
         'default_language': default_language,
-        'google_search_console_verification': google_search_console_verification.strip() if google_search_console_verification is not None else None,
-        'bing_webmaster_verification': bing_webmaster_verification.strip() if bing_webmaster_verification is not None else None,
+        'site_description': site_description.strip() if site_description is not None else None,
+        'contact_email': contact_email.strip() if contact_email is not None else None,
+        'logo_url': logo_url.strip() if logo_url is not None else None,
+        'favicon_url': favicon_url.strip() if favicon_url is not None else None,
         'organization_logo_url': organization_logo_url.strip() if organization_logo_url is not None else None,
+        'watermark_url': watermark_url.strip() if watermark_url is not None else None,
+        'facebook_url': facebook_url.strip() if facebook_url is not None else None,
         'youtube_url': youtube_url.strip() if youtube_url is not None else None,
         'tiktok_url': tiktok_url.strip() if tiktok_url is not None else None,
+        'instagram_url': instagram_url.strip() if instagram_url is not None else None,
+        'telegram_url': telegram_url.strip() if telegram_url is not None else None,
+        'mailru_url': mailru_url.strip() if mailru_url is not None else None,
+        'google_search_console_verification': google_search_console_verification.strip() if google_search_console_verification is not None else None,
+        'bing_webmaster_verification': bing_webmaster_verification.strip() if bing_webmaster_verification is not None else None,
+        'google_analytics_id': google_analytics_id.strip() if google_analytics_id is not None else None,
+        'google_tag_manager_id': google_tag_manager_id.strip() if google_tag_manager_id is not None else None,
+        'adsense_publisher_id': adsense_publisher_id.strip() if adsense_publisher_id is not None else None,
+        'ads_txt_status': ads_txt_status.strip() if ads_txt_status is not None else None,
+        'auto_ads_status': auto_ads_status.strip() if auto_ads_status is not None else None,
+        'header_ad_slot': header_ad_slot.strip() if header_ad_slot is not None else None,
+        'sidebar_ad_slot': sidebar_ad_slot.strip() if sidebar_ad_slot is not None else None,
+        'article_ad_slot': article_ad_slot.strip() if article_ad_slot is not None else None,
     }
     for key, value in values.items():
         if value is not None:
