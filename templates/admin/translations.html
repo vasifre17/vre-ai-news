@@ -1,21 +1,140 @@
 {% extends "admin/_base.html" %}
-{% set title = 'Translations | VREYC Admin' %}
-{% set heading = 'AI translations' %}
+{% set title = 'AI Translations | VREYC Admin' %}
+{% set heading = 'AI Translations' %}
 {% block content %}
-<section class="panel">
-  <div class="panel-head wrap">
+<section class="translations-pro-page">
+  <div class="translations-hero panel">
     <div>
-      <h2>Generate missing multilingual article fields</h2>
-      <p class="muted">AZ is the primary article language. AI generates missing EN, RU, TR, ZH and ES rows in article_translations without duplicating articles.</p>
+      <p class="eyebrow">Multilingual AI newsroom</p>
+      <h2>AI Translations</h2>
+      <p class="muted translations-subtitle">Manage multilingual article versions and complete missing translations.</p>
     </div>
     <form method="post" action="/admin/translations/generate-missing">
       <button class="btn primary" type="submit">Generate translations for all missing articles</button>
     </form>
   </div>
-  {% if not ai_translation_status.configured %}<div class="alert danger">{{ ai_translation_status.message }}</div>{% endif %}
+
+  {% if not ai_translation_status.configured %}
+  <div class="translation-warning-card" role="alert">
+    <div class="translation-warning-icon">!</div>
+    <div>
+      <strong>AI translation provider is not configured</strong>
+      <p>Automatic generation is paused. Add a valid OpenAI API key in the server environment to enable missing-language generation.</p>
+      <small>{{ ai_translation_status.message }}</small>
+    </div>
+  </div>
+  {% endif %}
+
   {% if request.query_params.get('queued') == 'bulk' %}<div class="alert">Bulk translation generation was queued in the background.</div>{% endif %}
   {% if request.query_params.get('queued') == 'article' %}<div class="alert">Article translation generation was queued in the background.</div>{% endif %}
-  {% if request.query_params.get('warning') == 'ai_not_configured' %}<div class="alert danger">AI translation provider is not configured.</div>{% endif %}
-  <div class="table-wrap"><table><thead><tr><th>ID</th><th>Title</th><th>Existing languages</th><th>Missing</th><th>Action</th></tr></thead><tbody>{% for a in articles %}<tr><td>{{ a.id }}</td><td><strong>{{ a.title }}</strong><small>{{ a.status }}</small></td><td>AZ{% for t in a.translations %}, {{ t.language|upper }}{% endfor %}</td><td>{% set missing = translation_missing_map.get(a.id, []) %}{% if missing %}{{ missing|join(', ')|upper }}{% else %}<span class="badge published">Complete</span>{% endif %}</td><td><form method="post" action="/admin/translations/{{ a.id }}/generate"><button class="btn small primary" type="submit">Generate missing translations</button></form></td></tr>{% else %}<tr><td colspan="5">No articles yet.</td></tr>{% endfor %}</tbody></table></div>
+  {% if request.query_params.get('queued') == 'missing_article' %}<div class="alert danger">Article was not found.</div>{% endif %}
+  {% if request.query_params.get('warning') == 'ai_not_configured' %}<div class="translation-warning-card compact" role="alert"><div class="translation-warning-icon">!</div><div><strong>AI translation provider is not configured</strong><p>Configure the provider before queueing translation jobs.</p></div></div>{% endif %}
+
+  <div class="translation-stat-grid">
+    <article class="stat-card translation-stat-card">
+      <span>Total articles</span>
+      <strong>{{ translation_stats.total_articles }}</strong>
+      <small>Newsroom source records</small>
+    </article>
+    <article class="stat-card translation-stat-card">
+      <span>Fully translated</span>
+      <strong>{{ translation_stats.fully_translated }}</strong>
+      <small>All supported languages complete</small>
+    </article>
+    <article class="stat-card translation-stat-card warning">
+      <span>Missing translations</span>
+      <strong>{{ translation_stats.missing_translations }}</strong>
+      <small>Language versions to complete</small>
+    </article>
+    <article class="stat-card translation-stat-card">
+      <span>Supported languages</span>
+      <strong>{{ translation_stats.supported_languages }}</strong>
+      <small>AZ, EN, RU, TR, ZH, ES</small>
+    </article>
+  </div>
+
+  <div class="translations-dashboard-grid">
+    <section class="panel translation-coverage-panel">
+      <div class="panel-head wrap">
+        <div>
+          <h2>Language coverage</h2>
+          <p class="muted">Completion percentage across all articles.</p>
+        </div>
+      </div>
+      <div class="coverage-list">
+        {% for row in language_coverage %}
+        <div class="coverage-row">
+          <div class="coverage-label">
+            <span class="language-orb">{{ row.code|upper }}</span>
+            <div><strong>{{ row.code|upper }}</strong><small>{{ row.label }}</small></div>
+          </div>
+          <div class="coverage-meter" aria-label="{{ row.code|upper }} coverage {{ row.percentage }} percent"><span style="width: {{ row.percentage }}%"></span></div>
+          <strong class="coverage-percent">{{ row.percentage }}%</strong>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <aside class="panel translation-queue-panel">
+      <div class="panel-head wrap">
+        <div>
+          <h2>Translation queue</h2>
+          <p class="muted">Current AI generation activity.</p>
+        </div>
+      </div>
+      <div class="queue-metrics">
+        <div><span>Pending</span><strong>{{ queue_stats.pending }}</strong></div>
+        <div><span>Completed</span><strong>{{ queue_stats.completed }}</strong></div>
+        <div><span>Failed</span><strong>{{ queue_stats.failed }}</strong></div>
+        <div><span>Last generated</span><strong>{% if queue_stats.last_generated %}{{ queue_stats.last_generated.strftime('%Y-%m-%d %H:%M') }}{% else %}—{% endif %}</strong></div>
+      </div>
+    </aside>
+  </div>
+
+  <section class="panel translation-articles-panel">
+    <div class="panel-head wrap">
+      <div>
+        <h2>Article translation control</h2>
+        <p class="muted">Review existing language versions and generate only missing translations.</p>
+      </div>
+    </div>
+    <div class="translation-card-list">
+      {% for a in articles %}
+      {% set missing = translation_missing_map.get(a.id, []) %}
+      {% set status = translation_status_map.get(a.id, {}) %}
+      <article class="translation-article-card {{ 'complete' if not missing else 'needs-translation' }}">
+        <div class="translation-article-main">
+          <div class="translation-article-kicker">Article #{{ a.id }} · {{ a.status }}</div>
+          <h3>{{ a.title }}</h3>
+          <div class="translation-badge-groups">
+            <div>
+              <span class="badge-label">Existing languages</span>
+              <div class="translation-badges">
+                {% for lang in status.existing %}<span class="language-badge existing">{{ lang|upper }}</span>{% endfor %}
+              </div>
+            </div>
+            <div>
+              <span class="badge-label">Missing languages</span>
+              <div class="translation-badges">
+                {% if missing %}{% for lang in missing %}<span class="language-badge missing">{{ lang|upper }}</span>{% endfor %}{% else %}<span class="language-badge complete">Complete</span>{% endif %}
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="translation-article-side">
+          <span class="translation-status-pill {{ 'complete' if not missing else 'warning' }}">{{ 'Complete' if not missing else 'Needs translation' }}</span>
+          <form method="post" action="/admin/translations/{{ a.id }}/generate">
+            <button class="btn small primary" type="submit">Generate missing translations</button>
+          </form>
+        </div>
+      </article>
+      {% else %}
+      <div class="empty-state-card">
+        <strong>No articles yet.</strong>
+        <p class="muted">Create articles first, then return here to manage multilingual versions.</p>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
 </section>
 {% endblock %}

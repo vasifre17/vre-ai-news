@@ -3010,7 +3010,51 @@ def save_settings(request: Request, site_name: str = Form('VREYC'), editor_name:
 def admin_translations(request: Request, db=Depends(get_db), _=Depends(require_auth)):
     articles = db.query(Article).options(selectinload(Article.translations)).order_by(Article.updated_at.desc(), Article.created_at.desc()).all()
     translation_missing_map = {a.id: missing_translation_languages(a) for a in articles}
-    return templates.TemplateResponse('admin/translations.html', {'request': request, 'articles': articles, 'languages': SUPPORTED_LANGUAGES, 'translation_missing_map': translation_missing_map, 'ai_translation_status': ai_translation_status()})
+    total_articles = len(articles)
+    fully_translated = sum(1 for article in articles if not translation_missing_map.get(article.id))
+    language_coverage = []
+    for language in SUPPORTED_LANGUAGES:
+        completed = total_articles if language == "az" else sum(1 for article in articles if language not in translation_missing_map.get(article.id, []))
+        language_coverage.append({
+            "code": language,
+            "label": LANGUAGE_LABELS.get(language, language.upper()),
+            "completed": completed,
+            "percentage": round((completed / total_articles) * 100) if total_articles else 0,
+        })
+    translation_status_map = {
+        article.id: {
+            "existing": [language for language in SUPPORTED_LANGUAGES if language not in translation_missing_map.get(article.id, [])],
+            "complete": not translation_missing_map.get(article.id),
+        }
+        for article in articles
+    }
+    translation_job_ids = [job.id for job in scheduler.get_jobs() if "translation" in (job.id or "").lower()]
+    failed_translation_count = db.query(FetchLog).filter(FetchLog.level == "ERROR", FetchLog.message.ilike("%translation%")).count()
+    last_generated_at = db.query(func.max(ArticleTranslation.updated_at)).scalar()
+    queue_stats = {
+        "pending": len(translation_job_ids),
+        "completed": fully_translated,
+        "failed": failed_translation_count,
+        "last_generated": last_generated_at,
+    }
+    translation_stats = {
+        "total_articles": total_articles,
+        "fully_translated": fully_translated,
+        "missing_translations": sum(len(missing) for missing in translation_missing_map.values()),
+        "supported_languages": len(SUPPORTED_LANGUAGES),
+    }
+    return templates.TemplateResponse('admin/translations.html', {
+        'request': request,
+        'articles': articles,
+        'languages': SUPPORTED_LANGUAGES,
+        'language_labels': LANGUAGE_LABELS,
+        'translation_missing_map': translation_missing_map,
+        'translation_status_map': translation_status_map,
+        'translation_stats': translation_stats,
+        'language_coverage': language_coverage,
+        'queue_stats': queue_stats,
+        'ai_translation_status': ai_translation_status(),
+    })
 
 
 @app.post('/admin/translations/{article_id}/generate')
