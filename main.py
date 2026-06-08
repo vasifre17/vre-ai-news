@@ -11,6 +11,7 @@ from types import SimpleNamespace
 import re
 import shutil
 from urllib.parse import parse_qs, urlparse
+from xml.etree import ElementTree
 from pathlib import Path
 from uuid import uuid4
 from sqlalchemy import func, or_, select, text
@@ -25,6 +26,7 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 from apscheduler.schedulers.background import BackgroundScheduler
 from bs4 import BeautifulSoup
+import requests
 
 from config import PLACEHOLDER_VALUES, settings
 from database.session import SessionLocal, init_db
@@ -48,6 +50,8 @@ templates.env.globals["adsense_publisher_id"] = settings.adsense_publisher_id
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.state.dashboard_analytics_cache = {"expires_at": 0.0, "payload": None}
+app.state.youtube_shorts_cache = {"expires_at": 0.0, "payload": None}
+app.state.youtube_shorts_cache_lock = threading.Lock()
 scheduler = BackgroundScheduler()
 SUPPORTED_LANGUAGES = ["az", "en", "ru", "tr", "zh", "es"]
 LANGUAGE_LABELS = {"az": "Azerbaijani", "en": "English", "ru": "Russian", "tr": "Turkish", "zh": "Chinese", "es": "Spanish"}
@@ -341,7 +345,7 @@ PUBLIC_LABELS["az"].update({
     "newsletter_duplicate": "Bu e-poçt artıq abunədir.",
     "newsletter_invalid": "Düzgün e-poçt ünvanı daxil edin.",
     "newsletter_error": "Abunəliyi saxlamaq mümkün olmadı. Zəhmət olmasa yenidən cəhd edin.",
-    "latest_video_label": "Son video",
+    "latest_video_label": "Son Shorts",
 })
 PUBLIC_LABELS["en"].update({
     "newsroom_label": "Premium newsroom",
@@ -372,7 +376,7 @@ PUBLIC_LABELS["en"].update({
     "newsletter_duplicate": "This email is already subscribed.",
     "newsletter_invalid": "Please enter a valid email address.",
     "newsletter_error": "Subscription could not be saved. Please try again.",
-    "latest_video_label": "Latest video",
+    "latest_video_label": "Latest Shorts",
 })
 
 def public_labels(language: str) -> dict[str, str]:
@@ -426,6 +430,136 @@ ALLOWED_ARTICLE_ATTRIBUTES = {
 }
 YOUTUBE_HOSTS = {"youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "www.youtu.be", "youtube-nocookie.com", "www.youtube-nocookie.com"}
 IFRAME_WRAPPER_CLASS = "iframe-video-embed"
+
+
+
+YOUTUBE_CHANNEL_URL = "https://www.youtube.com/@vasifreyc"
+YOUTUBE_SHORTS_PAGE_URL = f"{YOUTUBE_CHANNEL_URL}/shorts"
+YOUTUBE_CACHE_TTL_SECONDS = 60 * 30
+YOUTUBE_HTTP_TIMEOUT_SECONDS = 4
+YOUTUBE_VIDEO_ID_RE = re.compile(r"^[A-Za-z0-9_-]{11}$")
+
+
+def youtube_thumbnail_url(video_id: str | None) -> str:
+    return f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg" if video_id else ""
+
+
+def youtube_watch_url(video_id: str | None, *, short: bool = False) -> str:
+    if not video_id:
+        return YOUTUBE_CHANNEL_URL
+    path = "shorts" if short else "watch"
+    return f"https://www.youtube.com/{path}/{video_id}" if short else f"https://www.youtube.com/watch?v={video_id}"
+
+
+def youtube_embed_url(video_id: str | None, *, short: bool = False) -> str:
+    if not video_id:
+        return ""
+    params = "enablejsapi=1&autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1"
+    if short:
+        params += f"&loop=1&playlist={video_id}"
+    return f"https://www.youtube.com/embed/{video_id}?{params}"
+
+
+def youtube_video_payload(video_id: str | None, *, short: bool = False) -> dict[str, str] | None:
+    video_id = (video_id or "").strip()
+    if not YOUTUBE_VIDEO_ID_RE.fullmatch(video_id):
+        return None
+    return {
+        "video_id": video_id,
+        "url": youtube_watch_url(video_id, short=short),
+        "embed_url": youtube_embed_url(video_id, short=short),
+        "thumbnail": youtube_thumbnail_url(video_id),
+        "kind": "short" if short else "video",
+    }
+
+
+def unique_youtube_ids(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    unique: list[str] = []
+    for value in values:
+        if not YOUTUBE_VIDEO_ID_RE.fullmatch(value or "") or value in seen:
+            continue
+        seen.add(value)
+        unique.append(value)
+    return unique
+
+
+def parse_youtube_shorts_ids(page_html: str) -> list[str]:
+    """Extract Shorts IDs in page order from the Vasif REYC Shorts tab HTML."""
+    normalized = (page_html or "").replace("\\/", "/")
+    ids = re.findall(r"/shorts/([A-Za-z0-9_-]{11})", normalized)
+    return unique_youtube_ids(ids)
+
+
+def parse_youtube_channel_id(page_html: str) -> str | None:
+    normalized = page_html or ""
+    for pattern in (r'"channelId":"([A-Za-z0-9_-]+)"', r'"externalId":"([A-Za-z0-9_-]+)"', r'channel_id=([A-Za-z0-9_-]+)'):
+        match = re.search(pattern, normalized)
+        if match:
+            return match.group(1)
+    return None
+
+
+def fetch_youtube_text(url: str) -> str:
+    response = requests.get(
+        url,
+        headers={"User-Agent": "Mozilla/5.0 (compatible; VREYC-News/1.0; +https://vreyc.com)"},
+        timeout=YOUTUBE_HTTP_TIMEOUT_SECONDS,
+    )
+    response.raise_for_status()
+    return response.text
+
+
+def latest_channel_video_id(channel_id: str | None) -> str | None:
+    if not channel_id:
+        return None
+    feed_xml = fetch_youtube_text(f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}")
+    root = ElementTree.fromstring(feed_xml)
+    namespaces = {"atom": "http://www.w3.org/2005/Atom", "yt": "http://www.youtube.com/xml/schemas/2015"}
+    entry = root.find("atom:entry", namespaces)
+    if entry is None:
+        return None
+    video_id = entry.findtext("yt:videoId", default="", namespaces=namespaces).strip()
+    return video_id if YOUTUBE_VIDEO_ID_RE.fullmatch(video_id) else None
+
+
+def build_youtube_shorts_widget() -> dict[str, object]:
+    payload: dict[str, object] = {"channel_url": YOUTUBE_CHANNEL_URL, "short": None, "fallback": None}
+    shorts_html = fetch_youtube_text(YOUTUBE_SHORTS_PAGE_URL)
+    shorts_ids = parse_youtube_shorts_ids(shorts_html)
+    if shorts_ids:
+        payload["short"] = youtube_video_payload(shorts_ids[0], short=True)
+
+    channel_id = parse_youtube_channel_id(shorts_html)
+    try:
+        fallback_id = latest_channel_video_id(channel_id)
+    except Exception as exc:
+        logger.warning("Could not refresh Vasif REYC latest channel video fallback: %s", exc)
+        fallback_id = None
+    if fallback_id:
+        payload["fallback"] = youtube_video_payload(fallback_id, short=fallback_id in shorts_ids)
+    return payload
+
+
+def latest_youtube_shorts_widget() -> dict[str, object]:
+    now = time.monotonic()
+    cache = getattr(app.state, "youtube_shorts_cache", {"expires_at": 0.0, "payload": None})
+    if cache.get("payload") and float(cache.get("expires_at") or 0) > now:
+        return cache["payload"]
+
+    with app.state.youtube_shorts_cache_lock:
+        cache = getattr(app.state, "youtube_shorts_cache", {"expires_at": 0.0, "payload": None})
+        if cache.get("payload") and float(cache.get("expires_at") or 0) > now:
+            return cache["payload"]
+        try:
+            payload = build_youtube_shorts_widget()
+            ttl = YOUTUBE_CACHE_TTL_SECONDS
+        except Exception as exc:
+            logger.warning("Could not refresh Vasif REYC YouTube Shorts widget: %s", exc)
+            payload = cache.get("payload") or {"channel_url": YOUTUBE_CHANNEL_URL, "short": None, "fallback": None}
+            ttl = 5 * 60
+        app.state.youtube_shorts_cache = {"expires_at": time.monotonic() + ttl, "payload": payload}
+        return payload
 
 
 def is_html_fragment(value: str) -> bool:
@@ -2168,13 +2302,14 @@ def home(request: Request, language: str = "az", q: str = "", category: str = ""
         })
     alt_links = {lang: f"/{lang}/" for lang in SUPPORTED_LANGUAGES}
     settings_map = get_settings_map(db)
+    youtube_widget = latest_youtube_shorts_widget()
     canonical = canonical_url(request, f'{language}/')
     schema_graph = [
         build_organization_schema(settings_map),
         build_website_schema(settings_map, language),
         build_breadcrumb_schema([("Home", canonical)]),
     ]
-    return templates.TemplateResponse("public/home.html", {"request": request, "articles": article_cards, "latest_articles": latest_cards, "sidebar_articles": sidebar_cards, "trending_articles": trending_cards, "most_viewed_articles": most_viewed_cards, "breaking_articles": breaking_cards, "latest_news_count": latest_news_count, "today_views": today_views, "category_blocks": category_blocks, "hero": hero, "categories": categories["primary"], "secondary_categories": categories["secondary"], "q": q, "category": category, "site_url": settings.site_url, "canonical": canonical, "language": language, "languages": SUPPORTED_LANGUAGES, "alt_links": alt_links, "ui": public_labels(language), "category_labels": category_labels, "settings_map": settings_map, "verification_meta": seo_verification_meta(settings_map), "schema_graph": schema_graph, "site_name": site_name_from_settings(settings_map), "app_version": APP_VERSION})
+    return templates.TemplateResponse("public/home.html", {"request": request, "articles": article_cards, "latest_articles": latest_cards, "sidebar_articles": sidebar_cards, "trending_articles": trending_cards, "most_viewed_articles": most_viewed_cards, "breaking_articles": breaking_cards, "latest_news_count": latest_news_count, "today_views": today_views, "category_blocks": category_blocks, "hero": hero, "categories": categories["primary"], "secondary_categories": categories["secondary"], "q": q, "category": category, "site_url": settings.site_url, "canonical": canonical, "language": language, "languages": SUPPORTED_LANGUAGES, "alt_links": alt_links, "ui": public_labels(language), "category_labels": category_labels, "settings_map": settings_map, "verification_meta": seo_verification_meta(settings_map), "schema_graph": schema_graph, "site_name": site_name_from_settings(settings_map), "youtube_widget": youtube_widget, "app_version": APP_VERSION})
 
 
 @app.get("/privacy", response_class=HTMLResponse)
