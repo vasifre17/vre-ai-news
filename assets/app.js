@@ -127,3 +127,47 @@ if (mobileMenuToggle && mobileMenuPanel) {
     mobileMenuPanel.hidden = isOpen;
   });
 }
+
+const newsletterForms = document.querySelectorAll('[data-newsletter-form]');
+newsletterForms.forEach((form) => {
+  const input = form.querySelector('input[name="email"]');
+  const button = form.querySelector('button[type="submit"]');
+  const message = form.querySelector('[data-newsletter-message]');
+  const setMessage = (text, state) => {
+    if (!message) return;
+    message.textContent = text;
+    form.classList.toggle('is-success', state === 'success');
+    form.classList.toggle('is-error', state === 'error');
+  };
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!input || !input.checkValidity()) {
+      if (input) input.reportValidity();
+      setMessage(form.dataset.invalid || 'Please enter a valid email address.', 'error');
+      return;
+    }
+
+    if (button) button.disabled = true;
+    form.classList.remove('is-success', 'is-error');
+
+    try {
+      const response = await fetch(form.action, {
+        method: 'POST',
+        body: new FormData(form),
+        headers: { Accept: 'application/json' },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.ok === false) {
+        setMessage(data.message || form.dataset.invalid || 'Please enter a valid email address.', 'error');
+        return;
+      }
+      input.value = '';
+      setMessage(data.message || form.dataset.success || 'Subscription saved successfully.', 'success');
+    } catch (error) {
+      setMessage(form.dataset.error || 'Subscription could not be saved. Please try again.', 'error');
+    } finally {
+      if (button) button.disabled = false;
+    }
+  });
+});
