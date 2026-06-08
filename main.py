@@ -305,6 +305,49 @@ CATEGORY_LABELS = {
 }
 
 
+
+
+PUBLIC_LABELS["az"].update({
+    "newsroom_label": "Premium xəbər otağı",
+    "language_label": "Dil",
+    "open_menu": "Menyunu aç",
+    "breaking_news": "Təcili xəbər",
+    "editorial_flow": "Canlı redaksiya lenti",
+    "sidebar_label": "Xəbər paneli",
+    "most_viewed": "Ən çox oxunan",
+    "trending_label": "Trenddə",
+    "sections_label": "Bölmələr",
+    "category_blocks_title": "Kateqoriyalar üzrə xəbərlər",
+    "view_all": "Hamısına bax",
+    "category_empty": "Yeni xəbərlər tezliklə burada görünəcək.",
+    "newsletter_label": "Xəbər bülleteni",
+    "newsletter_headline": "Xəbərləri ilk siz alın",
+    "newsletter_text": "Ən vacib xəbərlər, təhlillər və yeniliklər üçün premium e-poçt bülleteni.",
+    "subscribe_label": "Abunə ol",
+    "privacy_label": "Məxfilik",
+    "sitemap_label": "Sayt xəritəsi",
+})
+PUBLIC_LABELS["en"].update({
+    "newsroom_label": "Premium newsroom",
+    "language_label": "Language",
+    "open_menu": "Open menu",
+    "breaking_news": "Breaking news",
+    "editorial_flow": "Live editorial flow",
+    "sidebar_label": "News sidebar",
+    "most_viewed": "Most viewed",
+    "trending_label": "Trending",
+    "sections_label": "Sections",
+    "category_blocks_title": "Explore by category",
+    "view_all": "View all",
+    "category_empty": "Fresh stories will appear here soon.",
+    "newsletter_label": "Newsletter",
+    "newsletter_headline": "Get breaking news first",
+    "newsletter_text": "A premium inbox briefing for the biggest stories, launches and analysis.",
+    "subscribe_label": "Subscribe",
+    "privacy_label": "Privacy Policy",
+    "sitemap_label": "Sitemap",
+})
+
 def public_labels(language: str) -> dict[str, str]:
     return PUBLIC_LABELS.get(language, PUBLIC_LABELS["az"])
 
@@ -312,8 +355,9 @@ def public_labels(language: str) -> dict[str, str]:
 def public_category_labels(language: str) -> dict[str, str]:
     return CATEGORY_LABELS.get(language, CATEGORY_LABELS["az"])
 
-PRIMARY_CATEGORY_NAMES = ["Politics", "World", "Economy", "Technology", "Business", "Sports", "Health"]
-SECONDARY_CATEGORY_NAMES = ["Country", "Incident", "Science and Education", "Show Business"]
+PRIMARY_CATEGORY_NAMES = ["Country", "World", "Economy", "Technology", "Business", "Sports", "Health"]
+SECONDARY_CATEGORY_NAMES = ["Agriculture", "Politics", "Incident", "Science and Education", "Show Business"]
+CATEGORY_BLOCK_NAMES = ["Country", "World", "Economy", "Technology", "Sports", "Health", "Agriculture", "Business"]
 
 DEFAULT_CATEGORIES = [
     {"name": "Politics", "description": "Policy, elections, diplomacy and public leadership.", "color": "#e11d48"},
@@ -327,6 +371,7 @@ DEFAULT_CATEGORIES = [
     {"name": "Incident", "description": "Breaking incidents, public safety and developing events.", "color": "#ef4444"},
     {"name": "Science and Education", "description": "Science, schools, universities and education policy.", "color": "#14b8a6"},
     {"name": "Show Business", "description": "Entertainment, celebrities, culture and show business.", "color": "#d946ef"},
+    {"name": "Agriculture", "description": "Agriculture, food systems, rural economy and climate-smart farming.", "color": "#65a30d"},
 ]
 
 
@@ -2007,7 +2052,10 @@ def home(request: Request, language: str = "az", q: str = "", category: str = ""
         query = query.filter((Article.title.ilike(f"%{q}%")) | (Article.summary.ilike(f"%{q}%")) | (Article.id.in_(translation_matches.scalar_subquery())))
     if category:
         query = query.filter(Article.category == category)
-    articles = attach_real_view_counts(db, query.order_by(public_article_datetime_expression().desc(), Article.created_at.desc(), Article.id.desc()).limit(30).all())
+    articles = attach_real_view_counts(
+        db,
+        query.order_by(Article.is_featured.desc(), Article.homepage_order.asc(), public_article_datetime_expression().desc(), Article.created_at.desc(), Article.id.desc()).limit(30).all(),
+    )
     category_labels = public_category_labels(language)
     article_cards = [article_card(a, language, category_labels) for a in articles]
     hero = article_cards[0] if article_cards else None
@@ -2017,7 +2065,31 @@ def home(request: Request, language: str = "az", q: str = "", category: str = ""
         sidebar_query = sidebar_query.filter(Article.id != hero["article"].id)
     sidebar_articles = attach_real_view_counts(db, sidebar_query.order_by(public_article_datetime_expression().desc(), Article.created_at.desc(), Article.id.desc()).limit(8).all())
     sidebar_cards = [article_card(a, language, category_labels) for a in sidebar_articles]
+    trending_articles = attach_real_view_counts(
+        db,
+        sidebar_query.order_by(Article.is_trending.desc(), public_article_datetime_expression().desc(), Article.created_at.desc(), Article.id.desc()).limit(6).all(),
+    )
+    trending_cards = [article_card(a, language, category_labels) for a in trending_articles]
+    view_candidates = attach_real_view_counts(
+        db,
+        db.query(Article).options(selectinload(Article.translations)).filter(public_article_visibility_filter()).order_by(Article.view_count.desc(), public_article_datetime_expression().desc(), Article.id.desc()).limit(40).all(),
+    )
+    most_viewed_cards = [article_card(a, language, category_labels) for a in sorted(view_candidates, key=lambda item: (getattr(item, "real_view_count", 0) or item.view_count or 0, public_article_datetime(item) or datetime.min), reverse=True)[:6]]
+    breaking_cards = (trending_cards or latest_cards or article_cards)[:6]
     categories = public_category_navigation(db)
+    category_color_map = {c.name: (c.color or "#48a6ff") for c in [*categories["primary"], *categories["secondary"]]}
+    category_blocks = []
+    for category_name in CATEGORY_BLOCK_NAMES:
+        block_articles = attach_real_view_counts(
+            db,
+            db.query(Article).options(selectinload(Article.translations)).filter(public_article_visibility_filter(), Article.category == category_name).order_by(public_article_datetime_expression().desc(), Article.created_at.desc(), Article.id.desc()).limit(3).all(),
+        )
+        category_blocks.append({
+            "name": category_name,
+            "label": category_labels.get(category_name, category_name),
+            "color": category_color_map.get(category_name, "#48a6ff"),
+            "articles": [article_card(a, language, category_labels) for a in block_articles],
+        })
     alt_links = {lang: f"/{lang}/" for lang in SUPPORTED_LANGUAGES}
     settings_map = get_settings_map(db)
     canonical = canonical_url(request, f'{language}/')
@@ -2026,7 +2098,7 @@ def home(request: Request, language: str = "az", q: str = "", category: str = ""
         build_website_schema(settings_map, language),
         build_breadcrumb_schema([("Home", canonical)]),
     ]
-    return templates.TemplateResponse("public/home.html", {"request": request, "articles": article_cards, "latest_articles": latest_cards, "sidebar_articles": sidebar_cards, "hero": hero, "categories": categories["primary"], "secondary_categories": categories["secondary"], "q": q, "category": category, "site_url": settings.site_url, "canonical": canonical, "language": language, "languages": SUPPORTED_LANGUAGES, "alt_links": alt_links, "ui": public_labels(language), "category_labels": category_labels, "settings_map": settings_map, "verification_meta": seo_verification_meta(settings_map), "schema_graph": schema_graph, "site_name": site_name_from_settings(settings_map), "app_version": APP_VERSION})
+    return templates.TemplateResponse("public/home.html", {"request": request, "articles": article_cards, "latest_articles": latest_cards, "sidebar_articles": sidebar_cards, "trending_articles": trending_cards, "most_viewed_articles": most_viewed_cards, "breaking_articles": breaking_cards, "category_blocks": category_blocks, "hero": hero, "categories": categories["primary"], "secondary_categories": categories["secondary"], "q": q, "category": category, "site_url": settings.site_url, "canonical": canonical, "language": language, "languages": SUPPORTED_LANGUAGES, "alt_links": alt_links, "ui": public_labels(language), "category_labels": category_labels, "settings_map": settings_map, "verification_meta": seo_verification_meta(settings_map), "schema_graph": schema_graph, "site_name": site_name_from_settings(settings_map), "app_version": APP_VERSION})
 
 
 @app.get("/privacy", response_class=HTMLResponse)

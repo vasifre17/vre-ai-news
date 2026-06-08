@@ -18,10 +18,10 @@
 <body>
 {% import "public/_ad_macros.html" as ads %}
 <header class="site-header glass">
-  <nav class="nav container">
-    <a class="logo brand-logo" href="/{{ language }}/" aria-label="Vasif REYC home"><img class="logo-avatar" src="https://vreyc.com/static/uploads/images/v-99fe872e6408.png" alt="Vasif REYC"><span class="logo-name">Vasif REYC</span></a>
-    <form class="search-wrap" action="/{{ language }}/" role="search"><input type="search" name="q" value="{{q}}" placeholder="{{ ui.search_placeholder }}" aria-label="{{ ui.search }}"></form>
-    <div class="header-actions"><div class="language-switcher">{% for lang in languages %}<a href="/{{lang}}/">{{lang|upper}}</a>{% endfor %}</div></div>
+  <nav class="nav container premium-nav">
+    <a class="logo brand-logo" href="/{{ language }}/" aria-label="Vasif REYC home"><img class="logo-avatar" src="https://vreyc.com/static/uploads/images/v-99fe872e6408.png" alt="Vasif REYC"><span class="logo-stack"><span class="logo-name">Vasif REYC</span><span class="logo-kicker">{{ ui.get('newsroom_label', 'Premium newsroom') }}</span></span></a>
+    <form class="search-wrap desktop-search" action="/{{ language }}/" role="search"><input type="search" name="q" value="{{q}}" placeholder="{{ ui.search_placeholder }}" aria-label="{{ ui.search }}"></form>
+    <div class="header-actions"><div class="language-switcher" aria-label="{{ ui.get('language_label', 'Language') }}">{% for lang in languages %}<a href="/{{lang}}/" {% if lang == language %}aria-current="page"{% endif %}>{{lang|upper}}</a>{% endfor %}</div><button class="mobile-menu-toggle" id="mobileMenuToggle" type="button" aria-label="{{ ui.get('open_menu', 'Open menu') }}" aria-expanded="false" aria-controls="mobile-menu-{{ language }}"><span></span><span></span><span></span></button></div>
   </nav>
   <nav class="categories container" aria-label="{{ ui.news }}">
     <div class="primary-categories">{% for c in categories %}<a href="/{{ language }}/?category={{ c.name }}" style="--cat-color: {{ c.color or '#48a6ff' }}">{{ category_labels.get(c.name, c.name) }}</a>{% endfor %}</div>
@@ -30,6 +30,10 @@
       <div class="category-dropdown" id="category-dropdown-{{ language }}" hidden>{% for c in categories %}{% if loop.index > 3 %}<a class="mobile-only-category" href="/{{ language }}/?category={{ c.name }}" style="--cat-color: {{ c.color or '#48a6ff' }}">{{ category_labels.get(c.name, c.name) }}</a>{% endif %}{% endfor %}{% for c in secondary_categories %}<a href="/{{ language }}/?category={{ c.name }}" style="--cat-color: {{ c.color or '#48a6ff' }}">{{ category_labels.get(c.name, c.name) }}</a>{% endfor %}</div>
     </div>{% endif %}
   </nav>
+  <div class="mobile-nav-panel container" id="mobile-menu-{{ language }}" hidden>
+    <form class="search-wrap mobile-search" action="/{{ language }}/" role="search"><input type="search" name="q" value="{{q}}" placeholder="{{ ui.search_placeholder }}" aria-label="{{ ui.search }}"></form>
+    <div class="mobile-nav-links"><a href="/{{ language }}/">{{ ui.latest_news }}</a><a href="#category-blocks">{{ ui.get('sections_label', 'Sections') }}</a><a href="#newsletter">{{ ui.get('newsletter_label', 'Newsletter') }}</a></div>
+  </div>
 </header>
 <nav class="fixed-social-sidebar" aria-label="Social links and theme switcher">
   <button id="themeToggle" class="social-button theme-lamp-button" type="button" aria-label="Switch to dark mode" aria-pressed="false"><span class="theme-icon" aria-hidden="true">💡</span></button>
@@ -50,45 +54,70 @@
 {{ ads.ad_slot("left-sidebar", "ADVERTISEMENT", "ad-zone-side ad-zone-side-left") }}
 {{ ads.ad_slot("right-sidebar", "ADVERTISEMENT", "ad-zone-side ad-zone-side-right") }}
 <main class="container section page-shell home-shell">
-  <div class="news-shell">
+  <div class="news-shell newsroom-home">
+  {% if breaking_articles %}
+  <section class="breaking-strip glass" aria-label="{{ ui.get('breaking_news', 'Breaking news') }}">
+    <strong><span aria-hidden="true">●</span> {{ ui.get('breaking_news', 'Breaking news') }}</strong>
+    <div class="breaking-marquee"><div>{% for row in breaking_articles %}<a href="{{ row.url }}">{{ row.title }}</a>{% endfor %}</div></div>
+  </section>
+  {% endif %}
   {% if hero %}
-  <section class="hero-news glass">
+  <section class="hero-news hero-premium glass" aria-labelledby="home-hero-title">
     <a class="hero-image" href="{{ hero.url }}">{% if hero.image_exists %}{% set hero_srcset = hero.article.image_url|image_srcset %}<img src="{{ hero.article.image_url|public_image_url }}" {% if hero_srcset %}srcset="{{ hero_srcset }}" sizes="(max-width: 1050px) 100vw, 58vw"{% endif %} alt="{{ hero.title }}" loading="eager">{% else %}<div class="image-placeholder">VREYC</div>{% endif %}</a>
     <div class="hero-copy">
+      <span class="eyebrow">{{ ui.top_story }}</span>
       <span class="badge">{{ hero.category_label }}</span>
-      <h1><a href="{{ hero.url }}">{{ hero.title }}</a></h1>
+      <h1 id="home-hero-title"><a href="{{ hero.url }}">{{ hero.title }}</a></h1>
       <p>{{ hero.summary }}</p>
-      <small>{{ hero.article.published_at|format_published_at }} • {{ hero.view_count }} views</small>
+      <small class="hero-meta"><time datetime="{{ hero.article.published_at.isoformat() if hero.article.published_at else '' }}">{{ hero.article.published_at|format_published_at }}</time><span>{{ hero.view_count }} {{ ui.views_label|lower }}</span></small>
     </div>
   </section>
   {{ ads.ad_slot("hero", "ADVERTISEMENT") }}
   {% endif %}
   <div class="portal-layout">
-    <section>
-      <div class="section-title"><h2>{{ ui.latest_news }}</h2></div>
+    <section aria-labelledby="latest-news-title">
+      <div class="section-title"><div><p class="eyebrow">{{ ui.get('editorial_flow', 'Live editorial flow') }}</p><h2 id="latest-news-title">{{ ui.latest_news }}</h2></div></div>
       {% if latest_articles|length == 0 %}<div class="glass empty-state">{{ ui.no_articles }}</div>{% endif %}
       <div class="latest-grid">
         {% for row in latest_articles %}
-        <article class="news-card glass">
+        <article class="news-card glass" itemscope itemtype="https://schema.org/NewsArticle">
           <a class="card-media" href="{{ row.url }}" aria-label="{{ row.title }}">
-            {% if row.image_exists %}{% set card_srcset = row.article.image_url|image_srcset %}<img src="{{row.article.image_url|public_image_url}}" {% if card_srcset %}srcset="{{ card_srcset }}" sizes="(max-width: 700px) 100vw, (max-width: 1050px) 50vw, 33vw"{% endif %} alt="{{row.title}}" loading="lazy">{% else %}<div class="image-placeholder compact">VREYC</div>{% endif %}
+            {% if row.image_exists %}{% set card_srcset = row.article.image_url|image_srcset %}<img src="{{row.article.image_url|public_image_url}}" {% if card_srcset %}srcset="{{ card_srcset }}" sizes="(max-width: 700px) 100vw, (max-width: 1050px) 50vw, 33vw"{% endif %} alt="{{row.title}}" loading="lazy" itemprop="image">{% else %}<div class="image-placeholder compact">VREYC</div>{% endif %}
             <span class="badge card-category-badge">{{ row.category_label }}</span>
           </a>
           <div class="card-body">
-            <h3><a href="{{row.url}}">{{row.title}}</a></h3>
-            <p>{{row.summary}}</p>
-            <small class="meta-row"><span>{{row.article.published_at|format_published_at}}</span><span>{{ row.category_label }}</span><span>{{ row.view_count }} views</span></small>
+            <h3 itemprop="headline"><a href="{{row.url}}" itemprop="url">{{row.title}}</a></h3>
+            <p itemprop="description">{{row.summary}}</p>
+            <small class="meta-row"><time datetime="{{ row.article.published_at.isoformat() if row.article.published_at else '' }}" itemprop="datePublished">{{row.article.published_at|format_published_at}}</time><span>{{ row.category_label }}</span><span>{{ row.view_count }} {{ ui.views_label|lower }}</span></small>
           </div>
         </article>
         {% if loop.index is divisibleby 6 %}{{ ads.ad_slot("infeed", "ADVERTISEMENT") }}{% endif %}
         {% endfor %}
       </div>
     </section>
-    <aside class="trending-sidebar glass">
-      <h2>{{ ui.most_watched }}</h2>
-      <div class="trending-list">{% for row in sidebar_articles %}<a href="{{ row.url }}"><div><strong>{{ row.title }}</strong><small>{{ row.category_label }} • {{ row.article.published_at|format_published_at }} • {{ row.view_count }} views</small></div></a>{% endfor %}</div>
+    <aside class="trending-sidebar premium-sidebar glass" aria-label="{{ ui.get('sidebar_label', 'News sidebar') }}">
+      <section><h2>{{ ui.get('most_viewed', 'Most viewed') }}</h2><div class="trending-list ranked-list">{% for row in most_viewed_articles %}<a href="{{ row.url }}"><span>{{ loop.index }}</span><div><strong>{{ row.title }}</strong><small>{{ row.view_count }} {{ ui.views_label|lower }} • {{ row.article.published_at|format_published_at }}</small></div></a>{% endfor %}</div></section>
+      <section><h2>{{ ui.get('trending_label', 'Trending') }}</h2><div class="trending-list">{% for row in trending_articles %}<a href="{{ row.url }}"><div><strong>{{ row.title }}</strong><small>{{ row.category_label }} • {{ row.article.published_at|format_published_at }}</small></div></a>{% endfor %}</div></section>
+      <section><h2>{{ ui.latest }}</h2><div class="trending-list">{% for row in sidebar_articles %}<a href="{{ row.url }}"><div><strong>{{ row.title }}</strong><small>{{ row.category_label }} • {{ row.article.published_at|format_published_at }}</small></div></a>{% endfor %}</div></section>
     </aside>
   </div>
+  {% if category_blocks %}
+  <section class="category-blocks" id="category-blocks" aria-labelledby="category-blocks-title">
+    <div class="section-title"><div><p class="eyebrow">{{ ui.get('sections_label', 'Sections') }}</p><h2 id="category-blocks-title">{{ ui.get('category_blocks_title', 'Explore by category') }}</h2></div></div>
+    <div class="category-block-grid">
+      {% for block in category_blocks %}
+      <section class="category-block glass" style="--cat-color: {{ block.color }}">
+        <a class="category-block-head" href="/{{ language }}/?category={{ block.name }}"><span>{{ block.label }}</span><small>{{ ui.get('view_all', 'View all') }}</small></a>
+        {% if block.articles %}<div class="category-block-list">{% for row in block.articles %}<a href="{{ row.url }}"><strong>{{ row.title }}</strong><small>{{ row.article.published_at|format_published_at }}</small></a>{% endfor %}</div>{% else %}<p>{{ ui.get('category_empty', 'Fresh stories will appear here soon.') }}</p>{% endif %}
+      </section>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+  <section class="newsletter-card glass" id="newsletter" aria-labelledby="newsletter-title">
+    <div><p class="eyebrow">{{ ui.get('newsletter_label', 'Newsletter') }}</p><h2 id="newsletter-title">{{ ui.get('newsletter_headline', 'Get breaking news first') }}</h2><p>{{ ui.get('newsletter_text', 'A premium inbox briefing for the biggest stories, launches and analysis.') }}</p></div>
+    <form class="newsletter-form"><input type="email" placeholder="{{ ui.email }}" aria-label="{{ ui.email }}"><button type="button">{{ ui.get('subscribe_label', 'Subscribe') }}</button></form>
+  </section>
   </div>
 </main>
 {{ ads.ad_slot("footer", "ADVERTISEMENT", container=True) }}
@@ -97,7 +126,7 @@
     <strong>VREYC</strong>
     <span>{{ ui.footer_tagline }}</span>
     <div class="footer-languages">{% for lang in languages %}<a href="/{{lang}}/">{{lang|upper}}</a>{% endfor %}</div>
-    <div class="footer-policy-links"><a class="footer-policy-link" href="/privacy">Privacy Policy</a><a class="footer-policy-link" href="/terms">Terms of Use</a></div>
+    <div class="footer-policy-links"><a class="footer-policy-link" href="/privacy">{{ ui.get('privacy_label', 'Privacy') }}</a><a class="footer-policy-link" href="/terms">Terms of Use</a><a class="footer-policy-link" href="/sitemap.xml">{{ ui.get('sitemap_label', 'Sitemap') }}</a></div>
   </div>
   <section class="footer-panel footer-about" aria-labelledby="footer-about-title">
     <h2 id="footer-about-title">{{ ui.about }}</h2>

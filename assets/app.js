@@ -116,3 +116,14 @@ nativeShareLinks.forEach((link) => {
     }
   });
 });
+
+const mobileMenuToggle = document.getElementById('mobileMenuToggle');
+const mobileMenuPanel = mobileMenuToggle ? document.getElementById(mobileMenuToggle.getAttribute('aria-controls')) : null;
+if (mobileMenuToggle && mobileMenuPanel) {
+  mobileMenuPanel.hidden = true;
+  mobileMenuToggle.addEventListener('click', () => {
+    const isOpen = mobileMenuToggle.getAttribute('aria-expanded') === 'true';
+    mobileMenuToggle.setAttribute('aria-expanded', String(!isOpen));
+    mobileMenuPanel.hidden = isOpen;
+  });
+}
