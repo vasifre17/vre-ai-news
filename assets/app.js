@@ -210,3 +210,38 @@ newsletterForms.forEach((form) => {
     }
   });
 });
+
+const youtubeLazyFrames = document.querySelectorAll('[data-youtube-lazy]');
+const loadYoutubeFrame = (frame) => {
+  if (!frame || frame.dataset.loaded === '1') return;
+  const src = frame.dataset.src;
+  if (!src) return;
+  frame.dataset.loaded = '1';
+  const iframe = document.createElement('iframe');
+  iframe.src = src;
+  iframe.title = frame.dataset.title || 'Vasif REYC YouTube video';
+  iframe.loading = 'lazy';
+  iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
+  iframe.referrerPolicy = 'strict-origin-when-cross-origin';
+  iframe.allowFullscreen = true;
+  frame.replaceChildren(iframe);
+};
+
+youtubeLazyFrames.forEach((frame) => {
+  const button = frame.querySelector('.youtube-load-button');
+  if (button) button.addEventListener('click', () => loadYoutubeFrame(frame));
+
+  if ('IntersectionObserver' in window) {
+    const observer = new IntersectionObserver((entries, activeObserver) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        loadYoutubeFrame(frame);
+        activeObserver.unobserve(frame);
+      });
+    }, { rootMargin: '240px 0px' });
+    observer.observe(frame);
+    return;
+  }
+
+  window.setTimeout(() => loadYoutubeFrame(frame), 1200);
+});
