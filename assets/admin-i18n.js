@@ -14,6 +14,27 @@
       'SEO Diagnostics': 'SEO diaqnostika',
       'Settings': 'Parametrlər',
 
+      // Premium login page
+      'VREYC News CMS': 'VREYC News CMS',
+      'Premium Newsroom Console': 'Premium Xəbər Otağı Konsolu',
+      'Enterprise access for VREYC editorial operations, Google News workflows, SEO quality controls, and secure newsroom publishing.': 'VREYC redaksiya əməliyyatları, Google News iş axınları, SEO keyfiyyət nəzarəti və təhlükəsiz xəbər otağı yayımı üçün korporativ giriş.',
+      'System status': 'Sistem statusu',
+      'Server Online': 'Server Onlayndır',
+      'Google News Active': 'Google News Aktivdir',
+      'SEO Monitoring Active': 'SEO Monitorinq Aktivdir',
+      'Security Active': 'Təhlükəsizlik Aktivdir',
+      'Secure admin access': 'Təhlükəsiz admin girişi',
+      'Welcome back': 'Xoş gəlmisiniz',
+      'Sign in to continue to the premium newsroom console.': 'Premium xəbər otağı konsoluna davam etmək üçün daxil olun.',
+      'VREYC CMS 2026 Edition': 'VREYC CMS 2026 Buraxılışı',
+      'Username': 'İstifadəçi adı',
+      'Password': 'Şifrə',
+      'Remember me': 'Məni xatırla',
+      'Login': 'Daxil ol',
+      'Show password': 'Şifrəni göstər',
+      'Hide password': 'Şifrəni gizlət',
+      'Wrong username or password': 'İstifadəçi adı və ya şifrə yanlışdır',
+
       // Required common actions and labels
       'View site': 'Sayta bax',
       'Logout': 'Çıxış',
@@ -640,7 +661,9 @@
       'Missing update timestamp': 'Yenilənmə vaxtı çatışmır',
       'Article content is short for Google News': 'Xəbər məzmunu Google News üçün qısadır'
     },
-    en: {}
+    en: {
+      'Operativ • Dəqiq • Etibarlı': 'Fast • Accurate • Trusted'
+    }
   };
 
   const textNodeOriginals = new WeakMap();
@@ -670,10 +693,7 @@
     return `${leading}${translated}${trailing}`;
   };
 
-  const translateValue = (source, language) => {
-    if (language === 'en') return source;
-    return translations[language]?.[source.trim()] || source;
-  };
+  const translateValue = (source, language) => translations[language]?.[source.trim()] || source;
 
   const shouldSkipNode = (node) => {
     const parent = node.parentElement;
