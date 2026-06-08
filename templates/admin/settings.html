@@ -122,6 +122,56 @@
         {{ settings_row('Database connection status', 'Connected to configured database', 'Active' if database_ready else 'Missing', 'active' if database_ready else 'missing') }}
       </div>
     </article>
+
+    <article class="settings-card newsroom-team-card" aria-labelledby="newsroom-team-title">
+      <div class="settings-card-head newsroom-team-head">
+        <div>
+          <span class="settings-card-kicker">I</span>
+          <h2 id="newsroom-team-title">Newsroom Team</h2>
+          <p class="muted">Plan future multi-user newsroom access without changing the current admin login.</p>
+        </div>
+        {{ status_badge('Planned', 'not-configured') }}
+      </div>
+      <div class="newsroom-team-toolbar" aria-label="Newsroom team actions">
+        <button class="btn newsroom-team-button" type="button" disabled><span>Invite user</span><small>Coming soon</small></button>
+        <button class="btn newsroom-team-button" type="button" disabled><span>Manage roles</span><small>Coming soon</small></button>
+        <button class="btn newsroom-team-button" type="button" disabled><span>Login history</span><small>Coming soon</small></button>
+      </div>
+      <div class="newsroom-role-grid">
+        <section class="newsroom-role-card is-active" aria-label="Owner role">
+          <div class="newsroom-role-topline"><h3>Owner</h3>{{ status_badge('Active', 'active') }}</div>
+          <p><strong>Access level</strong><span>Full newsroom ownership</span></p>
+          <p><strong>Permissions summary</strong><span>Current protected admin access, settings oversight, publishing control and future user governance.</span></p>
+          <p><strong>Status</strong><span>Active</span></p>
+        </section>
+        <section class="newsroom-role-card" aria-label="Admin role">
+          <div class="newsroom-role-topline"><h3>Admin</h3>{{ status_badge('Planned', 'not-configured') }}</div>
+          <p><strong>Access level</strong><span>High operational access</span></p>
+          <p><strong>Permissions summary</strong><span>Planned management of articles, categories, media workflows, SEO tools and team operations.</span></p>
+          <p><strong>Status</strong><span>Planned</span></p>
+        </section>
+        <section class="newsroom-role-card" aria-label="Editor role">
+          <div class="newsroom-role-topline"><h3>Editor</h3>{{ status_badge('Planned', 'not-configured') }}</div>
+          <p><strong>Access level</strong><span>Editorial publishing access</span></p>
+          <p><strong>Permissions summary</strong><span>Planned review, edit, schedule, translate and publish permissions for newsroom stories.</span></p>
+          <p><strong>Status</strong><span>Planned</span></p>
+        </section>
+        <section class="newsroom-role-card" aria-label="Author role">
+          <div class="newsroom-role-topline"><h3>Author</h3>{{ status_badge('Planned', 'not-configured') }}</div>
+          <p><strong>Access level</strong><span>Content creation access</span></p>
+          <p><strong>Permissions summary</strong><span>Planned draft creation, media selection and submission to editors for approval.</span></p>
+          <p><strong>Status</strong><span>Planned</span></p>
+        </section>
+        <section class="newsroom-role-card" aria-label="Moderator role">
+          <div class="newsroom-role-topline"><h3>Moderator</h3>{{ status_badge('Planned', 'not-configured') }}</div>
+          <p><strong>Access level</strong><span>Community safety access</span></p>
+          <p><strong>Permissions summary</strong><span>Planned comment review, abuse reports, visibility checks and moderation queue support.</span></p>
+          <p><strong>Status</strong><span>Planned</span></p>
+        </section>
+      </div>
+      <p class="muted settings-card-note">Visual placeholder only. No user database, role model or authentication behavior is changed in this release.</p>
+    </article>
+
   </section>
 
   <div class="settings-save-bar">
