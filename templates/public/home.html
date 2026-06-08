@@ -19,7 +19,7 @@
 {% import "public/_ad_macros.html" as ads %}
 <header class="site-header glass">
   <nav class="nav container premium-nav">
-    <a class="logo brand-logo" href="/{{ language }}/" aria-label="Vasif REYC home"><img class="logo-avatar" src="https://vreyc.com/static/uploads/images/v-99fe872e6408.png" alt="Vasif REYC"><span class="logo-mark" aria-label="Vasif REYC dot com"><span class="logo-stack"><span class="logo-word logo-word-vasif">Vasif</span><span class="logo-word logo-word-reyc">REYC</span></span><span class="logo-dotcom">.com</span></span></a>
+    <a class="logo brand-logo" href="/{{ language }}/" aria-label="Vasif REYC home"><img class="logo-avatar" src="https://vreyc.com/static/uploads/images/v-99fe872e6408.png" alt="Vasif REYC"><span class="logo-mark logo-name" aria-label="Vasif REYC">Vasif REYC</span></a>
     <form class="search-wrap desktop-search" action="/{{ language }}/" role="search"><input type="search" name="q" value="{{q}}" placeholder="{{ ui.search_placeholder }}" aria-label="{{ ui.search }}"></form>
     <div class="header-actions"><details class="language-switcher" aria-label="{{ ui.get('language_label', 'Language') }}"><summary><span>AZ</span><span class="language-arrow" aria-hidden="true">▾</span></summary><div class="language-dropdown">{% for lang in ['en', 'ru', 'tr', 'zh', 'es'] %}<a href="{{ alt_links.get(lang, '/' ~ lang ~ '/') }}">{{lang|upper}}</a>{% endfor %}</div></details><button class="mobile-menu-toggle" id="mobileMenuToggle" type="button" aria-label="{{ ui.get('open_menu', 'Open menu') }}" aria-expanded="false" aria-controls="mobile-menu-{{ language }}"><span></span><span></span><span></span></button></div>
   </nav>
@@ -62,35 +62,47 @@
   </section>
   {% endif %}
   {% if hero %}
+  {% set slides = hero_slides or [hero] %}
+  {% set youtube_item = youtube_widget.short or youtube_widget.fallback %}
   <div class="hero-feature-row">
-    <section class="hero-news hero-premium glass" aria-labelledby="home-hero-title">
-      <a class="hero-image" href="{{ hero.url }}">{% if hero.image_exists %}{% set hero_srcset = hero.article.image_url|image_srcset %}<img src="{{ hero.article.image_url|public_image_url }}" {% if hero_srcset %}srcset="{{ hero_srcset }}" sizes="(max-width: 1050px) 100vw, 58vw"{% endif %} alt="{{ hero.title }}" loading="eager">{% else %}<div class="image-placeholder">VREYC</div>{% endif %}</a>
-      <div class="hero-copy">
-        <span class="eyebrow">{{ ui.top_story }}</span>
-        <span class="badge">{{ hero.category_label }}</span>
-        <h1 id="home-hero-title"><a href="{{ hero.url }}">{{ hero.title }}</a></h1>
-        <p>{{ hero.summary }}</p>
-        <small class="hero-meta"><time datetime="{{ hero.article.published_at.isoformat() if hero.article.published_at else '' }}">{{ hero.article.published_at|format_published_at }}</time><span>{{ hero.view_count }} {{ ui.views_label|lower }}</span></small>
+    <section class="hero-news hero-premium glass" aria-labelledby="home-hero-title" data-hero-carousel>
+      <div class="hero-slides">
+        {% for slide in slides %}
+        <article class="hero-slide{% if loop.first %} is-active{% endif %}" data-hero-slide{% if not loop.first %} hidden{% endif %}>
+          <a class="hero-image" href="{{ slide.url }}" aria-label="{{ slide.title }}">{% if slide.image_exists %}{% set hero_srcset = slide.article.image_url|image_srcset %}<img src="{{ slide.article.image_url|public_image_url }}" {% if hero_srcset %}srcset="{{ hero_srcset }}" sizes="(max-width: 768px) 100vw, (max-width: 1180px) 44vw, 500px"{% endif %} alt="{{ slide.title }}" loading="{{ 'eager' if loop.first else 'lazy' }}">{% else %}<div class="image-placeholder">VREYC</div>{% endif %}</a>
+          <div class="hero-copy">
+            <span class="eyebrow">{{ ui.top_story }}</span>
+            <span class="badge">{{ slide.category_label }}</span>
+            <h1 id="{{ 'home-hero-title' if loop.first else 'home-hero-title-' ~ loop.index }}"><a href="{{ slide.url }}">{{ slide.title }}</a></h1>
+            <p>{{ slide.summary }}</p>
+            <small class="hero-meta"><time datetime="{{ slide.article.published_at.isoformat() if slide.article.published_at else '' }}">{{ slide.article.published_at|format_published_at }}</time><span>{{ slide.view_count }} {{ ui.views_label|lower }}</span></small>
+          </div>
+        </article>
+        {% endfor %}
       </div>
+      {% if slides|length > 1 %}
+      <div class="hero-carousel-controls" aria-label="{{ ui.top_story }} carousel controls">
+        <button class="hero-arrow" type="button" data-hero-prev aria-label="Previous featured article">‹</button>
+        <div class="hero-dots" role="tablist" aria-label="{{ ui.top_story }}">
+          {% for slide in slides %}<button class="hero-dot{% if loop.first %} is-active{% endif %}" type="button" data-hero-dot="{{ loop.index0 }}" aria-label="Show featured article {{ loop.index }}" aria-selected="{{ 'true' if loop.first else 'false' }}"></button>{% endfor %}
+        </div>
+        <button class="hero-arrow" type="button" data-hero-next aria-label="Next featured article">›</button>
+      </div>
+      {% endif %}
     </section>
-    {% set youtube_item = youtube_widget.short or youtube_widget.fallback %}
     <aside class="youtube-latest-card glass" aria-labelledby="youtube-latest-title">
       <div class="youtube-latest-head">
         <p class="eyebrow">YouTube</p>
         <h2 id="youtube-latest-title">{{ ui.get('latest_video_label', 'Son Shorts' if language == 'az' else 'Latest Shorts') }}</h2>
       </div>
       {% if youtube_item %}
-      <div class="youtube-lazy-frame{% if youtube_item.kind != 'short' %} youtube-lazy-frame--video{% endif %}" data-youtube-short data-video-id="{{ youtube_item.video_id }}" data-kind="{{ youtube_item.kind }}" data-embed-src="{{ youtube_item.embed_url }}" data-url="{{ youtube_item.url }}" data-fallback-video-id="{{ youtube_widget.fallback.video_id if youtube_widget.fallback else '' }}" data-fallback-kind="{{ youtube_widget.fallback.kind if youtube_widget.fallback else '' }}" data-fallback-src="{{ youtube_widget.fallback.embed_url if youtube_widget.fallback else '' }}" data-fallback-url="{{ youtube_widget.fallback.url if youtube_widget.fallback else '' }}" data-fallback-thumbnail="{{ youtube_widget.fallback.thumbnail if youtube_widget.fallback else '' }}" data-title="{{ ui.get('latest_video_label', 'Son Shorts' if language == 'az' else 'Latest Shorts') }} - Vasif REYC">
-        <a class="youtube-load-button" href="{{ youtube_item.url }}" target="_blank" rel="noopener noreferrer" aria-label="{{ ui.get('latest_video_label', 'Son Shorts' if language == 'az' else 'Latest Shorts') }}">
-          <img class="youtube-thumbnail" src="{{ youtube_item.thumbnail }}" alt="{{ ui.get('latest_video_label', 'Son Shorts' if language == 'az' else 'Latest Shorts') }}" loading="lazy">
-          <span class="youtube-play-icon" aria-hidden="true">▶</span>
-          <span>{{ ui.get('latest_video_label', 'Son Shorts' if language == 'az' else 'Latest Shorts') }}</span>
-        </a>
-      </div>
-      {% else %}
-      <a class="youtube-lazy-frame youtube-fallback-link" href="{{ youtube_widget.channel_url }}" target="_blank" rel="noopener noreferrer" aria-label="{{ ui.get('latest_video_label', 'Son Shorts' if language == 'az' else 'Latest Shorts') }}">
+      <a class="youtube-short-card" href="{{ youtube_item.url }}" target="_blank" rel="noopener noreferrer" aria-label="{{ ui.get('latest_video_label', 'Son Shorts' if language == 'az' else 'Latest Shorts') }}">
+        <img class="youtube-thumbnail" src="{{ youtube_item.thumbnail }}" alt="{{ ui.get('latest_video_label', 'Son Shorts' if language == 'az' else 'Latest Shorts') }}" loading="lazy">
         <span class="youtube-play-icon" aria-hidden="true">▶</span>
-        <span>{{ ui.get('latest_video_label', 'Son Shorts' if language == 'az' else 'Latest Shorts') }}</span>
+      </a>
+      {% else %}
+      <a class="youtube-short-card youtube-fallback-link" href="{{ youtube_widget.channel_url }}" target="_blank" rel="noopener noreferrer" aria-label="{{ ui.get('latest_video_label', 'Son Shorts' if language == 'az' else 'Latest Shorts') }}">
+        <span class="youtube-play-icon" aria-hidden="true">▶</span>
       </a>
       {% endif %}
       <a class="youtube-channel-link" href="{{ youtube_widget.channel_url }}" target="_blank" rel="noopener noreferrer">Vasif REYC YouTube</a>
