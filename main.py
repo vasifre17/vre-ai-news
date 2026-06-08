@@ -1,8 +1,10 @@
 from datetime import UTC, datetime, timedelta
 import hashlib
+import json
 import logging
 import os
 import time
+import threading
 from email.utils import format_datetime
 import html
 from types import SimpleNamespace
@@ -60,6 +62,9 @@ UPLOAD_COPY_CHUNK_SIZE = 1024 * 1024
 IMAGE_VARIANT_WIDTHS = (480, 960, 1440)
 APP_VERSION = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
 logger = logging.getLogger(__name__)
+NEWSLETTER_SUBSCRIPTIONS_FILE = Path(os.getenv("NEWSLETTER_SUBSCRIPTIONS_FILE", "data/newsletter_subscriptions.jsonl"))
+NEWSLETTER_LOCK = threading.Lock()
+EMAIL_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 
 
 def ensure_upload_dir() -> None:
@@ -326,6 +331,16 @@ PUBLIC_LABELS["az"].update({
     "subscribe_label": "Abunə ol",
     "privacy_label": "Məxfilik",
     "sitemap_label": "Sayt xəritəsi",
+    "quick_access_title": "Oxucu paneli",
+    "quick_access_kicker": "Sürətli giriş",
+    "latest_count_label": "Son xəbərlər",
+    "today_views_label": "Bugünkü baxış",
+    "seo_ready_label": "Google News / SEO hazır",
+    "latest_quick_link": "Ən son xəbərlər",
+    "newsletter_success": "Abunəliyiniz uğurla qeydə alındı.",
+    "newsletter_duplicate": "Bu e-poçt artıq abunədir.",
+    "newsletter_invalid": "Düzgün e-poçt ünvanı daxil edin.",
+    "newsletter_error": "Abunəliyi saxlamaq mümkün olmadı. Zəhmət olmasa yenidən cəhd edin.",
 })
 PUBLIC_LABELS["en"].update({
     "newsroom_label": "Premium newsroom",
@@ -346,6 +361,16 @@ PUBLIC_LABELS["en"].update({
     "subscribe_label": "Subscribe",
     "privacy_label": "Privacy Policy",
     "sitemap_label": "Sitemap",
+    "quick_access_title": "Reader panel",
+    "quick_access_kicker": "Quick Access",
+    "latest_count_label": "Latest news",
+    "today_views_label": "Today views",
+    "seo_ready_label": "Google News / SEO ready",
+    "latest_quick_link": "Latest news",
+    "newsletter_success": "Subscription saved successfully.",
+    "newsletter_duplicate": "This email is already subscribed.",
+    "newsletter_invalid": "Please enter a valid email address.",
+    "newsletter_error": "Subscription could not be saved. Please try again.",
 })
 
 def public_labels(language: str) -> dict[str, str]:
@@ -2037,6 +2062,53 @@ def startup() -> None:
         scheduler.start()
 
 
+
+def today_public_views_count(db) -> int:
+    today_start = datetime_for_database(current_server_utc().replace(hour=0, minute=0, second=0, microsecond=0))
+    return db.query(ArticleView).filter(ArticleView.viewed_at >= today_start, ArticleView.is_admin_traffic.is_(False)).count()
+
+
+def read_newsletter_emails() -> set[str]:
+    if not NEWSLETTER_SUBSCRIPTIONS_FILE.exists():
+        return set()
+    emails: set[str] = set()
+    for line in NEWSLETTER_SUBSCRIPTIONS_FILE.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            payload = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        email = str(payload.get("email", "")).strip().lower()
+        if email:
+            emails.add(email)
+    return emails
+
+
+@app.post("/{language}/newsletter/subscribe")
+def newsletter_subscribe(request: Request, language: str, email: str = Form("")):
+    language = language if language in SUPPORTED_LANGUAGES else "az"
+    labels = public_labels(language)
+    normalized_email = (email or "").strip().lower()
+    if not EMAIL_PATTERN.fullmatch(normalized_email):
+        return JSONResponse({"ok": False, "message": labels.get("newsletter_invalid", "Please enter a valid email address.")}, status_code=400)
+
+    with NEWSLETTER_LOCK:
+        NEWSLETTER_SUBSCRIPTIONS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        if normalized_email in read_newsletter_emails():
+            return JSONResponse({"ok": False, "message": labels.get("newsletter_duplicate", "This email is already subscribed.")}, status_code=409)
+        payload = {
+            "email": normalized_email,
+            "language": language,
+            "created_at": current_server_utc().isoformat(),
+            "source": str(request.url.path),
+        }
+        with NEWSLETTER_SUBSCRIPTIONS_FILE.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
+
+    return {"ok": True, "message": labels.get("newsletter_success", "Subscription saved successfully.")}
+
+
 @app.get("/", response_class=HTMLResponse)
 @app.get("/{language}/", response_class=HTMLResponse)
 def home(request: Request, language: str = "az", q: str = "", category: str = "", db=Depends(get_db)):
@@ -2063,7 +2135,7 @@ def home(request: Request, language: str = "az", q: str = "", category: str = ""
     sidebar_query = db.query(Article).options(selectinload(Article.translations)).filter(public_article_visibility_filter())
     if hero:
         sidebar_query = sidebar_query.filter(Article.id != hero["article"].id)
-    sidebar_articles = attach_real_view_counts(db, sidebar_query.order_by(public_article_datetime_expression().desc(), Article.created_at.desc(), Article.id.desc()).limit(8).all())
+    sidebar_articles = attach_real_view_counts(db, sidebar_query.order_by(public_article_datetime_expression().desc(), Article.created_at.desc(), Article.id.desc()).limit(12).all())
     sidebar_cards = [article_card(a, language, category_labels) for a in sidebar_articles]
     trending_articles = attach_real_view_counts(
         db,
@@ -2075,6 +2147,8 @@ def home(request: Request, language: str = "az", q: str = "", category: str = ""
         db.query(Article).options(selectinload(Article.translations)).filter(public_article_visibility_filter()).order_by(Article.view_count.desc(), public_article_datetime_expression().desc(), Article.id.desc()).limit(40).all(),
     )
     most_viewed_cards = [article_card(a, language, category_labels) for a in sorted(view_candidates, key=lambda item: (getattr(item, "real_view_count", 0) or item.view_count or 0, public_article_datetime(item) or datetime.min), reverse=True)[:6]]
+    latest_news_count = db.query(Article).filter(public_article_visibility_filter()).count()
+    today_views = today_public_views_count(db)
     breaking_cards = (trending_cards or latest_cards or article_cards)[:6]
     categories = public_category_navigation(db)
     category_color_map = {c.name: (c.color or "#48a6ff") for c in [*categories["primary"], *categories["secondary"]]}
@@ -2098,7 +2172,7 @@ def home(request: Request, language: str = "az", q: str = "", category: str = ""
         build_website_schema(settings_map, language),
         build_breadcrumb_schema([("Home", canonical)]),
     ]
-    return templates.TemplateResponse("public/home.html", {"request": request, "articles": article_cards, "latest_articles": latest_cards, "sidebar_articles": sidebar_cards, "trending_articles": trending_cards, "most_viewed_articles": most_viewed_cards, "breaking_articles": breaking_cards, "category_blocks": category_blocks, "hero": hero, "categories": categories["primary"], "secondary_categories": categories["secondary"], "q": q, "category": category, "site_url": settings.site_url, "canonical": canonical, "language": language, "languages": SUPPORTED_LANGUAGES, "alt_links": alt_links, "ui": public_labels(language), "category_labels": category_labels, "settings_map": settings_map, "verification_meta": seo_verification_meta(settings_map), "schema_graph": schema_graph, "site_name": site_name_from_settings(settings_map), "app_version": APP_VERSION})
+    return templates.TemplateResponse("public/home.html", {"request": request, "articles": article_cards, "latest_articles": latest_cards, "sidebar_articles": sidebar_cards, "trending_articles": trending_cards, "most_viewed_articles": most_viewed_cards, "breaking_articles": breaking_cards, "latest_news_count": latest_news_count, "today_views": today_views, "category_blocks": category_blocks, "hero": hero, "categories": categories["primary"], "secondary_categories": categories["secondary"], "q": q, "category": category, "site_url": settings.site_url, "canonical": canonical, "language": language, "languages": SUPPORTED_LANGUAGES, "alt_links": alt_links, "ui": public_labels(language), "category_labels": category_labels, "settings_map": settings_map, "verification_meta": seo_verification_meta(settings_map), "schema_graph": schema_graph, "site_name": site_name_from_settings(settings_map), "app_version": APP_VERSION})
 
 
 @app.get("/privacy", response_class=HTMLResponse)

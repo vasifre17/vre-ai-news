@@ -19,7 +19,7 @@
 {% import "public/_ad_macros.html" as ads %}
 <header class="site-header glass">
   <nav class="nav container premium-nav">
-    <a class="logo brand-logo" href="/{{ language }}/" aria-label="Vasif REYC home"><img class="logo-avatar" src="https://vreyc.com/static/uploads/images/v-99fe872e6408.png" alt="Vasif REYC"><span class="logo-stack"><span class="logo-name">Vasif REYC</span><span class="logo-kicker">{{ ui.get('newsroom_label', 'Premium newsroom') }}</span></span></a>
+    <a class="logo brand-logo" href="/{{ language }}/" aria-label="Vasif REYC home"><img class="logo-avatar" src="https://vreyc.com/static/uploads/images/v-99fe872e6408.png" alt="Vasif REYC"><span class="logo-stack" aria-label="Vasif REYC"><span class="logo-name logo-name-small">Vasif</span><span class="logo-name logo-name-strong">REYC</span><span class="logo-kicker">{{ ui.get('newsroom_label', 'Premium newsroom') }}</span></span></a>
     <form class="search-wrap desktop-search" action="/{{ language }}/" role="search"><input type="search" name="q" value="{{q}}" placeholder="{{ ui.search_placeholder }}" aria-label="{{ ui.search }}"></form>
     <div class="header-actions"><div class="language-switcher" aria-label="{{ ui.get('language_label', 'Language') }}">{% for lang in languages %}<a href="/{{lang}}/" {% if lang == language %}aria-current="page"{% endif %}>{{lang|upper}}</a>{% endfor %}</div><button class="mobile-menu-toggle" id="mobileMenuToggle" type="button" aria-label="{{ ui.get('open_menu', 'Open menu') }}" aria-expanded="false" aria-controls="mobile-menu-{{ language }}"><span></span><span></span><span></span></button></div>
   </nav>
@@ -61,6 +61,16 @@
     <div class="breaking-marquee"><div>{% for row in breaking_articles %}<a href="{{ row.url }}">{{ row.title }}</a>{% endfor %}</div></div>
   </section>
   {% endif %}
+  {% if not hero %}
+  <section class="quick-access-card quick-access-card-standalone" aria-label="{{ ui.get('quick_access_title', 'Reader panel') }}">
+    <div class="quick-access-head"><span>{{ ui.get('quick_access_kicker', 'Quick Access') }}</span><strong>{{ ui.get('quick_access_title', 'Reader panel') }}</strong></div>
+    <div class="quick-access-stats">
+      <span><strong>{{ latest_news_count }}</strong><small>{{ ui.get('latest_count_label', 'Latest news') }}</small></span>
+      <span><strong>{{ today_views }}</strong><small>{{ ui.get('today_views_label', 'Today views') }}</small></span>
+    </div>
+    <div class="quick-access-actions"><span class="seo-ready-badge">✓ {{ ui.get('seo_ready_label', 'Google News / SEO ready') }}</span><a href="#latest-news-title">{{ ui.get('latest_quick_link', ui.latest_news) }}</a></div>
+  </section>
+  {% endif %}
   {% if hero %}
   <section class="hero-news hero-premium glass" aria-labelledby="home-hero-title">
     <a class="hero-image" href="{{ hero.url }}">{% if hero.image_exists %}{% set hero_srcset = hero.article.image_url|image_srcset %}<img src="{{ hero.article.image_url|public_image_url }}" {% if hero_srcset %}srcset="{{ hero_srcset }}" sizes="(max-width: 1050px) 100vw, 58vw"{% endif %} alt="{{ hero.title }}" loading="eager">{% else %}<div class="image-placeholder">VREYC</div>{% endif %}</a>
@@ -70,6 +80,14 @@
       <h1 id="home-hero-title"><a href="{{ hero.url }}">{{ hero.title }}</a></h1>
       <p>{{ hero.summary }}</p>
       <small class="hero-meta"><time datetime="{{ hero.article.published_at.isoformat() if hero.article.published_at else '' }}">{{ hero.article.published_at|format_published_at }}</time><span>{{ hero.view_count }} {{ ui.views_label|lower }}</span></small>
+      <div class="quick-access-card" aria-label="{{ ui.get('quick_access_title', 'Reader panel') }}">
+        <div class="quick-access-head"><span>{{ ui.get('quick_access_kicker', 'Quick Access') }}</span><strong>{{ ui.get('quick_access_title', 'Reader panel') }}</strong></div>
+        <div class="quick-access-stats">
+          <span><strong>{{ latest_news_count }}</strong><small>{{ ui.get('latest_count_label', 'Latest news') }}</small></span>
+          <span><strong>{{ today_views }}</strong><small>{{ ui.get('today_views_label', 'Today views') }}</small></span>
+        </div>
+        <div class="quick-access-actions"><span class="seo-ready-badge">✓ {{ ui.get('seo_ready_label', 'Google News / SEO ready') }}</span><a href="#latest-news-title">{{ ui.get('latest_quick_link', ui.latest_news) }}</a></div>
+      </div>
     </div>
   </section>
   {{ ads.ad_slot("hero", "ADVERTISEMENT") }}
@@ -96,9 +114,9 @@
       </div>
     </section>
     <aside class="trending-sidebar premium-sidebar glass" aria-label="{{ ui.get('sidebar_label', 'News sidebar') }}">
-      <section><h2>{{ ui.get('most_viewed', 'Most viewed') }}</h2><div class="trending-list ranked-list">{% for row in most_viewed_articles %}<a href="{{ row.url }}"><span>{{ loop.index }}</span><div><strong>{{ row.title }}</strong><small>{{ row.view_count }} {{ ui.views_label|lower }} • {{ row.article.published_at|format_published_at }}</small></div></a>{% endfor %}</div></section>
+      <section><h2>{{ ui.most_watched }}</h2><div class="trending-list">{% for row in sidebar_articles %}<a href="{{ row.url }}"><div><strong>{{ row.title }}</strong><small>{{ row.category_label }} • {{ row.article.published_at|format_published_at }}</small></div></a>{% endfor %}</div></section>
       <section><h2>{{ ui.get('trending_label', 'Trending') }}</h2><div class="trending-list">{% for row in trending_articles %}<a href="{{ row.url }}"><div><strong>{{ row.title }}</strong><small>{{ row.category_label }} • {{ row.article.published_at|format_published_at }}</small></div></a>{% endfor %}</div></section>
-      <section><h2>{{ ui.latest }}</h2><div class="trending-list">{% for row in sidebar_articles %}<a href="{{ row.url }}"><div><strong>{{ row.title }}</strong><small>{{ row.category_label }} • {{ row.article.published_at|format_published_at }}</small></div></a>{% endfor %}</div></section>
+      <section><h2>{{ ui.get('most_viewed', 'Most viewed') }}</h2><div class="trending-list ranked-list">{% for row in most_viewed_articles %}<a href="{{ row.url }}"><span>{{ loop.index }}</span><div><strong>{{ row.title }}</strong><small>{{ row.view_count }} {{ ui.views_label|lower }} • {{ row.article.published_at|format_published_at }}</small></div></a>{% endfor %}</div></section>
     </aside>
   </div>
   {% if category_blocks %}
@@ -116,7 +134,7 @@
   {% endif %}
   <section class="newsletter-card glass" id="newsletter" aria-labelledby="newsletter-title">
     <div><p class="eyebrow">{{ ui.get('newsletter_label', 'Newsletter') }}</p><h2 id="newsletter-title">{{ ui.get('newsletter_headline', 'Get breaking news first') }}</h2><p>{{ ui.get('newsletter_text', 'A premium inbox briefing for the biggest stories, launches and analysis.') }}</p></div>
-    <form class="newsletter-form"><input type="email" placeholder="{{ ui.email }}" aria-label="{{ ui.email }}"><button type="button">{{ ui.get('subscribe_label', 'Subscribe') }}</button></form>
+    <form class="newsletter-form" data-newsletter-form action="/{{ language }}/newsletter/subscribe" method="post" data-success="{{ ui.get('newsletter_success', 'Subscription saved successfully.') }}" data-invalid="{{ ui.get('newsletter_invalid', 'Please enter a valid email address.') }}" data-error="{{ ui.get('newsletter_error', 'Subscription could not be saved. Please try again.') }}"><input name="email" type="email" placeholder="{{ ui.email }}" aria-label="{{ ui.email }}" autocomplete="email" required><button type="submit">{{ ui.get('subscribe_label', 'Subscribe') }}</button><p class="newsletter-message" data-newsletter-message role="status" aria-live="polite"></p></form>
   </section>
   </div>
 </main>
