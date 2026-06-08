@@ -434,6 +434,7 @@ IFRAME_WRAPPER_CLASS = "iframe-video-embed"
 
 
 YOUTUBE_CHANNEL_URL = "https://www.youtube.com/@vasifreyc"
+FEATURED_YOUTUBE_SHORT_ID = "LXh-sCJWvkA"
 YOUTUBE_SHORTS_PAGE_URL = f"{YOUTUBE_CHANNEL_URL}/shorts"
 YOUTUBE_CACHE_TTL_SECONDS = 60 * 30
 YOUTUBE_HTTP_TIMEOUT_SECONDS = 4
@@ -524,12 +525,9 @@ def latest_channel_video_id(channel_id: str | None) -> str | None:
 
 
 def build_youtube_shorts_widget() -> dict[str, object]:
-    payload: dict[str, object] = {"channel_url": YOUTUBE_CHANNEL_URL, "short": None, "fallback": None}
+    payload: dict[str, object] = {"channel_url": YOUTUBE_CHANNEL_URL, "short": youtube_video_payload(FEATURED_YOUTUBE_SHORT_ID, short=True), "fallback": None}
     shorts_html = fetch_youtube_text(YOUTUBE_SHORTS_PAGE_URL)
     shorts_ids = parse_youtube_shorts_ids(shorts_html)
-    if shorts_ids:
-        payload["short"] = youtube_video_payload(shorts_ids[0], short=True)
-
     channel_id = parse_youtube_channel_id(shorts_html)
     try:
         fallback_id = latest_channel_video_id(channel_id)
@@ -556,7 +554,7 @@ def latest_youtube_shorts_widget() -> dict[str, object]:
             ttl = YOUTUBE_CACHE_TTL_SECONDS
         except Exception as exc:
             logger.warning("Could not refresh Vasif REYC YouTube Shorts widget: %s", exc)
-            payload = cache.get("payload") or {"channel_url": YOUTUBE_CHANNEL_URL, "short": None, "fallback": None}
+            payload = cache.get("payload") or {"channel_url": YOUTUBE_CHANNEL_URL, "short": youtube_video_payload(FEATURED_YOUTUBE_SHORT_ID, short=True), "fallback": None}
             ttl = 5 * 60
         app.state.youtube_shorts_cache = {"expires_at": time.monotonic() + ttl, "payload": payload}
         return payload
@@ -2267,10 +2265,13 @@ def home(request: Request, language: str = "az", q: str = "", category: str = ""
     category_labels = public_category_labels(language)
     article_cards = [article_card(a, language, category_labels) for a in articles]
     hero = article_cards[0] if article_cards else None
-    latest_cards = [row for row in article_cards if not hero or row["article"].id != hero["article"].id]
+    featured_cards = [row for row in article_cards if bool(getattr(row["article"], "is_featured", False))]
+    hero_slides = featured_cards if len(featured_cards) > 1 else ([hero] if hero else [])
+    hero_slide_ids = {row["article"].id for row in hero_slides}
+    latest_cards = [row for row in article_cards if row["article"].id not in hero_slide_ids]
     sidebar_query = db.query(Article).options(selectinload(Article.translations)).filter(public_article_visibility_filter())
-    if hero:
-        sidebar_query = sidebar_query.filter(Article.id != hero["article"].id)
+    if hero_slide_ids:
+        sidebar_query = sidebar_query.filter(Article.id.notin_(hero_slide_ids))
     sidebar_articles = attach_real_view_counts(db, sidebar_query.order_by(public_article_datetime_expression().desc(), Article.created_at.desc(), Article.id.desc()).limit(12).all())
     sidebar_cards = [article_card(a, language, category_labels) for a in sidebar_articles]
     trending_articles = attach_real_view_counts(
@@ -2309,7 +2310,7 @@ def home(request: Request, language: str = "az", q: str = "", category: str = ""
         build_website_schema(settings_map, language),
         build_breadcrumb_schema([("Home", canonical)]),
     ]
-    return templates.TemplateResponse("public/home.html", {"request": request, "articles": article_cards, "latest_articles": latest_cards, "sidebar_articles": sidebar_cards, "trending_articles": trending_cards, "most_viewed_articles": most_viewed_cards, "breaking_articles": breaking_cards, "latest_news_count": latest_news_count, "today_views": today_views, "category_blocks": category_blocks, "hero": hero, "categories": categories["primary"], "secondary_categories": categories["secondary"], "q": q, "category": category, "site_url": settings.site_url, "canonical": canonical, "language": language, "languages": SUPPORTED_LANGUAGES, "alt_links": alt_links, "ui": public_labels(language), "category_labels": category_labels, "settings_map": settings_map, "verification_meta": seo_verification_meta(settings_map), "schema_graph": schema_graph, "site_name": site_name_from_settings(settings_map), "youtube_widget": youtube_widget, "app_version": APP_VERSION})
+    return templates.TemplateResponse("public/home.html", {"request": request, "articles": article_cards, "latest_articles": latest_cards, "sidebar_articles": sidebar_cards, "trending_articles": trending_cards, "most_viewed_articles": most_viewed_cards, "breaking_articles": breaking_cards, "hero_slides": hero_slides, "latest_news_count": latest_news_count, "today_views": today_views, "category_blocks": category_blocks, "hero": hero, "categories": categories["primary"], "secondary_categories": categories["secondary"], "q": q, "category": category, "site_url": settings.site_url, "canonical": canonical, "language": language, "languages": SUPPORTED_LANGUAGES, "alt_links": alt_links, "ui": public_labels(language), "category_labels": category_labels, "settings_map": settings_map, "verification_meta": seo_verification_meta(settings_map), "schema_graph": schema_graph, "site_name": site_name_from_settings(settings_map), "youtube_widget": youtube_widget, "app_version": APP_VERSION})
 
 
 @app.get("/privacy", response_class=HTMLResponse)

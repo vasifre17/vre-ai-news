@@ -211,140 +211,37 @@ newsletterForms.forEach((form) => {
   });
 });
 
-const youtubeShortFrames = document.querySelectorAll('[data-youtube-short]');
-let youtubeIframeApiPromise;
+const heroCarousels = document.querySelectorAll('[data-hero-carousel]');
 
-const ensureYoutubeIframeApi = () => {
-  if (window.YT && window.YT.Player) return Promise.resolve(window.YT);
-  if (youtubeIframeApiPromise) return youtubeIframeApiPromise;
+heroCarousels.forEach((carousel) => {
+  const slides = Array.from(carousel.querySelectorAll('[data-hero-slide]'));
+  const dots = Array.from(carousel.querySelectorAll('[data-hero-dot]'));
+  const previous = carousel.querySelector('[data-hero-prev]');
+  const next = carousel.querySelector('[data-hero-next]');
+  if (slides.length <= 1) return;
 
-  youtubeIframeApiPromise = new Promise((resolve, reject) => {
-    const previousCallback = window.onYouTubeIframeAPIReady;
-    window.onYouTubeIframeAPIReady = () => {
-      if (typeof previousCallback === 'function') previousCallback();
-      resolve(window.YT);
-    };
+  let activeIndex = Math.max(0, slides.findIndex((slide) => slide.classList.contains('is-active')));
 
-    const existingScript = document.querySelector('script[src="https://www.youtube.com/iframe_api"]');
-    if (!existingScript) {
-      const script = document.createElement('script');
-      script.src = 'https://www.youtube.com/iframe_api';
-      script.async = true;
-      script.onerror = () => reject(new Error('YouTube iframe API failed to load'));
-      document.head.appendChild(script);
-    }
-
-    window.setTimeout(() => {
-      if (!(window.YT && window.YT.Player)) reject(new Error('YouTube iframe API timed out'));
-    }, 6000);
-  });
-
-  return youtubeIframeApiPromise;
-};
-
-const keepYoutubeThumbnail = (frame, url, thumbnail) => {
-  frame.dataset.loaded = '0';
-  frame.dataset.playerReady = '0';
-  const link = frame.querySelector('.youtube-load-button');
-  if (link && url) link.href = url;
-  const image = frame.querySelector('.youtube-thumbnail');
-  if (image && thumbnail) image.src = thumbnail;
-  frame.querySelectorAll('iframe').forEach((iframe) => iframe.remove());
-};
-
-const loadYoutubeCandidate = (frame, candidate, allowFallback = true) => {
-  if (!frame || !candidate.src || frame.dataset.loading === candidate.src) return;
-  frame.dataset.loading = candidate.src;
-  frame.dataset.playerReady = '0';
-  frame.classList.toggle('youtube-lazy-frame--video', candidate.kind !== 'short');
-
-  const holder = document.createElement('div');
-  const holderId = `youtube-player-${candidate.id}-${Date.now()}`;
-  holder.id = holderId;
-  frame.appendChild(holder);
-
-  const fail = () => {
-    holder.remove();
-    frame.dataset.loading = '';
-    if (allowFallback && candidate.kind === 'short' && frame.dataset.fallbackSrc && frame.dataset.fallbackVideoId && frame.dataset.fallbackVideoId !== candidate.id) {
-      const link = frame.querySelector('.youtube-load-button');
-      const image = frame.querySelector('.youtube-thumbnail');
-      if (link && frame.dataset.fallbackUrl) link.href = frame.dataset.fallbackUrl;
-      if (image && frame.dataset.fallbackThumbnail) image.src = frame.dataset.fallbackThumbnail;
-      loadYoutubeCandidate(frame, {
-        id: frame.dataset.fallbackVideoId,
-        src: frame.dataset.fallbackSrc,
-        url: frame.dataset.fallbackUrl,
-        kind: frame.dataset.fallbackKind || 'video',
-      }, false);
-      return;
-    }
-    keepYoutubeThumbnail(frame, candidate.url, candidate.thumbnail || frame.dataset.fallbackThumbnail || '');
+  const showSlide = (index) => {
+    activeIndex = (index + slides.length) % slides.length;
+    slides.forEach((slide, slideIndex) => {
+      const isActive = slideIndex === activeIndex;
+      slide.classList.toggle('is-active', isActive);
+      slide.hidden = !isActive;
+    });
+    dots.forEach((dot, dotIndex) => {
+      const isActive = dotIndex === activeIndex;
+      dot.classList.toggle('is-active', isActive);
+      dot.setAttribute('aria-selected', String(isActive));
+    });
   };
 
-  ensureYoutubeIframeApi().then((YT) => {
-    const player = new YT.Player(holderId, {
-      videoId: candidate.id,
-      playerVars: {
-        autoplay: 1,
-        mute: 1,
-        playsinline: 1,
-        rel: 0,
-        modestbranding: 1,
-      },
-      events: {
-        onReady: (event) => {
-          try {
-            event.target.mute();
-            event.target.playVideo();
-          } catch (error) {
-            // Keep the thumbnail visible if playback cannot start.
-          }
-        },
-        onStateChange: (event) => {
-          if (![YT.PlayerState.PLAYING, YT.PlayerState.BUFFERING].includes(event.data)) return;
-          frame.dataset.loaded = '1';
-          frame.dataset.playerReady = '1';
-          frame.dataset.loading = '';
-          const preview = frame.querySelector('.youtube-load-button');
-          if (preview) preview.remove();
-        },
-        onError: fail,
-      },
-    });
+  previous?.addEventListener('click', () => showSlide(activeIndex - 1));
+  next?.addEventListener('click', () => showSlide(activeIndex + 1));
+  dots.forEach((dot, dotIndex) => dot.addEventListener('click', () => showSlide(dotIndex)));
 
-    window.setTimeout(() => {
-      if (frame.dataset.playerReady !== '1') {
-        try { player.destroy(); } catch (error) { /* no-op */ }
-        fail();
-      }
-    }, 8000);
-  }).catch(fail);
-};
-
-const loadYoutubeShortFrame = (frame) => {
-  if (!frame || frame.dataset.loaded === '1' || frame.dataset.loading) return;
-  loadYoutubeCandidate(frame, {
-    id: frame.dataset.videoId,
-    src: frame.dataset.embedSrc,
-    url: frame.dataset.url,
-    kind: frame.dataset.kind || 'short',
-    thumbnail: frame.querySelector('.youtube-thumbnail')?.getAttribute('src') || '',
+  carousel.addEventListener('keydown', (event) => {
+    if (event.key === 'ArrowLeft') showSlide(activeIndex - 1);
+    if (event.key === 'ArrowRight') showSlide(activeIndex + 1);
   });
-};
-
-youtubeShortFrames.forEach((frame) => {
-  if ('IntersectionObserver' in window) {
-    const observer = new IntersectionObserver((entries, activeObserver) => {
-      entries.forEach((entry) => {
-        if (!entry.isIntersecting) return;
-        loadYoutubeShortFrame(frame);
-        activeObserver.unobserve(frame);
-      });
-    }, { rootMargin: '240px 0px' });
-    observer.observe(frame);
-    return;
-  }
-
-  window.setTimeout(() => loadYoutubeShortFrame(frame), 1200);
 });
