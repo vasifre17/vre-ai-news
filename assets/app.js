@@ -24,6 +24,45 @@ if (btn) {
   });
 }
 
+
+const languageSwitchers = document.querySelectorAll('.language-switcher');
+languageSwitchers.forEach((switcher) => {
+  const summary = switcher.querySelector('summary');
+  if (summary) {
+    summary.setAttribute('aria-haspopup', 'menu');
+    summary.setAttribute('aria-expanded', String(switcher.open));
+  }
+
+  switcher.addEventListener('toggle', () => {
+    if (summary) summary.setAttribute('aria-expanded', String(switcher.open));
+    if (!switcher.open) return;
+    languageSwitchers.forEach((otherSwitcher) => {
+      if (otherSwitcher === switcher) return;
+      otherSwitcher.open = false;
+    });
+  });
+
+  switcher.querySelectorAll('.language-dropdown a').forEach((link) => {
+    link.addEventListener('click', () => {
+      switcher.open = false;
+    });
+  });
+});
+
+document.addEventListener('click', (event) => {
+  languageSwitchers.forEach((switcher) => {
+    if (switcher.contains(event.target)) return;
+    switcher.open = false;
+  });
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key !== 'Escape') return;
+  languageSwitchers.forEach((switcher) => {
+    switcher.open = false;
+  });
+});
+
 const categoryMenus = document.querySelectorAll('.category-menu');
 categoryMenus.forEach((menu) => {
   const button = menu.querySelector('.category-menu-button');
