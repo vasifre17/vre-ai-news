@@ -341,6 +341,7 @@ PUBLIC_LABELS["az"].update({
     "newsletter_duplicate": "Bu e-poçt artıq abunədir.",
     "newsletter_invalid": "Düzgün e-poçt ünvanı daxil edin.",
     "newsletter_error": "Abunəliyi saxlamaq mümkün olmadı. Zəhmət olmasa yenidən cəhd edin.",
+    "latest_video_label": "Son video",
 })
 PUBLIC_LABELS["en"].update({
     "newsroom_label": "Premium newsroom",
@@ -371,6 +372,7 @@ PUBLIC_LABELS["en"].update({
     "newsletter_duplicate": "This email is already subscribed.",
     "newsletter_invalid": "Please enter a valid email address.",
     "newsletter_error": "Subscription could not be saved. Please try again.",
+    "latest_video_label": "Latest video",
 })
 
 def public_labels(language: str) -> dict[str, str]:
