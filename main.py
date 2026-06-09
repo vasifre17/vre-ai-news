@@ -1,4 +1,5 @@
 from datetime import UTC, datetime, timedelta
+from zoneinfo import ZoneInfo
 import hashlib
 import json
 import logging
@@ -65,6 +66,7 @@ MAX_UPLOAD_IMAGE_BYTES = 20 * 1024 * 1024
 UPLOAD_COPY_CHUNK_SIZE = 1024 * 1024
 IMAGE_VARIANT_WIDTHS = (480, 960, 1440)
 APP_VERSION = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
+PUBLIC_DISPLAY_TIMEZONE = ZoneInfo("Asia/Baku")
 logger = logging.getLogger(__name__)
 NEWSLETTER_SUBSCRIPTIONS_FILE = Path(os.getenv("NEWSLETTER_SUBSCRIPTIONS_FILE", "data/newsletter_subscriptions.jsonl"))
 NEWSLETTER_LOCK = threading.Lock()
@@ -861,19 +863,34 @@ AZERBAIJANI_MONTH_NAMES = {
 }
 
 
+def public_display_datetime(value: datetime | None) -> datetime | None:
+    if not value:
+        return None
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=UTC)
+    return value.astimezone(PUBLIC_DISPLAY_TIMEZONE)
+
+
 def format_published_at(value):
     return value.strftime("%b %d, %Y") if value else ""
 
 
+def format_public_published_at(value):
+    local_value = public_display_datetime(value)
+    return local_value.strftime("%b %d, %Y") if local_value else ""
+
+
 def format_article_meta_datetime(value):
-    if not value:
+    local_value = public_display_datetime(value)
+    if not local_value:
         return ""
-    month = AZERBAIJANI_MONTH_NAMES.get(value.month, value.strftime("%B"))
-    return f"{value.day:02d} {month} {value.year} • {value:%H:%M}"
+    month = AZERBAIJANI_MONTH_NAMES.get(local_value.month, local_value.strftime("%B"))
+    return f"{local_value.day:02d} {month} {local_value.year} • {local_value:%H:%M}"
 
 
 def format_article_publish_time(value):
-    return value.strftime("%H:%M") if value else ""
+    local_value = public_display_datetime(value)
+    return local_value.strftime("%H:%M") if local_value else ""
 
 
 def format_admin_datetime(value):
@@ -1091,6 +1108,7 @@ def media_asset_article_values(asset: MediaAsset) -> set[str]:
 
 
 templates.env.filters["format_published_at"] = format_published_at
+templates.env.filters["format_public_published_at"] = format_public_published_at
 templates.env.filters["format_article_meta_datetime"] = format_article_meta_datetime
 templates.env.filters["format_article_publish_time"] = format_article_publish_time
 templates.env.filters["format_admin_datetime"] = format_admin_datetime
@@ -2426,12 +2444,13 @@ def home(request: Request, language: str = "az", q: str = "", category: str = ""
         query.order_by(public_article_datetime_expression().desc(), Article.created_at.desc(), Article.id.desc()).limit(5).all(),
     )
     hero_slides = [article_card(a, language, category_labels) for a in latest_slide_articles]
-    hero = hero_slides[0] if hero_slides else (article_cards[0] if article_cards else None)
-    hero_slide_ids = {row["article"].id for row in hero_slides}
-    latest_cards = [row for row in article_cards if row["article"].id not in hero_slide_ids]
+    latest_feed_articles = attach_real_view_counts(
+        db,
+        query.order_by(public_article_datetime_expression().desc(), Article.created_at.desc(), Article.id.desc()).limit(30).all(),
+    )
+    latest_cards = [article_card(a, language, category_labels) for a in latest_feed_articles]
+    hero = hero_slides[0] if hero_slides else (latest_cards[0] if latest_cards else (article_cards[0] if article_cards else None))
     sidebar_query = db.query(Article).options(selectinload(Article.translations)).filter(public_article_visibility_filter())
-    if hero_slide_ids:
-        sidebar_query = sidebar_query.filter(Article.id.notin_(hero_slide_ids))
     sidebar_articles = attach_real_view_counts(db, sidebar_query.order_by(public_article_datetime_expression().desc(), Article.created_at.desc(), Article.id.desc()).limit(12).all())
     sidebar_cards = [article_card(a, language, category_labels) for a in sidebar_articles]
     trending_articles = attach_real_view_counts(

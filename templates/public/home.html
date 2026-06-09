@@ -74,7 +74,7 @@
             <span class="badge">{{ slide.category_label }}</span>
             <h1 id="{{ 'home-hero-title' if loop.first else 'home-hero-title-' ~ loop.index }}"><a href="{{ slide.url }}">{{ slide.title }}</a></h1>
             <p>{{ slide.summary }}</p>
-            <small class="hero-meta"><time datetime="{{ slide.article.published_at.isoformat() if slide.article.published_at else '' }}">{{ slide.article.published_at|format_published_at }}</time><span>{{ slide.view_count }} {{ ui.views_label|lower }}</span></small>
+            <small class="hero-meta"><time datetime="{{ slide.article.published_at.isoformat() if slide.article.published_at else '' }}">{{ slide.article.published_at|format_public_published_at }}</time><span>{{ slide.view_count }} {{ ui.views_label|lower }}</span></small>
           </div>
         </article>
         {% endfor %}
@@ -126,7 +126,7 @@
           <div class="card-body">
             <h3 itemprop="headline"><a href="{{row.url}}" itemprop="url">{{row.title}}</a></h3>
             <p itemprop="description">{{row.summary}}</p>
-            <small class="meta-row"><time datetime="{{ row.article.published_at.isoformat() if row.article.published_at else '' }}" itemprop="datePublished">{{row.article.published_at|format_published_at}}</time><span>{{ row.category_label }}</span><span>{{ row.view_count }} {{ ui.views_label|lower }}</span></small>
+            <small class="meta-row"><time datetime="{{ row.article.published_at.isoformat() if row.article.published_at else '' }}" itemprop="datePublished">{{row.article.published_at|format_public_published_at}}</time><span>{{ row.category_label }}</span><span>{{ row.view_count }} {{ ui.views_label|lower }}</span></small>
           </div>
         </article>
         {% if loop.index is divisibleby 6 %}{{ ads.ad_slot("infeed", "ADVERTISEMENT") }}{% endif %}
@@ -134,9 +134,9 @@
       </div>
     </section>
     <aside class="trending-sidebar premium-sidebar glass" aria-label="{{ ui.get('sidebar_label', 'News sidebar') }}">
-      <section><h2>{{ ui.most_watched }}</h2><div class="trending-list">{% for row in sidebar_articles %}<a href="{{ row.url }}"><div><strong>{{ row.title }}</strong><small>{{ row.category_label }} • {{ row.article.published_at|format_published_at }}</small></div></a>{% endfor %}</div></section>
-      <section><h2>{{ ui.get('trending_label', 'Trending') }}</h2><div class="trending-list">{% for row in trending_articles %}<a href="{{ row.url }}"><div><strong>{{ row.title }}</strong><small>{{ row.category_label }} • {{ row.article.published_at|format_published_at }}</small></div></a>{% endfor %}</div></section>
-      <section><h2>{{ ui.get('most_viewed', 'Most viewed') }}</h2><div class="trending-list ranked-list">{% for row in most_viewed_articles %}<a href="{{ row.url }}"><span>{{ loop.index }}</span><div><strong>{{ row.title }}</strong><small>{{ row.view_count }} {{ ui.views_label|lower }} • {{ row.article.published_at|format_published_at }}</small></div></a>{% endfor %}</div></section>
+      <section><h2>{{ ui.most_watched }}</h2><div class="trending-list">{% for row in sidebar_articles %}<a href="{{ row.url }}"><div><strong>{{ row.title }}</strong><small>{{ row.category_label }} • {{ row.article.published_at|format_public_published_at }}</small></div></a>{% endfor %}</div></section>
+      <section><h2>{{ ui.get('trending_label', 'Trending') }}</h2><div class="trending-list">{% for row in trending_articles %}<a href="{{ row.url }}"><div><strong>{{ row.title }}</strong><small>{{ row.category_label }} • {{ row.article.published_at|format_public_published_at }}</small></div></a>{% endfor %}</div></section>
+      <section><h2>{{ ui.get('most_viewed', 'Most viewed') }}</h2><div class="trending-list ranked-list">{% for row in most_viewed_articles %}<a href="{{ row.url }}"><span>{{ loop.index }}</span><div><strong>{{ row.title }}</strong><small>{{ row.view_count }} {{ ui.views_label|lower }} • {{ row.article.published_at|format_public_published_at }}</small></div></a>{% endfor %}</div></section>
     </aside>
   </div>
   {% if category_blocks %}
@@ -146,7 +146,7 @@
       {% for block in category_blocks %}
       <section class="category-block glass" style="--cat-color: {{ block.color }}">
         <a class="category-block-head" href="/{{ language }}/?category={{ block.name }}"><span>{{ block.label }}</span><small>{{ ui.get('view_all', 'View all') }}</small></a>
-        {% if block.articles %}<div class="category-block-list">{% for row in block.articles %}<a href="{{ row.url }}"><strong>{{ row.title }}</strong><small>{{ row.article.published_at|format_published_at }}</small></a>{% endfor %}</div>{% else %}<p>{{ ui.get('category_empty', 'Fresh stories will appear here soon.') }}</p>{% endif %}
+        {% if block.articles %}<div class="category-block-list">{% for row in block.articles %}<a href="{{ row.url }}"><strong>{{ row.title }}</strong><small>{{ row.article.published_at|format_public_published_at }}</small></a>{% endfor %}</div>{% else %}<p>{{ ui.get('category_empty', 'Fresh stories will appear here soon.') }}</p>{% endif %}
       </section>
       {% endfor %}
     </div>
