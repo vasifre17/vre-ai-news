@@ -36,8 +36,7 @@ def test_youtube_video_payload_builds_shorts_and_embed_metadata():
 
     assert payload["kind"] == "short"
     assert payload["url"] == "https://www.youtube.com/shorts/AAA111bbb22"
-    assert payload["embed_url"].startswith("https://www.youtube.com/embed/AAA111bbb22?")
-    assert "mute=1" in payload["embed_url"]
+    assert payload["embed_url"] == "https://www.youtube.com/embed/AAA111bbb22?autoplay=1&mute=1&loop=1&playlist=AAA111bbb22&playsinline=1&rel=0"
     assert payload["thumbnail"] == "https://i.ytimg.com/vi/AAA111bbb22/hqdefault.jpg"
 
 

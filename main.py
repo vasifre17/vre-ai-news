@@ -455,9 +455,10 @@ def youtube_watch_url(video_id: str | None, *, short: bool = False) -> str:
 def youtube_embed_url(video_id: str | None, *, short: bool = False) -> str:
     if not video_id:
         return ""
-    params = "enablejsapi=1&autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1"
     if short:
-        params += f"&loop=1&playlist={video_id}"
+        params = f"autoplay=1&mute=1&loop=1&playlist={video_id}&playsinline=1&rel=0"
+    else:
+        params = "enablejsapi=1&autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1"
     return f"https://www.youtube.com/embed/{video_id}?{params}"
 
 

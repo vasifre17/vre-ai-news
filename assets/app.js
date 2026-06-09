@@ -236,12 +236,34 @@ heroCarousels.forEach((carousel) => {
     });
   };
 
-  previous?.addEventListener('click', () => showSlide(activeIndex - 1));
-  next?.addEventListener('click', () => showSlide(activeIndex + 1));
-  dots.forEach((dot, dotIndex) => dot.addEventListener('click', () => showSlide(dotIndex)));
+  let rotateTimer = null;
+  const startRotation = () => {
+    window.clearInterval(rotateTimer);
+    rotateTimer = window.setInterval(() => showSlide(activeIndex + 1), 6000);
+  };
+  const manualSlide = (index) => {
+    showSlide(index);
+    startRotation();
+  };
+
+  previous?.addEventListener('click', () => manualSlide(activeIndex - 1));
+  next?.addEventListener('click', () => manualSlide(activeIndex + 1));
+  dots.forEach((dot, dotIndex) => dot.addEventListener('click', () => manualSlide(dotIndex)));
 
   carousel.addEventListener('keydown', (event) => {
-    if (event.key === 'ArrowLeft') showSlide(activeIndex - 1);
-    if (event.key === 'ArrowRight') showSlide(activeIndex + 1);
+    if (event.key === 'ArrowLeft') manualSlide(activeIndex - 1);
+    if (event.key === 'ArrowRight') manualSlide(activeIndex + 1);
   });
+  carousel.addEventListener('mouseenter', () => window.clearInterval(rotateTimer));
+  carousel.addEventListener('mouseleave', startRotation);
+  startRotation();
+});
+
+document.querySelectorAll('[data-youtube-short-embed]').forEach((card) => {
+  const iframe = card.querySelector('iframe');
+  if (!iframe) return;
+
+  iframe.addEventListener('load', () => {
+    card.classList.add('is-loaded');
+  }, { once: true });
 });
