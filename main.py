@@ -114,6 +114,19 @@ PUBLIC_LABELS = {
         "latest": "Son",
         "latest_news": "Son xəbərlər",
         "most_watched": "Xəbər lenti",
+        "most_viewed": "Ən çox oxunanlar",
+        "trending_label": "Trenddə",
+        "author_label": "Müəllif",
+        "source_label": "Mənbə",
+        "copy_link": "Linki kopyala",
+        "copy_success": "Link kopyalandı",
+        "newsletter_label": "Bülleten",
+        "newsletter_headline": "Xəbərləri ilk siz alın",
+        "newsletter_text": "Ən vacib xəbər və təhlilləri birbaşa e-poçtunuzda oxuyun.",
+        "subscribe_label": "Abunə ol",
+        "newsletter_success": "Abunəlik uğurla yadda saxlanıldı.",
+        "newsletter_invalid": "Zəhmət olmasa düzgün e-poçt ünvanı daxil edin.",
+        "newsletter_error": "Abunəlik yadda saxlanılmadı. Yenidən cəhd edin.",
         "date_label": "Tarix",
         "views_label": "Baxış",
         "related": "Oxşar xəbərlər",
@@ -146,6 +159,19 @@ PUBLIC_LABELS = {
         "latest": "Latest",
         "latest_news": "Latest news",
         "most_watched": "News feed",
+        "most_viewed": "Most viewed",
+        "trending_label": "Trending",
+        "author_label": "Author",
+        "source_label": "Source",
+        "copy_link": "Copy link",
+        "copy_success": "Link copied",
+        "newsletter_label": "Newsletter",
+        "newsletter_headline": "Get breaking news first",
+        "newsletter_text": "A premium inbox briefing for the biggest stories, launches and analysis.",
+        "subscribe_label": "Subscribe",
+        "newsletter_success": "Subscription saved successfully.",
+        "newsletter_invalid": "Please enter a valid email address.",
+        "newsletter_error": "Subscription could not be saved. Please try again.",
         "date_label": "Date",
         "views_label": "Views",
         "related": "Related",
@@ -323,7 +349,7 @@ PUBLIC_LABELS["az"].update({
     "breaking_news": "Təcili xəbər",
     "editorial_flow": "Canlı redaksiya lenti",
     "sidebar_label": "Xəbər paneli",
-    "most_viewed": "Ən çox oxunan",
+    "most_viewed": "Ən çox oxunanlar",
     "trending_label": "Trenddə",
     "sections_label": "Bölmələr",
     "category_blocks_title": "Kateqoriyalar üzrə xəbərlər",
@@ -380,7 +406,12 @@ PUBLIC_LABELS["en"].update({
 })
 
 def public_labels(language: str) -> dict[str, str]:
-    return PUBLIC_LABELS.get(language, PUBLIC_LABELS["az"])
+    labels = dict(PUBLIC_LABELS["en"])
+    if language == "az":
+        labels.update(PUBLIC_LABELS["az"])
+        return labels
+    labels.update(PUBLIC_LABELS.get(language, PUBLIC_LABELS["az"]))
+    return labels
 
 
 def public_category_labels(language: str) -> dict[str, str]:
@@ -2494,6 +2525,20 @@ def render_article_page(slug: str, request: Request, language: str = "az", db=De
     if len(related) < 3:
         related = related + db.query(Article).options(selectinload(Article.translations)).filter(public_article_visibility_filter(), Article.id != article.id, Article.category != article.category).order_by(public_article_datetime_expression().desc(), Article.created_at.desc()).limit(3 - len(related)).all()
     related = attach_real_view_counts(db, related)
+    sidebar_base = db.query(Article).options(selectinload(Article.translations)).filter(public_article_visibility_filter(), Article.id != article.id)
+    trending_articles = attach_real_view_counts(
+        db,
+        sidebar_base.order_by(Article.is_trending.desc(), public_article_datetime_expression().desc(), Article.created_at.desc(), Article.id.desc()).limit(5).all(),
+    )
+    view_candidates = attach_real_view_counts(
+        db,
+        db.query(Article).options(selectinload(Article.translations)).filter(public_article_visibility_filter(), Article.id != article.id).order_by(Article.view_count.desc(), public_article_datetime_expression().desc(), Article.id.desc()).limit(30).all(),
+    )
+    most_viewed_articles = sorted(
+        view_candidates,
+        key=lambda item: (getattr(item, "real_view_count", 0) or item.view_count or 0, public_article_datetime(item) or datetime.min),
+        reverse=True,
+    )[:5]
     canonical = canonical_url(request, f"{language}/{view.slug}")
     navigation = public_category_navigation(db)
     category_labels = public_category_labels(language)
@@ -2507,7 +2552,7 @@ def render_article_page(slug: str, request: Request, language: str = "az", db=De
         build_news_article_schema(article, view, canonical, image_url, settings_map, language),
     ]
     seo_audit = article_seo_audit(article, language)
-    return templates.TemplateResponse("public/article.html", {"request": request, "article": view, "root_article": article, "image_exists": image_exists, "narration": narration, "related_articles": [article_card(a, language, category_labels) for a in related], "categories": navigation["primary"], "secondary_categories": navigation["secondary"], "share_url": canonical, "site_url": settings.site_url, "canonical": canonical, "language": language, "languages": SUPPORTED_LANGUAGES, "alt_links": alt_links, "ui": public_labels(language), "category_labels": category_labels, "settings_map": settings_map, "verification_meta": seo_verification_meta(settings_map), "schema_graph": schema_graph, "seo_audit": seo_audit, "site_name": site_name_from_settings(settings_map), "og_image": image_url, "app_version": APP_VERSION})
+    return templates.TemplateResponse("public/article.html", {"request": request, "article": view, "root_article": article, "image_exists": image_exists, "narration": narration, "related_articles": [article_card(a, language, category_labels) for a in related], "trending_articles": [article_card(a, language, category_labels) for a in trending_articles], "most_viewed_articles": [article_card(a, language, category_labels) for a in most_viewed_articles], "categories": navigation["primary"], "secondary_categories": navigation["secondary"], "share_url": canonical, "site_url": settings.site_url, "canonical": canonical, "language": language, "languages": SUPPORTED_LANGUAGES, "alt_links": alt_links, "ui": public_labels(language), "category_labels": category_labels, "settings_map": settings_map, "verification_meta": seo_verification_meta(settings_map), "schema_graph": schema_graph, "seo_audit": seo_audit, "site_name": site_name_from_settings(settings_map), "og_image": image_url, "app_version": APP_VERSION})
 
 
 @app.get("/article/{slug}", response_class=HTMLResponse)
