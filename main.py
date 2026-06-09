@@ -156,6 +156,7 @@ PUBLIC_LABELS = {
         "founder_ceo": "VREYC-in təsisçisi və baş direktoru Vasif Cəbrayıllıdır.",
         "email": "E-poçt",
         "more_categories": "Daha çox kateqoriya",
+        "load_more": "Daha çox göstər",
     },
     "en": {
         "latest": "Latest",
@@ -201,6 +202,7 @@ PUBLIC_LABELS = {
         "founder_ceo": "VREYC founder and chief executive is Vasif Jabrayilli.",
         "email": "Email",
         "more_categories": "More categories",
+        "load_more": "Load more",
     },
     "ru": {
         "latest": "Последнее",
@@ -374,6 +376,7 @@ PUBLIC_LABELS["az"].update({
     "newsletter_invalid": "Düzgün e-poçt ünvanı daxil edin.",
     "newsletter_error": "Abunəliyi saxlamaq mümkün olmadı. Zəhmət olmasa yenidən cəhd edin.",
     "latest_video_label": "Son Shorts",
+    "load_more": "Daha çox göstər",
     "news_hub_eyebrow": "Premium xəbər otağı",
     "news_hub_title": "Xəbər Mərkəzi",
     "news_hub_breaking": "Son dəqiqə",
@@ -413,6 +416,7 @@ PUBLIC_LABELS["en"].update({
     "newsletter_invalid": "Please enter a valid email address.",
     "newsletter_error": "Subscription could not be saved. Please try again.",
     "latest_video_label": "Latest Shorts",
+    "load_more": "Load more",
     "news_hub_eyebrow": "Premium newsroom",
     "news_hub_title": "News Hub",
     "news_hub_breaking": "Breaking",
@@ -435,8 +439,8 @@ def public_labels(language: str) -> dict[str, str]:
 def public_category_labels(language: str) -> dict[str, str]:
     return CATEGORY_LABELS.get(language, CATEGORY_LABELS["az"])
 
-PRIMARY_CATEGORY_NAMES = ["Country", "World", "Economy", "Technology", "Business", "Sports", "Health"]
-SECONDARY_CATEGORY_NAMES = ["Agriculture", "Politics", "Incident", "Science and Education", "Show Business"]
+PRIMARY_CATEGORY_NAMES = ["Country", "World", "Economy", "Technology", "Business", "Sports", "Politics", "Incident"]
+SECONDARY_CATEGORY_NAMES = ["Health", "Agriculture", "Show Business", "Science and Education"]
 CATEGORY_BLOCK_NAMES = ["Country", "World", "Economy", "Technology", "Sports", "Health", "Agriculture", "Business"]
 NEWS_HUB_CATEGORY_BLOCKS = [
     {"key": "breaking", "category": None, "label_key": "news_hub_breaking", "fallback": "Son dəqiqə"},
@@ -2475,7 +2479,7 @@ def home(request: Request, language: str = "az", q: str = "", category: str = ""
     latest_cards = [article_card(a, language, category_labels) for a in latest_feed_articles]
     hero = hero_slides[0] if hero_slides else (latest_cards[0] if latest_cards else (article_cards[0] if article_cards else None))
     sidebar_query = db.query(Article).options(selectinload(Article.translations)).filter(public_article_visibility_filter())
-    sidebar_articles = attach_real_view_counts(db, sidebar_query.order_by(public_article_datetime_expression().desc(), Article.created_at.desc(), Article.id.desc()).limit(12).all())
+    sidebar_articles = attach_real_view_counts(db, sidebar_query.order_by(public_article_datetime_expression().desc(), Article.created_at.desc(), Article.id.desc()).limit(30).all())
     sidebar_cards = [article_card(a, language, category_labels) for a in sidebar_articles]
     trending_articles = attach_real_view_counts(
         db,
@@ -2490,22 +2494,6 @@ def home(request: Request, language: str = "az", q: str = "", category: str = ""
     latest_news_count = db.query(Article).filter(public_article_visibility_filter()).count()
     today_views = today_public_views_count(db)
     breaking_cards = (trending_cards or latest_cards or article_cards)[:6]
-    news_hub_blocks = []
-    for hub_block in NEWS_HUB_CATEGORY_BLOCKS:
-        hub_query = db.query(Article).options(selectinload(Article.translations)).filter(public_article_visibility_filter())
-        if hub_block["category"]:
-            hub_query = hub_query.filter(Article.category == hub_block["category"])
-        hub_articles = attach_real_view_counts(
-            db,
-            hub_query.order_by(public_article_datetime_expression().desc(), Article.created_at.desc(), Article.id.desc()).limit(5).all(),
-        )
-        news_hub_blocks.append({
-            "key": hub_block["key"],
-            "category": hub_block["category"],
-            "label_key": hub_block["label_key"],
-            "fallback": hub_block["fallback"],
-            "articles": [article_card(a, language, category_labels) for a in hub_articles],
-        })
     categories = public_category_navigation(db)
     category_color_map = {c.name: (c.color or "#48a6ff") for c in [*categories["primary"], *categories["secondary"]]}
     category_blocks = []
@@ -2529,7 +2517,7 @@ def home(request: Request, language: str = "az", q: str = "", category: str = ""
         build_website_schema(settings_map, language),
         build_breadcrumb_schema([("Home", canonical)]),
     ]
-    return templates.TemplateResponse("public/home.html", {"request": request, "articles": article_cards, "latest_articles": latest_cards, "sidebar_articles": sidebar_cards, "trending_articles": trending_cards, "most_viewed_articles": most_viewed_cards, "breaking_articles": breaking_cards, "news_hub_blocks": news_hub_blocks, "hero_slides": hero_slides, "latest_news_count": latest_news_count, "today_views": today_views, "category_blocks": category_blocks, "hero": hero, "categories": categories["primary"], "secondary_categories": categories["secondary"], "q": q, "category": category, "site_url": settings.site_url, "canonical": canonical, "language": language, "languages": SUPPORTED_LANGUAGES, "alt_links": alt_links, "ui": public_labels(language), "category_labels": category_labels, "settings_map": settings_map, "verification_meta": seo_verification_meta(settings_map), "schema_graph": schema_graph, "site_name": site_name_from_settings(settings_map), "youtube_widget": youtube_widget, "app_version": APP_VERSION})
+    return templates.TemplateResponse("public/home.html", {"request": request, "articles": article_cards, "latest_articles": latest_cards, "sidebar_articles": sidebar_cards, "trending_articles": trending_cards, "most_viewed_articles": most_viewed_cards, "breaking_articles": breaking_cards, "hero_slides": hero_slides, "latest_news_count": latest_news_count, "today_views": today_views, "category_blocks": category_blocks, "hero": hero, "categories": categories["primary"], "secondary_categories": categories["secondary"], "q": q, "category": category, "site_url": settings.site_url, "canonical": canonical, "language": language, "languages": SUPPORTED_LANGUAGES, "alt_links": alt_links, "ui": public_labels(language), "category_labels": category_labels, "settings_map": settings_map, "verification_meta": seo_verification_meta(settings_map), "schema_graph": schema_graph, "site_name": site_name_from_settings(settings_map), "youtube_widget": youtube_widget, "app_version": APP_VERSION})
 
 
 @app.get("/privacy", response_class=HTMLResponse)
