@@ -167,6 +167,24 @@ if (mobileMenuToggle && mobileMenuPanel) {
   });
 }
 
+
+const sidebarLoadMoreButtons = document.querySelectorAll('[data-sidebar-load-more]');
+sidebarLoadMoreButtons.forEach((button) => {
+  const sidebarSection = button.closest('section');
+  const feed = sidebarSection ? sidebarSection.querySelector('[data-sidebar-feed]') : null;
+  if (!feed) return;
+
+  button.addEventListener('click', () => {
+    const hiddenItems = Array.from(feed.querySelectorAll('a[hidden]'));
+    hiddenItems.slice(0, 10).forEach((item) => {
+      item.hidden = false;
+    });
+    if (feed.querySelectorAll('a[hidden]').length === 0) {
+      button.hidden = true;
+    }
+  });
+});
+
 const newsletterForms = document.querySelectorAll('[data-newsletter-form]');
 newsletterForms.forEach((form) => {
   const input = form.querySelector('input[name="email"]');

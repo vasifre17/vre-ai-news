@@ -112,38 +112,6 @@
   </div>
   {{ ads.ad_slot("hero", "ADVERTISEMENT") }}
   {% endif %}
-  {% if news_hub_blocks %}
-  <section class="news-hub-section" aria-labelledby="news-hub-title">
-    <div class="section-title news-hub-title-row"><div><p class="eyebrow">{{ ui.get('news_hub_eyebrow', 'Premium xəbər otağı') }}</p><h2 id="news-hub-title">{{ ui.get('news_hub_title', 'Xəbər Mərkəzi') }}</h2></div></div>
-    <div class="news-hub-grid">
-      {% for block in news_hub_blocks %}
-      <section class="news-hub-block glass news-hub-block-{{ block.key }}">
-        <div class="news-hub-block-head">
-          <h3>{{ ui.get(block.label_key, block.fallback) }}</h3>
-          {% if block.category %}<a href="/{{ language }}/?category={{ block.category }}">{{ ui.get('view_all', 'Hamısına bax') }}</a>{% endif %}
-        </div>
-        {% if block.articles %}
-        <div class="news-hub-list">
-          {% for row in block.articles %}
-          <article class="news-hub-item">
-            <a class="news-hub-thumb" href="{{ row.url }}" aria-label="{{ row.title }}">
-              {% if row.image_exists %}{% set hub_srcset = row.article.image_url|image_srcset %}<img src="{{ row.article.image_url|public_image_url }}" {% if hub_srcset %}srcset="{{ hub_srcset }}" sizes="(max-width: 680px) 88px, (max-width: 1024px) 104px, 72px"{% endif %} alt="{{ row.title }}" loading="lazy">{% else %}<div class="image-placeholder compact">VREYC</div>{% endif %}
-            </a>
-            <div class="news-hub-item-copy">
-              <h4><a href="{{ row.url }}">{{ row.title }}</a></h4>
-              <time datetime="{{ row.published_at.isoformat() if row.published_at else '' }}">{{ row.published_at|format_public_published_at }}</time>
-            </div>
-          </article>
-          {% endfor %}
-        </div>
-        {% else %}
-        <p class="news-hub-empty">{{ ui.get('news_hub_empty', 'Bu bölmə üçün yeni xəbərlər tezliklə əlavə olunacaq.') }}</p>
-        {% endif %}
-      </section>
-      {% endfor %}
-    </div>
-  </section>
-  {% endif %}
   <div class="portal-layout">
     <section aria-labelledby="latest-news-title">
       <div class="section-title"><div><p class="eyebrow">{{ ui.get('editorial_flow', 'Live editorial flow') }}</p><h2 id="latest-news-title">{{ ui.latest_news }}</h2></div></div>
@@ -166,8 +134,13 @@
       </div>
     </section>
     <aside class="trending-sidebar premium-sidebar glass" aria-label="{{ ui.get('sidebar_label', 'News sidebar') }}">
-      <section><h2>{{ ui.most_watched }}</h2><div class="trending-list">{% for row in sidebar_articles %}<a href="{{ row.url }}"><div><strong>{{ row.title }}</strong><small>{{ row.category_label }} • {{ row.article.published_at|format_public_published_at }}</small></div></a>{% endfor %}</div></section>
-      <section><h2>{{ ui.get('trending_label', 'Trending') }}</h2><div class="trending-list">{% for row in trending_articles %}<a href="{{ row.url }}"><div><strong>{{ row.title }}</strong><small>{{ row.category_label }} • {{ row.article.published_at|format_public_published_at }}</small></div></a>{% endfor %}</div></section>
+      <section>
+        <h2>{{ ui.most_watched }}</h2>
+        <div class="trending-list sidebar-feed-list" data-sidebar-feed>
+          {% for row in sidebar_articles %}<a href="{{ row.url }}"{% if loop.index > 20 %} hidden{% endif %}><div><strong>{{ row.title }}</strong><small>{{ row.category_label }} • {{ row.article.published_at|format_public_published_at }}</small></div></a>{% endfor %}
+        </div>
+        {% if sidebar_articles|length > 20 %}<button class="sidebar-load-more" type="button" data-sidebar-load-more>{{ ui.get('load_more', 'Daha çox göstər') }}</button>{% endif %}
+      </section>
       <section><h2>{{ ui.get('most_viewed', 'Most viewed') }}</h2><div class="trending-list ranked-list">{% for row in most_viewed_articles %}<a href="{{ row.url }}"><span>{{ loop.index }}</span><div><strong>{{ row.title }}</strong><small>{{ row.view_count }} {{ ui.views_label|lower }} • {{ row.article.published_at|format_public_published_at }}</small></div></a>{% endfor %}</div></section>
     </aside>
   </div>
