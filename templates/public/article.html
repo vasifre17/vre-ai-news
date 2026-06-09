@@ -45,12 +45,6 @@
     <div class="container article-hero-copy">
       <span class="badge article-category-badge">{{ article.category_label }}</span>
       <h1>{{article.title}}</h1>
-      {% if article.summary %}<p>{{article.summary}}</p>{% endif %}
-      <div class="article-hero-meta" aria-label="{{ ui.date_label }}">
-        <span>{{ ui.date_label }}: {{ root_article.published_at|format_published_at }}</span>
-        <span>{{ ui.views_label }}: {{ root_article.real_view_count or 0 }}</span>
-        <span>{{ ui.author_label }}: Vasif REYC</span>
-      </div>
     </div>
   </section>
   <div class="container section page-shell article-shell">
@@ -61,9 +55,8 @@
           {% if image_exists %}{% set article_srcset = root_article.image_url|image_srcset %}<img src="{{root_article.image_url|public_image_url}}" {% if article_srcset %}srcset="{{ article_srcset }}" sizes="(max-width: 1050px) 92vw, 860px"{% endif %} alt="{{article.title}}" loading="eager" fetchpriority="high" decoding="async" itemprop="image">{% else %}<div class="image-placeholder article-image-placeholder">VREYC</div>{% endif %}
         </figure>
         <div class="article-meta-panel" aria-label="Article metadata">
-          <span>{{ ui.date_label }}: {{ root_article.published_at|format_published_at }}</span>
-          <span>{{ ui.views_label }}: {{ root_article.real_view_count or 0 }}</span>
-          <span>{{ ui.source_label }}: Vasif REYC</span>
+          <span>{{ article_published_at|format_article_meta_datetime }} • {{ root_article.real_view_count or 0 }} baxış</span>
+          <span>Dərc edilib: {{ article_published_at|format_article_publish_time }}</span>
         </div>
         <div class="share-row article-share-row article-share-row-top" aria-label="{{ ui.share }}">
           <span class="share-row-title">{{ ui.share }}</span>

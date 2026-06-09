@@ -845,8 +845,35 @@ def render_article_content(value: str | None) -> str:
     return sanitize_article_html(value)
 
 
+AZERBAIJANI_MONTH_NAMES = {
+    1: "Yanvar",
+    2: "Fevral",
+    3: "Mart",
+    4: "Aprel",
+    5: "May",
+    6: "İyun",
+    7: "İyul",
+    8: "Avqust",
+    9: "Sentyabr",
+    10: "Oktyabr",
+    11: "Noyabr",
+    12: "Dekabr",
+}
+
+
 def format_published_at(value):
     return value.strftime("%b %d, %Y") if value else ""
+
+
+def format_article_meta_datetime(value):
+    if not value:
+        return ""
+    month = AZERBAIJANI_MONTH_NAMES.get(value.month, value.strftime("%B"))
+    return f"{value.day:02d} {month} {value.year} • {value:%H:%M}"
+
+
+def format_article_publish_time(value):
+    return value.strftime("%H:%M") if value else ""
 
 
 def format_admin_datetime(value):
@@ -1064,6 +1091,8 @@ def media_asset_article_values(asset: MediaAsset) -> set[str]:
 
 
 templates.env.filters["format_published_at"] = format_published_at
+templates.env.filters["format_article_meta_datetime"] = format_article_meta_datetime
+templates.env.filters["format_article_publish_time"] = format_article_publish_time
 templates.env.filters["format_admin_datetime"] = format_admin_datetime
 templates.env.filters["datetime_local_value"] = datetime_local_value
 templates.env.filters["image_srcset"] = image_srcset
@@ -2552,7 +2581,8 @@ def render_article_page(slug: str, request: Request, language: str = "az", db=De
         build_news_article_schema(article, view, canonical, image_url, settings_map, language),
     ]
     seo_audit = article_seo_audit(article, language)
-    return templates.TemplateResponse("public/article.html", {"request": request, "article": view, "root_article": article, "image_exists": image_exists, "narration": narration, "related_articles": [article_card(a, language, category_labels) for a in related], "trending_articles": [article_card(a, language, category_labels) for a in trending_articles], "most_viewed_articles": [article_card(a, language, category_labels) for a in most_viewed_articles], "categories": navigation["primary"], "secondary_categories": navigation["secondary"], "share_url": canonical, "site_url": settings.site_url, "canonical": canonical, "language": language, "languages": SUPPORTED_LANGUAGES, "alt_links": alt_links, "ui": public_labels(language), "category_labels": category_labels, "settings_map": settings_map, "verification_meta": seo_verification_meta(settings_map), "schema_graph": schema_graph, "seo_audit": seo_audit, "site_name": site_name_from_settings(settings_map), "og_image": image_url, "app_version": APP_VERSION})
+    article_published_at = public_article_datetime(article)
+    return templates.TemplateResponse("public/article.html", {"request": request, "article": view, "root_article": article, "article_published_at": article_published_at, "image_exists": image_exists, "narration": narration, "related_articles": [article_card(a, language, category_labels) for a in related], "trending_articles": [article_card(a, language, category_labels) for a in trending_articles], "most_viewed_articles": [article_card(a, language, category_labels) for a in most_viewed_articles], "categories": navigation["primary"], "secondary_categories": navigation["secondary"], "share_url": canonical, "site_url": settings.site_url, "canonical": canonical, "language": language, "languages": SUPPORTED_LANGUAGES, "alt_links": alt_links, "ui": public_labels(language), "category_labels": category_labels, "settings_map": settings_map, "verification_meta": seo_verification_meta(settings_map), "schema_graph": schema_graph, "seo_audit": seo_audit, "site_name": site_name_from_settings(settings_map), "og_image": image_url, "app_version": APP_VERSION})
 
 
 @app.get("/article/{slug}", response_class=HTMLResponse)
