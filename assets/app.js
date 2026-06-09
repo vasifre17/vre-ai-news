@@ -267,3 +267,43 @@ document.querySelectorAll('[data-youtube-short-embed]').forEach((card) => {
     card.classList.add('is-loaded');
   }, { once: true });
 });
+
+const articleContentAd = document.querySelector('.article-content .ad-zone-content');
+if (articleContentAd) {
+  const articleParagraphs = Array.from(document.querySelectorAll('.article-content > p'));
+  const insertionTarget = articleParagraphs[1] || articleParagraphs[0];
+  if (insertionTarget && insertionTarget.nextSibling !== articleContentAd) {
+    insertionTarget.insertAdjacentElement('afterend', articleContentAd);
+  }
+}
+
+document.querySelectorAll('.js-copy-link').forEach((button) => {
+  const originalLabel = button.dataset.copyLabel || button.textContent || 'Copy link';
+  const successLabel = button.dataset.copySuccess || 'Link copied';
+  button.addEventListener('click', async () => {
+    const url = button.dataset.copyUrl || window.location.href;
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(url);
+      } else {
+        const input = document.createElement('input');
+        input.value = url;
+        input.setAttribute('readonly', 'readonly');
+        input.style.position = 'fixed';
+        input.style.opacity = '0';
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand('copy');
+        input.remove();
+      }
+      button.textContent = successLabel;
+      button.classList.add('is-copied');
+      window.setTimeout(() => {
+        button.textContent = originalLabel;
+        button.classList.remove('is-copied');
+      }, 1800);
+    } catch (error) {
+      window.prompt(originalLabel, url);
+    }
+  });
+});
