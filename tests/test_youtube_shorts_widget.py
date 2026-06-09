@@ -49,3 +49,26 @@ def test_build_youtube_widget_uses_requested_featured_short(monkeypatch):
     assert FEATURED_YOUTUBE_SHORT_ID == "LXh-sCJWvkA"
     assert widget["short"]["video_id"] == FEATURED_YOUTUBE_SHORT_ID
     assert widget["short"]["url"] == "https://www.youtube.com/shorts/LXh-sCJWvkA"
+
+
+def test_build_youtube_widget_prefers_latest_short_from_shorts_tab(monkeypatch):
+    def fake_fetch(url):
+        if url.endswith('/shorts'):
+            return '{"metadata":{"channelId":"UCexample12345"}} <a href="/shorts/NEW111aaa22">Short</a>'
+        raise AssertionError(f"unexpected fetch: {url}")
+
+    monkeypatch.setattr("main.fetch_youtube_text", fake_fetch)
+    monkeypatch.setattr("main.latest_youtube_short_from_api", lambda channel_id: None)
+    widget = build_youtube_shorts_widget()
+
+    assert widget["short"]["video_id"] == "NEW111aaa22"
+    assert widget["short"]["embed_url"] == "https://www.youtube.com/embed/NEW111aaa22?autoplay=1&mute=1&loop=1&playlist=NEW111aaa22&playsinline=1&rel=0"
+
+
+def test_build_youtube_widget_uses_api_short_before_scraped_short(monkeypatch):
+    monkeypatch.setattr("main.fetch_youtube_text", lambda url: '{"metadata":{"channelId":"UCexample12345"}} <a href="/shorts/OLD111aaa22">Short</a>')
+    monkeypatch.setattr("main.latest_youtube_short_from_api", lambda channel_id: "API111aaa22")
+
+    widget = build_youtube_shorts_widget()
+
+    assert widget["short"]["video_id"] == "API111aaa22"

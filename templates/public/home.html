@@ -69,9 +69,8 @@
       <div class="hero-slides">
         {% for slide in slides %}
         <article class="hero-slide{% if loop.first %} is-active{% endif %}" data-hero-slide{% if not loop.first %} hidden{% endif %}>
-          <a class="hero-image" href="{{ slide.url }}" aria-label="{{ slide.title }}">{% if slide.image_exists %}{% set hero_srcset = slide.article.image_url|image_srcset %}<img src="{{ slide.article.image_url|public_image_url }}" {% if hero_srcset %}srcset="{{ hero_srcset }}" sizes="(max-width: 768px) 100vw, (max-width: 1180px) 44vw, 500px"{% endif %} alt="{{ slide.title }}" loading="{{ 'eager' if loop.first else 'lazy' }}">{% else %}<div class="image-placeholder">VREYC</div>{% endif %}</a>
+          <a class="hero-image" href="{{ slide.url }}" aria-label="{{ slide.title }}">{% if slide.image_exists %}{% set hero_srcset = slide.article.image_url|image_srcset %}<img src="{{ slide.article.image_url|public_image_url }}" {% if hero_srcset %}srcset="{{ hero_srcset }}" sizes="(max-width: 900px) 100vw, (max-width: 1180px) 72vw, 860px"{% endif %} alt="{{ slide.title }}" loading="{{ 'eager' if loop.first else 'lazy' }}">{% else %}<div class="image-placeholder">VREYC</div>{% endif %}</a>
           <div class="hero-copy">
-            <span class="eyebrow">{{ ui.top_story }}</span>
             <span class="badge">{{ slide.category_label }}</span>
             <h1 id="{{ 'home-hero-title' if loop.first else 'home-hero-title-' ~ loop.index }}"><a href="{{ slide.url }}">{{ slide.title }}</a></h1>
             <p>{{ slide.summary }}</p>
@@ -84,7 +83,7 @@
       <div class="hero-carousel-controls" aria-label="{{ ui.top_story }} carousel controls">
         <button class="hero-arrow" type="button" data-hero-prev aria-label="Previous featured article">‹</button>
         <div class="hero-dots" role="tablist" aria-label="{{ ui.top_story }}">
-          {% for slide in slides %}<button class="hero-dot{% if loop.first %} is-active{% endif %}" type="button" data-hero-dot="{{ loop.index0 }}" aria-label="Show featured article {{ loop.index }}" aria-selected="{{ 'true' if loop.first else 'false' }}"></button>{% endfor %}
+          {% for slide in slides %}<button class="hero-dot{% if loop.first %} is-active{% endif %}" type="button" data-hero-dot="{{ loop.index0 }}" aria-label="Show featured article {{ loop.index }}" aria-selected="{{ 'true' if loop.first else 'false' }}">{{ loop.index }}</button>{% endfor %}
         </div>
         <button class="hero-arrow" type="button" data-hero-next aria-label="Next featured article">›</button>
       </div>
@@ -108,7 +107,7 @@
         <span class="youtube-play-icon" aria-hidden="true">▶</span>
       </div>
       {% endif %}
-      <a class="youtube-channel-link" href="{{ youtube_widget.channel_url }}" target="_blank" rel="noopener noreferrer">Vasif REYC YouTube</a>
+      <span class="youtube-channel-link" aria-hidden="true">Vasif REYC Shorts</span>
     </aside>
   </div>
   {{ ads.ad_slot("hero", "ADVERTISEMENT") }}
