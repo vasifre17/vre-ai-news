@@ -112,6 +112,38 @@
   </div>
   {{ ads.ad_slot("hero", "ADVERTISEMENT") }}
   {% endif %}
+  {% if news_hub_blocks %}
+  <section class="news-hub-section" aria-labelledby="news-hub-title">
+    <div class="section-title news-hub-title-row"><div><p class="eyebrow">{{ ui.get('news_hub_eyebrow', 'Premium xəbər otağı') }}</p><h2 id="news-hub-title">{{ ui.get('news_hub_title', 'Xəbər Mərkəzi') }}</h2></div></div>
+    <div class="news-hub-grid">
+      {% for block in news_hub_blocks %}
+      <section class="news-hub-block glass news-hub-block-{{ block.key }}">
+        <div class="news-hub-block-head">
+          <h3>{{ ui.get(block.label_key, block.fallback) }}</h3>
+          {% if block.category %}<a href="/{{ language }}/?category={{ block.category }}">{{ ui.get('view_all', 'Hamısına bax') }}</a>{% endif %}
+        </div>
+        {% if block.articles %}
+        <div class="news-hub-list">
+          {% for row in block.articles %}
+          <article class="news-hub-item">
+            <a class="news-hub-thumb" href="{{ row.url }}" aria-label="{{ row.title }}">
+              {% if row.image_exists %}{% set hub_srcset = row.article.image_url|image_srcset %}<img src="{{ row.article.image_url|public_image_url }}" {% if hub_srcset %}srcset="{{ hub_srcset }}" sizes="(max-width: 680px) 88px, (max-width: 1024px) 104px, 72px"{% endif %} alt="{{ row.title }}" loading="lazy">{% else %}<div class="image-placeholder compact">VREYC</div>{% endif %}
+            </a>
+            <div class="news-hub-item-copy">
+              <h4><a href="{{ row.url }}">{{ row.title }}</a></h4>
+              <time datetime="{{ row.published_at.isoformat() if row.published_at else '' }}">{{ row.published_at|format_public_published_at }}</time>
+            </div>
+          </article>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="news-hub-empty">{{ ui.get('news_hub_empty', 'Bu bölmə üçün yeni xəbərlər tezliklə əlavə olunacaq.') }}</p>
+        {% endif %}
+      </section>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
   <div class="portal-layout">
     <section aria-labelledby="latest-news-title">
       <div class="section-title"><div><p class="eyebrow">{{ ui.get('editorial_flow', 'Live editorial flow') }}</p><h2 id="latest-news-title">{{ ui.latest_news }}</h2></div></div>
