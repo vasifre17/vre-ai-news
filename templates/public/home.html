@@ -62,7 +62,7 @@
   </section>
   {% endif %}
   {% if hero %}
-  {% set slides = hero_slides or [hero] %}
+  {% set slides = (hero_slides or [hero])[:5] %}
   {% set youtube_item = youtube_widget.short or youtube_widget.fallback %}
   <div class="hero-feature-row">
     <section class="hero-news hero-premium glass" aria-labelledby="home-hero-title" data-hero-carousel>
@@ -96,14 +96,17 @@
         <h2 id="youtube-latest-title">{{ ui.get('latest_video_label', 'Son Shorts' if language == 'az' else 'Latest Shorts') }}</h2>
       </div>
       {% if youtube_item %}
-      <a class="youtube-short-card" href="{{ youtube_item.url }}" target="_blank" rel="noopener noreferrer" aria-label="{{ ui.get('latest_video_label', 'Son Shorts' if language == 'az' else 'Latest Shorts') }}">
-        <img class="youtube-thumbnail" src="{{ youtube_item.thumbnail }}" alt="{{ ui.get('latest_video_label', 'Son Shorts' if language == 'az' else 'Latest Shorts') }}" loading="lazy">
-        <span class="youtube-play-icon" aria-hidden="true">▶</span>
-      </a>
+      <div class="youtube-short-card youtube-short-embed" data-youtube-short-embed aria-label="{{ ui.get('latest_video_label', 'Son Shorts' if language == 'az' else 'Latest Shorts') }}">
+        <iframe class="youtube-short-iframe" src="{{ youtube_item.embed_url }}" title="{{ ui.get('latest_video_label', 'Son Shorts' if language == 'az' else 'Latest Shorts') }}" loading="lazy" allow="autoplay; encrypted-media; picture-in-picture; web-share" allowfullscreen></iframe>
+        <div class="youtube-embed-fallback" data-youtube-short-fallback>
+          <img class="youtube-thumbnail" src="{{ youtube_item.thumbnail }}" alt="{{ ui.get('latest_video_label', 'Son Shorts' if language == 'az' else 'Latest Shorts') }}" loading="lazy">
+          <span class="youtube-play-icon" aria-hidden="true">▶</span>
+        </div>
+      </div>
       {% else %}
-      <a class="youtube-short-card youtube-fallback-link" href="{{ youtube_widget.channel_url }}" target="_blank" rel="noopener noreferrer" aria-label="{{ ui.get('latest_video_label', 'Son Shorts' if language == 'az' else 'Latest Shorts') }}">
+      <div class="youtube-short-card youtube-embed-fallback youtube-fallback-card" aria-label="{{ ui.get('latest_video_label', 'Son Shorts' if language == 'az' else 'Latest Shorts') }}">
         <span class="youtube-play-icon" aria-hidden="true">▶</span>
-      </a>
+      </div>
       {% endif %}
       <a class="youtube-channel-link" href="{{ youtube_widget.channel_url }}" target="_blank" rel="noopener noreferrer">Vasif REYC YouTube</a>
     </aside>
