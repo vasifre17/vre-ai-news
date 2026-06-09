@@ -436,6 +436,8 @@ IFRAME_WRAPPER_CLASS = "iframe-video-embed"
 YOUTUBE_CHANNEL_URL = "https://www.youtube.com/@vasifreyc"
 FEATURED_YOUTUBE_SHORT_ID = "LXh-sCJWvkA"
 YOUTUBE_SHORTS_PAGE_URL = f"{YOUTUBE_CHANNEL_URL}/shorts"
+YOUTUBE_RSS_URL = "https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
+YOUTUBE_API_BASE_URL = "https://www.googleapis.com/youtube/v3"
 YOUTUBE_CACHE_TTL_SECONDS = 60 * 30
 YOUTUBE_HTTP_TIMEOUT_SECONDS = 4
 YOUTUBE_VIDEO_ID_RE = re.compile(r"^[A-Za-z0-9_-]{11}$")
@@ -512,10 +514,85 @@ def fetch_youtube_text(url: str) -> str:
     return response.text
 
 
+def fetch_youtube_json(url: str, params: dict[str, str | int]) -> dict:
+    response = requests.get(
+        url,
+        params=params,
+        headers={"User-Agent": "VREYC-News/1.0 (+https://vreyc.com)"},
+        timeout=YOUTUBE_HTTP_TIMEOUT_SECONDS,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+def parse_youtube_duration_seconds(duration: str | None) -> int | None:
+    match = re.fullmatch(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?", duration or "")
+    if not match:
+        return None
+    hours, minutes, seconds = (int(part or 0) for part in match.groups())
+    return hours * 3600 + minutes * 60 + seconds
+
+
+def youtube_channel_id_from_api() -> str | None:
+    api_key = (settings.youtube_api_key or "").strip()
+    if not api_key:
+        return None
+    payload = fetch_youtube_json(
+        f"{YOUTUBE_API_BASE_URL}/channels",
+        {"key": api_key, "part": "id", "forHandle": "@vasifreyc"},
+    )
+    for item in payload.get("items", []):
+        channel_id = (item.get("id") or "").strip()
+        if channel_id:
+            return channel_id
+    return None
+
+
+def latest_youtube_short_from_api(channel_id: str | None) -> str | None:
+    api_key = (settings.youtube_api_key or "").strip()
+    if not api_key:
+        return None
+    channel_id = channel_id or youtube_channel_id_from_api()
+    if not channel_id:
+        return None
+    search_payload = fetch_youtube_json(
+        f"{YOUTUBE_API_BASE_URL}/search",
+        {
+            "key": api_key,
+            "part": "id",
+            "channelId": channel_id,
+            "maxResults": 10,
+            "order": "date",
+            "type": "video",
+        },
+    )
+    candidate_ids = unique_youtube_ids([item.get("id", {}).get("videoId", "") for item in search_payload.get("items", [])])
+    if not candidate_ids:
+        return None
+    videos_payload = fetch_youtube_json(
+        f"{YOUTUBE_API_BASE_URL}/videos",
+        {
+            "key": api_key,
+            "part": "contentDetails",
+            "id": ",".join(candidate_ids),
+            "maxResults": 10,
+        },
+    )
+    durations = {
+        item.get("id"): parse_youtube_duration_seconds(item.get("contentDetails", {}).get("duration"))
+        for item in videos_payload.get("items", [])
+    }
+    for video_id in candidate_ids:
+        duration = durations.get(video_id)
+        if duration is not None and duration <= 60:
+            return video_id
+    return None
+
+
 def latest_channel_video_id(channel_id: str | None) -> str | None:
     if not channel_id:
         return None
-    feed_xml = fetch_youtube_text(f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}")
+    feed_xml = fetch_youtube_text(YOUTUBE_RSS_URL.format(channel_id=channel_id))
     root = ElementTree.fromstring(feed_xml)
     namespaces = {"atom": "http://www.w3.org/2005/Atom", "yt": "http://www.youtube.com/xml/schemas/2015"}
     entry = root.find("atom:entry", namespaces)
@@ -526,17 +603,36 @@ def latest_channel_video_id(channel_id: str | None) -> str | None:
 
 
 def build_youtube_shorts_widget() -> dict[str, object]:
-    payload: dict[str, object] = {"channel_url": YOUTUBE_CHANNEL_URL, "short": youtube_video_payload(FEATURED_YOUTUBE_SHORT_ID, short=True), "fallback": None}
-    shorts_html = fetch_youtube_text(YOUTUBE_SHORTS_PAGE_URL)
-    shorts_ids = parse_youtube_shorts_ids(shorts_html)
-    channel_id = parse_youtube_channel_id(shorts_html)
+    fallback_short = youtube_video_payload(FEATURED_YOUTUBE_SHORT_ID, short=True)
+    payload: dict[str, object] = {"channel_url": YOUTUBE_CHANNEL_URL, "short": fallback_short, "fallback": fallback_short}
+    shorts_ids: list[str] = []
+    channel_id = None
+    latest_short_id = None
+
     try:
-        fallback_id = latest_channel_video_id(channel_id)
+        latest_short_id = latest_youtube_short_from_api(channel_id)
     except Exception as exc:
-        logger.warning("Could not refresh Vasif REYC latest channel video fallback: %s", exc)
-        fallback_id = None
-    if fallback_id:
-        payload["fallback"] = youtube_video_payload(fallback_id, short=fallback_id in shorts_ids)
+        logger.warning("Could not refresh Vasif REYC latest Shorts through YouTube API: %s", exc)
+
+    try:
+        shorts_html = fetch_youtube_text(YOUTUBE_SHORTS_PAGE_URL)
+        shorts_ids = parse_youtube_shorts_ids(shorts_html)
+        channel_id = parse_youtube_channel_id(shorts_html)
+    except Exception as exc:
+        logger.warning("Could not refresh Vasif REYC Shorts tab fallback: %s", exc)
+
+    if not latest_short_id and shorts_ids:
+        latest_short_id = shorts_ids[0]
+
+    if not latest_short_id:
+        try:
+            rss_video_id = latest_channel_video_id(channel_id)
+            if rss_video_id and (not shorts_ids or rss_video_id in shorts_ids):
+                latest_short_id = rss_video_id
+        except Exception as exc:
+            logger.warning("Could not refresh Vasif REYC latest channel RSS fallback: %s", exc)
+
+    payload["short"] = youtube_video_payload(latest_short_id, short=True) or fallback_short
     return payload
 
 
@@ -2265,9 +2361,12 @@ def home(request: Request, language: str = "az", q: str = "", category: str = ""
     )
     category_labels = public_category_labels(language)
     article_cards = [article_card(a, language, category_labels) for a in articles]
-    hero = article_cards[0] if article_cards else None
-    featured_cards = [row for row in article_cards if bool(getattr(row["article"], "is_featured", False))]
-    hero_slides = featured_cards if len(featured_cards) > 1 else ([hero] if hero else [])
+    latest_slide_articles = attach_real_view_counts(
+        db,
+        query.order_by(public_article_datetime_expression().desc(), Article.created_at.desc(), Article.id.desc()).limit(5).all(),
+    )
+    hero_slides = [article_card(a, language, category_labels) for a in latest_slide_articles]
+    hero = hero_slides[0] if hero_slides else (article_cards[0] if article_cards else None)
     hero_slide_ids = {row["article"].id for row in hero_slides}
     latest_cards = [row for row in article_cards if row["article"].id not in hero_slide_ids]
     sidebar_query = db.query(Article).options(selectinload(Article.translations)).filter(public_article_visibility_filter())
