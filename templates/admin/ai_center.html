@@ -1,0 +1,130 @@
+{% extends "admin/_base.html" %}
+{% set title = 'AI Publishing Center | VREYC Admin' %}
+{% set heading = 'AI Publishing Center' %}
+{% block content %}
+<section class="dashboard-hero ai-center-hero panel">
+  <div>
+    <p class="eyebrow">Safe AI newsroom control center</p>
+    <h2>AI Publishing Center</h2>
+    <p class="muted">Prepare future automatic news workflows without enabling real AI generation, API calls, or automatic publishing.</p>
+  </div>
+  <div class="dashboard-hero-actions">
+    <a class="btn" href="/admin/translations">AI Translations</a>
+    <button class="btn primary" type="button" disabled>Automation coming soon</button>
+  </div>
+</section>
+
+<section class="stats-grid dashboard-stats dashboard-stat-grid-v2 ai-center-stats" aria-label="AI publishing status cards">
+  <article class="stat-card premium-stat-card accent-blue">
+    <span>AI Status</span>
+    <strong>{{ 'Active' if ai_center_stats.ai_configured else 'Not configured' }}</strong>
+    <small>No API connection is made from this center.</small>
+  </article>
+  <article class="stat-card premium-stat-card">
+    <span>Drafts generated</span>
+    <strong>{{ ai_center_stats.drafts_generated }}</strong>
+    <small>Detected draft items prepared from sources.</small>
+  </article>
+  <article class="stat-card premium-stat-card accent-gold">
+    <span>Waiting review</span>
+    <strong>{{ ai_center_stats.waiting_review }}</strong>
+    <small>Editor approval is required before publishing.</small>
+  </article>
+  <article class="stat-card premium-stat-card accent-green">
+    <span>Published by AI</span>
+    <strong>{{ ai_center_stats.published_by_ai }}</strong>
+    <small>Automatic publishing is disabled.</small>
+  </article>
+  <article class="stat-card premium-stat-card accent-red">
+    <span>Failed tasks</span>
+    <strong>{{ ai_center_stats.failed_tasks }}</strong>
+    <small>Recent AI-related errors in the newsroom log.</small>
+  </article>
+</section>
+
+<section class="ai-center-layout">
+  <article class="panel dashboard-panel premium-dashboard-card ai-workflow-panel">
+    <div class="panel-head">
+      <div>
+        <p class="eyebrow">Editorial workflow</p>
+        <h2>AI workflow preview</h2>
+        <p class="muted">Every step is staged for future automation and remains editor-controlled in this phase.</p>
+      </div>
+      <span class="status-pill warn">Manual review</span>
+    </div>
+    <ol class="ai-workflow-list">
+      {% for step in workflow_steps %}
+      <li>
+        <span class="ai-step-index">{{ loop.index }}</span>
+        <div>
+          <strong>{{ step }}</strong>
+          <small>Coming soon</small>
+        </div>
+      </li>
+      {% endfor %}
+    </ol>
+  </article>
+
+  <article class="panel dashboard-panel premium-dashboard-card ai-safety-panel">
+    <div class="panel-head">
+      <div>
+        <p class="eyebrow">Safety policy</p>
+        <h2>Human approval required</h2>
+      </div>
+      <span class="status-pill ok">Safe mode</span>
+    </div>
+    <div class="ai-safety-note" role="note">
+      <strong>AI-generated articles must be reviewed by an editor before publishing.</strong>
+      <p class="muted">No automatic publishing is active in AI Publishing Center 1.0.</p>
+    </div>
+    <div class="dashboard-status-row">
+      <span>OpenAI API connection</span>
+      <strong class="status-pill neutral">Not connected here</strong>
+    </div>
+    <div class="dashboard-status-row">
+      <span>Automatic publishing</span>
+      <strong class="status-pill warn">Disabled</strong>
+    </div>
+  </article>
+</section>
+
+<section class="panel-grid two ai-center-tools-grid">
+  <article class="panel dashboard-panel premium-dashboard-card ai-source-panel">
+    <div class="panel-head">
+      <div>
+        <p class="eyebrow">Source management</p>
+        <h2>News sources</h2>
+        <p class="muted">Connect source intake later without changing the database schema in this phase.</p>
+      </div>
+    </div>
+    <div class="ai-action-grid">
+      {% for source in source_placeholders %}
+      <button class="ai-placeholder-action" type="button" disabled>
+        <span>{{ source.icon }}</span>
+        <strong>{{ source.label }}</strong>
+        <small>Coming soon</small>
+      </button>
+      {% endfor %}
+    </div>
+  </article>
+
+  <article class="panel dashboard-panel premium-dashboard-card ai-tools-panel">
+    <div class="panel-head">
+      <div>
+        <p class="eyebrow">AI tools</p>
+        <h2>Assistant tools</h2>
+        <p class="muted">Premium editor tools are placeholders until backend AI services are approved.</p>
+      </div>
+    </div>
+    <div class="ai-action-grid">
+      {% for tool in tool_placeholders %}
+      <button class="ai-placeholder-action" type="button" disabled>
+        <span>{{ tool.icon }}</span>
+        <strong>{{ tool.label }}</strong>
+        <small>Coming soon</small>
+      </button>
+      {% endfor %}
+    </div>
+  </article>
+</section>
+{% endblock %}
