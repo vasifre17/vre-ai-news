@@ -32,6 +32,7 @@ class Settings(BaseModel):
     google_analytics_id: str = os.getenv("GOOGLE_ANALYTICS_ID", "G-HHCSL6WB2H")
     adsense_publisher_id: str = os.getenv("ADSENSE_PUBLISHER_ID", "ca-pub-1323022477437742")
     youtube_api_key: str = os.getenv("YOUTUBE_API_KEY", "")
+    youtube_shorts_fallback_video_id: str = os.getenv("YOUTUBE_SHORTS_FALLBACK_VIDEO_ID", "LXh-sCJWvkA")
     # Uploaded article images must live outside the application tree so Docker rebuilds,
     # restarts, and git operations cannot remove them. Keep the public URL prefix stable
     # for existing article records.
