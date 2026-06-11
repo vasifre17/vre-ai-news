@@ -523,7 +523,7 @@ IFRAME_WRAPPER_CLASS = "iframe-video-embed"
 
 
 YOUTUBE_CHANNEL_URL = "https://www.youtube.com/@vasifreyc"
-FEATURED_YOUTUBE_SHORT_ID = "LXh-sCJWvkA"
+FEATURED_YOUTUBE_SHORT_ID = settings.youtube_shorts_fallback_video_id.strip() or "LXh-sCJWvkA"
 YOUTUBE_SHORTS_PAGE_URL = f"{YOUTUBE_CHANNEL_URL}/shorts"
 YOUTUBE_RSS_URL = "https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
 YOUTUBE_API_BASE_URL = "https://www.googleapis.com/youtube/v3"
@@ -678,23 +678,30 @@ def latest_youtube_short_from_api(channel_id: str | None) -> str | None:
     return None
 
 
-def latest_channel_video_id(channel_id: str | None) -> str | None:
+def latest_channel_video_ids(channel_id: str | None) -> list[str]:
     if not channel_id:
-        return None
+        return []
     feed_xml = fetch_youtube_text(YOUTUBE_RSS_URL.format(channel_id=channel_id))
     root = ElementTree.fromstring(feed_xml)
     namespaces = {"atom": "http://www.w3.org/2005/Atom", "yt": "http://www.youtube.com/xml/schemas/2015"}
-    entry = root.find("atom:entry", namespaces)
-    if entry is None:
-        return None
-    video_id = entry.findtext("yt:videoId", default="", namespaces=namespaces).strip()
-    return video_id if YOUTUBE_VIDEO_ID_RE.fullmatch(video_id) else None
+    video_ids = [
+        entry.findtext("yt:videoId", default="", namespaces=namespaces).strip()
+        for entry in root.findall("atom:entry", namespaces)
+    ]
+    return unique_youtube_ids(video_ids)
+
+
+def latest_channel_video_id(channel_id: str | None) -> str | None:
+    video_ids = latest_channel_video_ids(channel_id)
+    return video_ids[0] if video_ids else None
 
 
 def build_youtube_shorts_widget() -> dict[str, object]:
-    fallback_short = youtube_video_payload(FEATURED_YOUTUBE_SHORT_ID, short=True)
+    configured_fallback_id = FEATURED_YOUTUBE_SHORT_ID if YOUTUBE_VIDEO_ID_RE.fullmatch(FEATURED_YOUTUBE_SHORT_ID) else "LXh-sCJWvkA"
+    fallback_short = youtube_video_payload(configured_fallback_id, short=True)
     payload: dict[str, object] = {"channel_url": YOUTUBE_CHANNEL_URL, "short": fallback_short, "fallback": fallback_short}
     shorts_ids: list[str] = []
+    rss_video_ids: list[str] = []
     channel_id = None
     latest_short_id = None
 
@@ -710,16 +717,20 @@ def build_youtube_shorts_widget() -> dict[str, object]:
     except Exception as exc:
         logger.warning("Could not refresh Vasif REYC Shorts tab fallback: %s", exc)
 
+    if not latest_short_id:
+        try:
+            rss_video_ids = latest_channel_video_ids(channel_id)
+        except Exception as exc:
+            logger.warning("Could not refresh Vasif REYC latest channel RSS fallback: %s", exc)
+
+    if not latest_short_id and rss_video_ids and shorts_ids:
+        latest_short_id = next((video_id for video_id in rss_video_ids if video_id in shorts_ids), None)
+
     if not latest_short_id and shorts_ids:
         latest_short_id = shorts_ids[0]
 
-    if not latest_short_id:
-        try:
-            rss_video_id = latest_channel_video_id(channel_id)
-            if rss_video_id and (not shorts_ids or rss_video_id in shorts_ids):
-                latest_short_id = rss_video_id
-        except Exception as exc:
-            logger.warning("Could not refresh Vasif REYC latest channel RSS fallback: %s", exc)
+    if not latest_short_id and rss_video_ids:
+        latest_short_id = rss_video_ids[0]
 
     payload["short"] = youtube_video_payload(latest_short_id, short=True) or fallback_short
     return payload
@@ -740,7 +751,8 @@ def latest_youtube_shorts_widget() -> dict[str, object]:
             ttl = YOUTUBE_CACHE_TTL_SECONDS
         except Exception as exc:
             logger.warning("Could not refresh Vasif REYC YouTube Shorts widget: %s", exc)
-            payload = cache.get("payload") or {"channel_url": YOUTUBE_CHANNEL_URL, "short": youtube_video_payload(FEATURED_YOUTUBE_SHORT_ID, short=True), "fallback": None}
+            fallback_short = youtube_video_payload(FEATURED_YOUTUBE_SHORT_ID, short=True) or youtube_video_payload("LXh-sCJWvkA", short=True)
+            payload = cache.get("payload") or {"channel_url": YOUTUBE_CHANNEL_URL, "short": fallback_short, "fallback": fallback_short}
             ttl = 5 * 60
         app.state.youtube_shorts_cache = {"expires_at": time.monotonic() + ttl, "payload": payload}
         return payload

@@ -72,3 +72,35 @@ def test_build_youtube_widget_uses_api_short_before_scraped_short(monkeypatch):
     widget = build_youtube_shorts_widget()
 
     assert widget["short"]["video_id"] == "API111aaa22"
+
+
+def test_build_youtube_widget_prefers_rss_order_when_it_matches_detected_short(monkeypatch):
+    rss = '''<?xml version="1.0" encoding="UTF-8"?>
+    <feed xmlns="http://www.w3.org/2005/Atom" xmlns:yt="http://www.youtube.com/xml/schemas/2015">
+      <entry><yt:videoId>LONG11aaa22</yt:videoId></entry>
+      <entry><yt:videoId>RSS111aaa22</yt:videoId></entry>
+    </feed>'''
+
+    def fake_fetch(url):
+        if url.endswith('/shorts'):
+            return '{"metadata":{"channelId":"UCexample12345"}} <a href="/shorts/RSS111aaa22">Short</a> <a href="/shorts/TAB111aaa22">Short</a>'
+        if 'feeds/videos.xml' in url:
+            return rss
+        raise AssertionError(f"unexpected fetch: {url}")
+
+    monkeypatch.setattr("main.fetch_youtube_text", fake_fetch)
+    monkeypatch.setattr("main.latest_youtube_short_from_api", lambda channel_id: None)
+
+    widget = build_youtube_shorts_widget()
+
+    assert widget["short"]["video_id"] == "RSS111aaa22"
+
+
+def test_build_youtube_widget_falls_back_to_configured_featured_short(monkeypatch):
+    monkeypatch.setattr("main.fetch_youtube_text", lambda url: "")
+    monkeypatch.setattr("main.latest_youtube_short_from_api", lambda channel_id: None)
+
+    widget = build_youtube_shorts_widget()
+
+    assert widget["short"]["video_id"] == FEATURED_YOUTUBE_SHORT_ID
+
