@@ -50,13 +50,6 @@
   <div class="container section page-shell article-shell">
     <aside class="ad-zone ad-zone-vertical ad-zone-left" role="complementary" aria-label="Advertisement"><span>Reklam yeri</span></aside>
     <div class="article-layout article-detail-layout">
-      <nav class="article-sticky-sharebar" aria-label="{{ ui.share }}">
-        <span>{{ ui.share }}</span>
-        <a class="sharebar-button share-facebook js-native-share" href="https://www.facebook.com/sharer/sharer.php?u={{ share_url|urlencode }}" target="_blank" rel="noopener" data-share-title="{{ article.title|e }}" data-share-text="{{ article.summary|default(article.title, true)|e }}" data-share-url="{{ share_url }}">Facebook</a>
-        <a class="sharebar-button share-whatsapp js-native-share" href="https://api.whatsapp.com/send?text={{ (article.title ~ ' ' ~ share_url)|urlencode }}" target="_blank" rel="noopener" data-share-title="{{ article.title|e }}" data-share-text="{{ article.summary|default(article.title, true)|e }}" data-share-url="{{ share_url }}">WhatsApp</a>
-        <a class="sharebar-button share-telegram js-native-share" href="https://t.me/share/url?url={{ share_url|urlencode }}&text={{ article.title|urlencode }}" target="_blank" rel="noopener" data-share-title="{{ article.title|e }}" data-share-text="{{ article.summary|default(article.title, true)|e }}" data-share-url="{{ share_url }}">Telegram</a>
-        <button class="sharebar-button share-copy js-copy-link" type="button" data-copy-url="{{ share_url }}" data-copy-label="{{ ui.copy_link }}" data-copy-success="{{ ui.copy_success }}">{{ ui.copy_link }}</button>
-      </nav>
       <article class="glass article premium-article-card" itemscope itemtype="https://schema.org/NewsArticle">
         <figure class="article-image-frame">
           {% if image_exists %}{% set article_srcset = root_article.image_url|image_srcset %}<img src="{{root_article.image_url|public_image_url}}" {% if article_srcset %}srcset="{{ article_srcset }}" sizes="(max-width: 1050px) 92vw, 860px"{% endif %} alt="{{article.title}}" loading="eager" fetchpriority="high" decoding="async" itemprop="image">{% else %}<div class="image-placeholder article-image-placeholder">VREYC</div>{% endif %}
