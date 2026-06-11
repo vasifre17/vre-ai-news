@@ -2874,6 +2874,49 @@ def admin_dashboard(request: Request, db=Depends(get_db), _=Depends(require_auth
     return templates.TemplateResponse('admin/dashboard.html', {'request': request, 'drafts': drafts, 'published': published, 'scheduled': scheduled, 'next_scheduled_article': next_scheduled_article, 'total_articles': total_articles, 'categories': categories, 'media_count': media_count, 'logs': logs, 'recent_articles': latest_articles, 'latest_articles': latest_articles, 'most_viewed_articles': most_viewed_articles, 'analytics': analytics, 'dashboard_status': dashboard_status, 'top_categories': top_category_rows(db), 'traffic_charts': traffic_charts(db), "languages": SUPPORTED_LANGUAGES, "ai_translation_status": ai_translation_status()})
 
 
+@app.get('/admin/ai-center', response_class=HTMLResponse)
+def admin_ai_center(request: Request, db=Depends(get_db), _=Depends(require_auth)):
+    source_drafts = db.query(Article).filter(Article.status == 'draft', Article.source_url.isnot(None)).count()
+    waiting_review = db.query(Article).filter(Article.status == 'draft').count()
+    failed_tasks = db.query(FetchLog).filter(FetchLog.level == "ERROR", FetchLog.message.ilike("%AI%")).count()
+    ai_center_stats = {
+        "ai_configured": is_ai_translation_configured(),
+        "drafts_generated": source_drafts,
+        "waiting_review": waiting_review,
+        "published_by_ai": 0,
+        "failed_tasks": failed_tasks,
+    }
+    workflow_steps = [
+        "Check news sources",
+        "Translate the article",
+        "Customize the text",
+        "Prepare SEO title",
+        "Suggest an image",
+        "Add to draft",
+        "Wait for editor approval",
+    ]
+    source_placeholders = [
+        {"label": "Add RSS source", "icon": "RSS"},
+        {"label": "Add website source", "icon": "WWW"},
+        {"label": "Add YouTube source", "icon": "YT"},
+        {"label": "Add Telegram source", "icon": "TG"},
+    ]
+    tool_placeholders = [
+        {"label": "Rewrite article", "icon": "RW"},
+        {"label": "Translate article", "icon": "TR"},
+        {"label": "Generate SEO meta", "icon": "SEO"},
+        {"label": "Generate social post", "icon": "SOC"},
+        {"label": "Suggest image prompt", "icon": "IMG"},
+    ]
+    return templates.TemplateResponse('admin/ai_center.html', {
+        'request': request,
+        'ai_center_stats': ai_center_stats,
+        'workflow_steps': workflow_steps,
+        'source_placeholders': source_placeholders,
+        'tool_placeholders': tool_placeholders,
+    })
+
+
 @app.get('/admin/articles', response_class=HTMLResponse)
 def admin_articles(
     request: Request,
