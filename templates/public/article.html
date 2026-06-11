@@ -50,12 +50,20 @@
   <div class="container section page-shell article-shell">
     <aside class="ad-zone ad-zone-vertical ad-zone-left" role="complementary" aria-label="Advertisement"><span>Reklam yeri</span></aside>
     <div class="article-layout article-detail-layout">
+      <nav class="article-sticky-sharebar" aria-label="{{ ui.share }}">
+        <span>{{ ui.share }}</span>
+        <a class="sharebar-button share-facebook js-native-share" href="https://www.facebook.com/sharer/sharer.php?u={{ share_url|urlencode }}" target="_blank" rel="noopener" data-share-title="{{ article.title|e }}" data-share-text="{{ article.summary|default(article.title, true)|e }}" data-share-url="{{ share_url }}">Facebook</a>
+        <a class="sharebar-button share-whatsapp js-native-share" href="https://api.whatsapp.com/send?text={{ (article.title ~ ' ' ~ share_url)|urlencode }}" target="_blank" rel="noopener" data-share-title="{{ article.title|e }}" data-share-text="{{ article.summary|default(article.title, true)|e }}" data-share-url="{{ share_url }}">WhatsApp</a>
+        <a class="sharebar-button share-telegram js-native-share" href="https://t.me/share/url?url={{ share_url|urlencode }}&text={{ article.title|urlencode }}" target="_blank" rel="noopener" data-share-title="{{ article.title|e }}" data-share-text="{{ article.summary|default(article.title, true)|e }}" data-share-url="{{ share_url }}">Telegram</a>
+        <button class="sharebar-button share-copy js-copy-link" type="button" data-copy-url="{{ share_url }}" data-copy-label="{{ ui.copy_link }}" data-copy-success="{{ ui.copy_success }}">{{ ui.copy_link }}</button>
+      </nav>
       <article class="glass article premium-article-card" itemscope itemtype="https://schema.org/NewsArticle">
         <figure class="article-image-frame">
           {% if image_exists %}{% set article_srcset = root_article.image_url|image_srcset %}<img src="{{root_article.image_url|public_image_url}}" {% if article_srcset %}srcset="{{ article_srcset }}" sizes="(max-width: 1050px) 92vw, 860px"{% endif %} alt="{{article.title}}" loading="eager" fetchpriority="high" decoding="async" itemprop="image">{% else %}<div class="image-placeholder article-image-placeholder">VREYC</div>{% endif %}
         </figure>
         <div class="article-meta-panel" aria-label="Article metadata">
           <span>{{ article_published_at|format_article_meta_datetime }} • {{ root_article.real_view_count or 0 }} baxış</span>
+          <span>{{ ui.reading_time_prefix }}: {{ reading_time_minutes }} {{ ui.reading_time_minute }}</span>
         </div>
         <div class="share-row article-share-row article-share-row-top" aria-label="{{ ui.share }}">
           <span class="share-row-title">{{ ui.share }}</span>
@@ -68,6 +76,25 @@
         <div class="ad-zone ad-zone-article" role="complementary" aria-label="Advertisement"><span>Reklam yeri</span></div>
         <section class="glass audio-news" data-audio-ready="{{ '1' if narration and narration.status == 'ready' else '0' }}"><h3>{{ ui.audio_narration }}</h3>{% if narration and narration.status == 'ready' and narration.audio_path %}<audio id="narration" preload="none" src="{{narration.audio_path}}"></audio><div class="audio-controls"><button class="btn" id="playBtn" type="button">{{ ui.play }}</button><button class="btn" id="pauseBtn" type="button">{{ ui.pause }}</button><input id="seek" type="range" value="0" min="0" step="1"><span id="time">0:00 / 0:00</span><select id="speed"><option>1</option><option>1.25</option><option>1.5</option><option>1.75</option><option>2</option></select>{% if narration.allow_download %}<a class="btn" href="{{narration.audio_path}}" download>{{ ui.download }}</a>{% endif %}</div>{% else %}<p>{{ ui.narration_pending }}</p>{% endif %}</section>
         <div class="article-content" itemprop="articleBody">{{ article.content_html|safe }}<div class="ad-zone ad-zone-content" role="complementary" aria-label="Advertisement"><span>Reklam yeri</span></div></div>
+        <section class="article-engagement-panel glass" aria-labelledby="article-reaction-title">
+          <div class="reader-reaction-block">
+            <h2 id="article-reaction-title">{{ ui.reader_reaction_title }}</h2>
+            <div class="reaction-button-row" aria-label="{{ ui.reader_reaction_title }}">
+              <button class="reaction-button" type="button">{{ ui.reaction_interesting }}</button>
+              <button class="reaction-button" type="button">{{ ui.reaction_important }}</button>
+              <button class="reaction-button" type="button">{{ ui.reaction_surprising }}</button>
+              <button class="reaction-button" type="button">{{ ui.reaction_useful }}</button>
+            </div>
+          </div>
+          <div class="article-like-actions" aria-label="Like or dislike">
+            <button class="like-button" type="button">{{ ui.like_label }}</button>
+            <button class="like-button dislike-button" type="button">{{ ui.dislike_label }}</button>
+          </div>
+        </section>
+        <section class="article-comments-placeholder glass" aria-labelledby="article-comments-title">
+          <h2 id="article-comments-title">{{ ui.comments_label }}</h2>
+          <p>{{ ui.comments_coming_soon }}</p>
+        </section>
         <section class="newsletter-card article-newsletter glass" aria-labelledby="article-newsletter-title">
           <div><p class="eyebrow">{{ ui.newsletter_label }}</p><h2 id="article-newsletter-title">{{ ui.newsletter_headline }}</h2><p>{{ ui.newsletter_text }}</p></div>
           <form class="newsletter-form" data-newsletter-form action="/{{ language }}/newsletter/subscribe" method="post" data-success="{{ ui.newsletter_success }}" data-invalid="{{ ui.newsletter_invalid }}" data-error="{{ ui.newsletter_error }}"><input name="email" type="email" placeholder="{{ ui.email }}" aria-label="{{ ui.email }}" autocomplete="email" required><button type="submit">{{ ui.subscribe_label }}</button><p class="newsletter-message" data-newsletter-message role="status" aria-live="polite"></p></form>

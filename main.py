@@ -132,6 +132,17 @@ PUBLIC_LABELS = {
         "date_label": "Tarix",
         "views_label": "Baxış",
         "related": "Oxşar xəbərlər",
+        "reading_time_prefix": "Oxuma müddəti",
+        "reading_time_minute": "dəqiqə",
+        "reader_reaction_title": "Bu xəbər sizə necə təsir etdi?",
+        "reaction_interesting": "Maraqlıdır",
+        "reaction_important": "Vacibdir",
+        "reaction_surprising": "Təəccüblü",
+        "reaction_useful": "Faydalıdır",
+        "like_label": "Like",
+        "dislike_label": "Dislike",
+        "comments_label": "Şərhlər",
+        "comments_coming_soon": "Şərh sistemi tezliklə aktiv olacaq.",
         "more_stories": "Daha çox xəbər",
         "search": "Axtar",
         "search_placeholder": "Axtar",
@@ -177,7 +188,18 @@ PUBLIC_LABELS = {
         "newsletter_error": "Subscription could not be saved. Please try again.",
         "date_label": "Date",
         "views_label": "Views",
-        "related": "Related",
+        "related": "Related articles",
+        "reading_time_prefix": "Reading time",
+        "reading_time_minute": "min",
+        "reader_reaction_title": "How did this news feel?",
+        "reaction_interesting": "Maraqlıdır",
+        "reaction_important": "Vacibdir",
+        "reaction_surprising": "Təəccüblü",
+        "reaction_useful": "Faydalıdır",
+        "like_label": "Like",
+        "dislike_label": "Dislike",
+        "comments_label": "Comments",
+        "comments_coming_soon": "Comment system will be active soon.",
         "more_stories": "More stories",
         "search": "Search",
         "search_placeholder": "Search",
@@ -426,6 +448,13 @@ PUBLIC_LABELS["en"].update({
     "news_hub_sports": "Sports",
     "news_hub_empty": "Fresh stories for this section will appear soon.",
 })
+
+def estimate_reading_time_minutes(content: str | None) -> int:
+    """Estimate article reading time using a conservative news-reading pace."""
+    text = BeautifulSoup(content or "", "html.parser").get_text(" ")
+    word_count = len(re.findall(r"\w+", text, flags=re.UNICODE))
+    return max(1, (word_count + 199) // 200)
+
 
 def public_labels(language: str) -> dict[str, str]:
     labels = dict(PUBLIC_LABELS["en"])
@@ -2597,9 +2626,9 @@ def render_article_page(slug: str, request: Request, language: str = "az", db=De
     view = localized_article_view(article, language)
     narration = db.query(ArticleNarration).filter(ArticleNarration.article_id == article.id, ArticleNarration.language == language).first()
     alt_links = article_hreflang_links(article)
-    related = db.query(Article).options(selectinload(Article.translations)).filter(public_article_visibility_filter(), Article.id != article.id, Article.category == article.category).order_by(public_article_datetime_expression().desc(), Article.created_at.desc()).limit(3).all()
-    if len(related) < 3:
-        related = related + db.query(Article).options(selectinload(Article.translations)).filter(public_article_visibility_filter(), Article.id != article.id, Article.category != article.category).order_by(public_article_datetime_expression().desc(), Article.created_at.desc()).limit(3 - len(related)).all()
+    related = db.query(Article).options(selectinload(Article.translations)).filter(public_article_visibility_filter(), Article.id != article.id, Article.category == article.category).order_by(public_article_datetime_expression().desc(), Article.created_at.desc()).limit(4).all()
+    if len(related) < 4:
+        related = related + db.query(Article).options(selectinload(Article.translations)).filter(public_article_visibility_filter(), Article.id != article.id, Article.category != article.category).order_by(public_article_datetime_expression().desc(), Article.created_at.desc()).limit(4 - len(related)).all()
     related = attach_real_view_counts(db, related)
     sidebar_base = db.query(Article).options(selectinload(Article.translations)).filter(public_article_visibility_filter(), Article.id != article.id)
     trending_articles = attach_real_view_counts(
@@ -2629,7 +2658,8 @@ def render_article_page(slug: str, request: Request, language: str = "az", db=De
     ]
     seo_audit = article_seo_audit(article, language)
     article_published_at = public_article_datetime(article)
-    return templates.TemplateResponse("public/article.html", {"request": request, "article": view, "root_article": article, "article_published_at": article_published_at, "image_exists": image_exists, "narration": narration, "related_articles": [article_card(a, language, category_labels) for a in related], "trending_articles": [article_card(a, language, category_labels) for a in trending_articles], "most_viewed_articles": [article_card(a, language, category_labels) for a in most_viewed_articles], "categories": navigation["primary"], "secondary_categories": navigation["secondary"], "share_url": canonical, "site_url": settings.site_url, "canonical": canonical, "language": language, "languages": SUPPORTED_LANGUAGES, "alt_links": alt_links, "ui": public_labels(language), "category_labels": category_labels, "settings_map": settings_map, "verification_meta": seo_verification_meta(settings_map), "schema_graph": schema_graph, "seo_audit": seo_audit, "site_name": site_name_from_settings(settings_map), "og_image": image_url, "app_version": APP_VERSION})
+    reading_time_minutes = estimate_reading_time_minutes(view.content)
+    return templates.TemplateResponse("public/article.html", {"request": request, "article": view, "root_article": article, "article_published_at": article_published_at, "reading_time_minutes": reading_time_minutes, "image_exists": image_exists, "narration": narration, "related_articles": [article_card(a, language, category_labels) for a in related], "trending_articles": [article_card(a, language, category_labels) for a in trending_articles], "most_viewed_articles": [article_card(a, language, category_labels) for a in most_viewed_articles], "categories": navigation["primary"], "secondary_categories": navigation["secondary"], "share_url": canonical, "site_url": settings.site_url, "canonical": canonical, "language": language, "languages": SUPPORTED_LANGUAGES, "alt_links": alt_links, "ui": public_labels(language), "category_labels": category_labels, "settings_map": settings_map, "verification_meta": seo_verification_meta(settings_map), "schema_graph": schema_graph, "seo_audit": seo_audit, "site_name": site_name_from_settings(settings_map), "og_image": image_url, "app_version": APP_VERSION})
 
 
 @app.get("/article/{slug}", response_class=HTMLResponse)
