@@ -13,7 +13,8 @@ os.environ.setdefault("IMAGE_UPLOAD_DIR", tempfile.mkdtemp(prefix="vre-test-uplo
 
 from sqlalchemy.exc import IntegrityError
 
-from ai.translation_service import get_or_create_translation
+import ai.translation_service as translation_service
+from ai.translation_service import enqueue_missing_translations, get_or_create_translation
 from database.models import Article, ArticleTranslation
 from database.session import SessionLocal, init_db
 
@@ -95,3 +96,28 @@ def test_get_or_create_translation_recovers_existing_row_after_integrity_error()
     assert db.rolled_back is True
     assert len(db.added) == 1
     assert db.first_calls == 2
+
+
+def test_enqueue_missing_translations_recovers_existing_row_after_duplicate_integrity_error(monkeypatch):
+    prepare_translation_service_test()
+    db = SessionLocal()
+    try:
+        article = Article(title="Queue duplicate news", slug="queue-duplicate-news", status="published")
+        db.add(article)
+        db.flush()
+        existing = ArticleTranslation(article_id=article.id, language="en", status="pending")
+        db.add(existing)
+        db.commit()
+
+        def raise_duplicate(_db, _article, _language):
+            raise IntegrityError("INSERT", {}, Exception("duplicate key"))
+
+        monkeypatch.setattr(translation_service, "missing_translation_languages", lambda _article: ["en"])
+        monkeypatch.setattr(translation_service, "get_or_create_translation", raise_duplicate)
+
+        queued = enqueue_missing_translations(db, article)
+
+        assert queued == ["en"]
+        assert db.query(ArticleTranslation).filter(ArticleTranslation.article_id == article.id, ArticleTranslation.language == "en").count() == 1
+    finally:
+        db.close()

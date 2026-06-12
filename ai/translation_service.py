@@ -77,27 +77,33 @@ def unique_translation_slug(db, language: str, requested_slug: str, current_tran
         suffix += 1
 
 
+def find_translation(db, article_id: int, language: str) -> ArticleTranslation | None:
+    return db.query(ArticleTranslation).filter(ArticleTranslation.article_id == article_id, ArticleTranslation.language == language).first()
+
+
 def get_or_create_translation(db, article: Article, language: str) -> ArticleTranslation:
     language = (language or "").lower()
+    article_id = article.id
+
     for pending in db.new:
         if (
             isinstance(pending, ArticleTranslation)
-            and (pending.article_id == article.id or getattr(pending, "article", None) is article)
+            and (pending.article_id == article_id or getattr(pending, "article", None) is article)
             and (pending.language or "").lower() == language
         ):
             return pending
 
-    row = db.query(ArticleTranslation).filter(ArticleTranslation.article_id == article.id, ArticleTranslation.language == language).first()
+    row = find_translation(db, article_id, language)
     if row:
         return row
 
-    row = ArticleTranslation(article_id=article.id, language=language, status="pending")
+    row = ArticleTranslation(article_id=article_id, language=language, status="pending")
     db.add(row)
     try:
         db.flush()
     except IntegrityError:
         db.rollback()
-        row = db.query(ArticleTranslation).filter(ArticleTranslation.article_id == article.id, ArticleTranslation.language == language).first()
+        row = find_translation(db, article_id, language)
         if row:
             return row
         raise
@@ -118,8 +124,15 @@ def queue_translation_narration(db, article: Article, language: str) -> None:
 
 def enqueue_missing_translations(db, article: Article) -> list[str]:
     queued: list[str] = []
+    article_id = article.id
     for language in missing_translation_languages(article):
-        row = get_or_create_translation(db, article, language)
+        try:
+            row = get_or_create_translation(db, article, language)
+        except IntegrityError:
+            db.rollback()
+            row = find_translation(db, article_id, language)
+            if not row:
+                raise
         if not translation_has_content(row):
             row.status = "pending"
             row.error_message = None
