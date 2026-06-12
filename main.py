@@ -3327,7 +3327,9 @@ async def create_article(request: Request, db=Depends(get_db), _=Depends(require
     if article.status == 'published':
         touch_sitemap_refresh(db)
     if article.status == 'published':
-        enqueue_missing_translations(db, article)
+        # Temporarily disabled to test article creation without AI translation queue
+        # enqueue_missing_translations(db, article)
+        pass
     db.commit()
     return RedirectResponse('/admin/articles', status_code=302)
 
