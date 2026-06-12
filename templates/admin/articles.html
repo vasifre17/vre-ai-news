@@ -97,6 +97,8 @@
         <option value="ai_translate_missing" {{ 'disabled' if not ai_translation_status.configured else '' }}>Translate Missing Languages</option>
         <option value="ai_generate_tags" {{ 'disabled' if not ai_translation_status.configured else '' }}>Generate Tags</option>
         <option value="ai_generate_summary" {{ 'disabled' if not ai_translation_status.configured else '' }}>Generate Summary</option>
+        <option value="ai_generate_social" {{ 'disabled' if not ai_translation_status.configured else '' }}>Generate Social Share</option>
+        <option value="ai_rewrite_title" {{ 'disabled' if not ai_translation_status.configured else '' }}>Rewrite Title</option>
       </select>
       <select name="bulk_category" id="bulkCategory" aria-label="Bulk category">
         <option value="">Choose category for category change</option>

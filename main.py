@@ -2359,21 +2359,42 @@ def article_form_context(db, article: Article | None = None) -> dict:
 
 
 
-def apply_ai_seo_pack(db, article: Article) -> dict:
-    runtime = openai_runtime_settings()
-    if not runtime["configured"] or not runtime["seo_enabled"]:
-        db.add(FetchLog(level="WARNING", message="AI SEO provider is not configured or SEO is disabled."))
-        db.commit()
-        return {"configured": False, "message": "AI SEO provider is not configured or SEO is disabled."}
-    engine = AIEngine()
-    payload = engine.generate_seo_pack({
+def article_ai_payload(article: Article) -> dict[str, str]:
+    return {
         "title": article.title or "",
         "summary": article.summary or "",
         "content": article.content or "",
         "seo_title": article.seo_title or "",
         "meta_description": article.meta_description or "",
+        "focus_keywords": article.focus_keywords or "",
+        "google_news_description": article.google_news_description or "",
+        "image_alt_text": article.image_alt_text or "",
+        "facebook_share_text": article.facebook_share_text or "",
+        "telegram_share_text": article.telegram_share_text or "",
+        "x_share_text": article.x_share_text or "",
         "tags": article.tags or "",
-    }, article.language or "az")
+        "category": article.category or "",
+    }
+
+
+def _ai_runtime_ready(db, feature: str = "seo") -> dict:
+    runtime = openai_runtime_settings()
+    enabled_key = "translation_enabled" if feature == "translation" else "seo_enabled"
+    ready = bool(runtime["configured"] and runtime.get(enabled_key, True))
+    if not ready:
+        message = f"AI {feature} provider is not configured or {feature} is disabled."
+        db.add(FetchLog(level="WARNING", message=message))
+        db.commit()
+        return {"configured": False, "message": message}
+    return {"configured": True, "message": "AI provider ready."}
+
+
+def apply_ai_seo_pack(db, article: Article) -> dict:
+    ready = _ai_runtime_ready(db, "seo")
+    if not ready["configured"]:
+        return ready
+    engine = AIEngine()
+    payload = engine.generate_seo_pack(article_ai_payload(article), article.language or "az")
     article.seo_title = payload.get("seo_title") or article.seo_title or article.title
     article.meta_description = payload.get("meta_description") or article.meta_description
     article.focus_keywords = payload.get("focus_keywords") or article.focus_keywords or article.tags
@@ -2387,6 +2408,77 @@ def apply_ai_seo_pack(db, article: Article) -> dict:
     db.add(FetchLog(level="INFO", message=f"AI SEO generated for article {article.id}."))
     db.commit()
     return {"configured": True, "message": "AI SEO generated."}
+
+
+def apply_ai_title_rewrite(db, article: Article) -> dict:
+    ready = _ai_runtime_ready(db, "seo")
+    if not ready["configured"]:
+        return ready
+    payload = AIEngine().rewrite_title(article_ai_payload(article), article.language or "az")
+    article.title = payload.get("title") or article.title
+    article.seo_title = payload.get("seo_title") or article.seo_title or article.title
+    article.slug = unique_article_slug(db, article.title or f"article-{article.id}", article.id)
+    article.updated_at = datetime.utcnow()
+    db.add(FetchLog(level="INFO", message=f"AI title rewritten for article {article.id}."))
+    db.commit()
+    return {"configured": True, "message": "AI title rewritten."}
+
+
+def apply_ai_article_rewrite(db, article: Article) -> dict:
+    ready = _ai_runtime_ready(db, "seo")
+    if not ready["configured"]:
+        return ready
+    payload = AIEngine().rewrite_article(article_ai_payload(article), article.language or "az")
+    article.title = payload.get("title") or article.title
+    article.summary = payload.get("summary") or article.summary
+    article.content = payload.get("content") or article.content
+    article.seo_title = payload.get("seo_title") or article.seo_title or article.title
+    article.tags = payload.get("tags") or article.tags
+    article.category = payload.get("category") or article.category
+    article.slug = unique_article_slug(db, article.title or f"article-{article.id}", article.id)
+    article.updated_at = datetime.utcnow()
+    db.add(FetchLog(level="INFO", message=f"AI article rewritten for article {article.id}."))
+    db.commit()
+    return {"configured": True, "message": "AI article rewritten."}
+
+
+def apply_ai_social_pack(db, article: Article) -> dict:
+    ready = _ai_runtime_ready(db, "seo")
+    if not ready["configured"]:
+        return ready
+    payload = AIEngine().generate_social_share_pack(article_ai_payload(article), article.language or "az")
+    article.facebook_share_text = payload.get("facebook_share_text") or article.facebook_share_text
+    article.telegram_share_text = payload.get("telegram_share_text") or article.telegram_share_text
+    article.x_share_text = payload.get("x_share_text") or article.x_share_text
+    article.updated_at = datetime.utcnow()
+    db.add(FetchLog(level="INFO", message=f"AI social share texts generated for article {article.id}."))
+    db.commit()
+    return {"configured": True, "message": "AI social share texts generated."}
+
+
+def apply_ai_summary(db, article: Article) -> dict:
+    ready = _ai_runtime_ready(db, "seo")
+    if not ready["configured"]:
+        return ready
+    payload = AIEngine().generate_summary(article_ai_payload(article), article.language or "az")
+    article.summary = payload.get("summary") or article.summary
+    article.updated_at = datetime.utcnow()
+    db.add(FetchLog(level="INFO", message=f"AI summary generated for article {article.id}."))
+    db.commit()
+    return {"configured": True, "message": "AI summary generated."}
+
+
+def apply_ai_tags(db, article: Article) -> dict:
+    ready = _ai_runtime_ready(db, "seo")
+    if not ready["configured"]:
+        return ready
+    payload = AIEngine().generate_tags(article_ai_payload(article), article.language or "az")
+    article.tags = payload.get("tags") or article.tags
+    article.focus_keywords = article.focus_keywords or article.tags
+    article.updated_at = datetime.utcnow()
+    db.add(FetchLog(level="INFO", message=f"AI tags generated for article {article.id}."))
+    db.commit()
+    return {"configured": True, "message": "AI tags generated."}
 
 
 def validate_image_references(db) -> list[str]:
@@ -2947,6 +3039,7 @@ def admin_ai_center(request: Request, db=Depends(get_db), _=Depends(require_auth
     recent_ai_logs = db.query(FetchLog).filter(FetchLog.message.ilike("%AI%") | FetchLog.message.ilike("%translation%") | FetchLog.message.ilike("%SEO%")).order_by(FetchLog.created_at.desc()).limit(8).all()
     recent_ai_errors = db.query(FetchLog).filter(FetchLog.level == "ERROR", (FetchLog.message.ilike("%AI%") | FetchLog.message.ilike("%translation%") | FetchLog.message.ilike("%SEO%"))).order_by(FetchLog.created_at.desc()).limit(5).all()
     runtime = openai_runtime_settings()
+    ai_action_articles = db.query(Article).order_by(Article.updated_at.desc(), Article.created_at.desc()).limit(50).all()
     ai_center_stats = {
         "ai_configured": runtime["configured"],
         "api_status": "Active" if runtime["configured"] else "Not configured",
@@ -2967,10 +3060,10 @@ def admin_ai_center(request: Request, db=Depends(get_db), _=Depends(require_auth
         "Wait for editor approval",
     ]
     source_placeholders = [
-        {"label": "Add RSS source", "icon": "RSS"},
-        {"label": "Add website source", "icon": "WWW"},
-        {"label": "Add YouTube source", "icon": "YT"},
-        {"label": "Add Telegram source", "icon": "TG"},
+        {"label": "Open RSS feed", "icon": "RSS", "href": "/rss.xml"},
+        {"label": "Create web article", "icon": "WWW", "href": "/admin/articles/new"},
+        {"label": "Configure YouTube", "icon": "YT", "href": "/admin/settings"},
+        {"label": "Configure Telegram", "icon": "TG", "href": "/admin/settings"},
     ]
     tool_placeholders = [
         {"label": "Rewrite article", "icon": "RW"},
@@ -2987,7 +3080,41 @@ def admin_ai_center(request: Request, db=Depends(get_db), _=Depends(require_auth
         'tool_placeholders': tool_placeholders,
         'recent_ai_logs': recent_ai_logs,
         'recent_ai_errors': recent_ai_errors,
+        'ai_action_articles': ai_action_articles,
     })
+
+
+
+
+@app.post('/admin/ai-center/run')
+async def admin_ai_center_run(request: Request, db=Depends(get_db), _=Depends(require_auth)):
+    form = await request.form()
+    action = (form.get('ai_action') or '').strip()
+    article_id = form.get('article_id')
+    article = db.query(Article).get(int(article_id)) if str(article_id).isdigit() else None
+    if not article:
+        return RedirectResponse('/admin/ai-center?error=missing_article', status_code=302)
+    if action == 'translate':
+        if not is_ai_translation_configured():
+            db.add(FetchLog(level="WARNING", message=AI_TRANSLATION_WARNING))
+            db.commit()
+            return RedirectResponse('/admin/ai-center?warning=ai_not_configured', status_code=302)
+        scheduler.add_job(generate_missing_translations, args=[article.id], id=f"ai_center_translation_{article.id}_{datetime.utcnow().timestamp()}", replace_existing=False)
+        return RedirectResponse('/admin/ai-center?queued=translation', status_code=302)
+    action_map = {
+        'rewrite_article': apply_ai_article_rewrite,
+        'rewrite_title': apply_ai_title_rewrite,
+        'generate_seo': apply_ai_seo_pack,
+        'generate_social': apply_ai_social_pack,
+        'generate_summary': apply_ai_summary,
+        'generate_tags': apply_ai_tags,
+    }
+    handler = action_map.get(action)
+    if not handler:
+        return RedirectResponse('/admin/ai-center?error=bad_action', status_code=302)
+    result = handler(db, article)
+    status = 'done' if result.get('configured') else 'ai_not_configured'
+    return RedirectResponse(f'/admin/ai-center?action={action}&status={status}', status_code=302)
 
 
 @app.get('/admin/articles', response_class=HTMLResponse)
@@ -3102,6 +3229,16 @@ async def bulk_articles(request: Request, db=Depends(get_db), _=Depends(require_
         for article in articles:
             if action == 'ai_translate_missing':
                 scheduler.add_job(generate_missing_translations, args=[article.id], id=f"bulk_article_translation_{article.id}_{datetime.utcnow().timestamp()}", replace_existing=False)
+            elif action in {'ai_generate_meta', 'ai_fix_seo'}:
+                apply_ai_seo_pack(db, article)
+            elif action == 'ai_generate_tags':
+                apply_ai_tags(db, article)
+            elif action == 'ai_generate_summary':
+                apply_ai_summary(db, article)
+            elif action == 'ai_rewrite_title':
+                apply_ai_title_rewrite(db, article)
+            elif action == 'ai_generate_social':
+                apply_ai_social_pack(db, article)
             else:
                 db.add(FetchLog(level="INFO", message=f"AI bulk action {action} requested for article {article.id}."))
     db.commit()
@@ -3324,6 +3461,36 @@ def admin_generate_article_seo(article_id: int, request: Request, db=Depends(get
     result = apply_ai_seo_pack(db, article)
     status = 'generated' if result.get('configured') else 'ai_not_configured'
     return RedirectResponse(f'/admin/articles/{article_id}/edit?seo={status}', status_code=302)
+
+
+
+
+@app.post('/admin/articles/{article_id}/ai/{action}')
+def admin_article_ai_action(article_id: int, action: str, request: Request, db=Depends(get_db), _=Depends(require_auth)):
+    article = db.query(Article).get(article_id)
+    if not article:
+        return RedirectResponse('/admin/articles', status_code=302)
+    if action == 'translate':
+        if not is_ai_translation_configured():
+            db.add(FetchLog(level="WARNING", message=AI_TRANSLATION_WARNING))
+            db.commit()
+            return RedirectResponse(f'/admin/articles/{article_id}/edit?warning=ai_not_configured', status_code=302)
+        scheduler.add_job(generate_missing_translations, args=[article.id], id=f"article_ai_translation_{article.id}_{datetime.utcnow().timestamp()}", replace_existing=False)
+        return RedirectResponse(f'/admin/articles/{article_id}/edit?translations=queued', status_code=302)
+    action_map = {
+        'rewrite': apply_ai_article_rewrite,
+        'rewrite-title': apply_ai_title_rewrite,
+        'seo': apply_ai_seo_pack,
+        'social': apply_ai_social_pack,
+        'summary': apply_ai_summary,
+        'tags': apply_ai_tags,
+    }
+    handler = action_map.get(action)
+    if not handler:
+        return RedirectResponse(f'/admin/articles/{article_id}/edit?ai=bad_action', status_code=302)
+    result = handler(db, article)
+    status = 'generated' if result.get('configured') else 'ai_not_configured'
+    return RedirectResponse(f'/admin/articles/{article_id}/edit?ai={action}&status={status}', status_code=302)
 
 
 @app.post('/admin/articles/{article_id}/feature')
@@ -3750,7 +3917,10 @@ def settings_page(request: Request, db=Depends(get_db), _=Depends(require_auth))
 
 
 @app.post('/admin/settings')
-def save_settings(request: Request, site_name: str = Form('VREYC'), editor_name: str = Form('Editor'), publish_mode: str = Form('manual'), default_language: str = Form('az'), site_description: str | None = Form(None), contact_email: str | None = Form(None), logo_url: str | None = Form(None), favicon_url: str | None = Form(None), organization_logo_url: str | None = Form(None), watermark_url: str | None = Form(None), facebook_url: str | None = Form(None), youtube_url: str | None = Form(None), tiktok_url: str | None = Form(None), instagram_url: str | None = Form(None), telegram_url: str | None = Form(None), mailru_url: str | None = Form(None), google_search_console_verification: str | None = Form(None), bing_webmaster_verification: str | None = Form(None), google_analytics_id: str | None = Form(None), google_tag_manager_id: str | None = Form(None), adsense_publisher_id: str | None = Form(None), ads_txt_status: str | None = Form(None), auto_ads_status: str | None = Form(None), header_ad_slot: str | None = Form(None), sidebar_ad_slot: str | None = Form(None), article_ad_slot: str | None = Form(None), openai_api_key: str | None = Form(None), openai_model: str = Form('gpt-5.5-mini'), ai_translation_enabled: str | None = Form(None), ai_seo_enabled: str | None = Form(None), db=Depends(get_db), _=Depends(require_auth)):
+def save_settings(request: Request, site_name: str = Form('VREYC'), editor_name: str = Form('Editor'), publish_mode: str = Form('manual'), default_language: str = Form('az'), site_description: str | None = Form(None), contact_email: str | None = Form(None), logo_url: str | None = Form(None), favicon_url: str | None = Form(None), organization_logo_url: str | None = Form(None), watermark_url: str | None = Form(None), facebook_url: str | None = Form(None), youtube_url: str | None = Form(None), tiktok_url: str | None = Form(None), instagram_url: str | None = Form(None), telegram_url: str | None = Form(None), mailru_url: str | None = Form(None), google_search_console_verification: str | None = Form(None), bing_webmaster_verification: str | None = Form(None), google_analytics_id: str | None = Form(None), google_tag_manager_id: str | None = Form(None), adsense_publisher_id: str | None = Form(None), ads_txt_status: str | None = Form(None), auto_ads_status: str | None = Form(None), header_ad_slot: str | None = Form(None), sidebar_ad_slot: str | None = Form(None), article_ad_slot: str | None = Form(None), openai_api_key: str | None = Form(None), openai_clear_api_key: str | None = Form(None), openai_model: str = Form('gpt-5.5-mini'), ai_translation_enabled: str | None = Form(None), ai_seo_enabled: str | None = Form(None), db=Depends(get_db), _=Depends(require_auth)):
+    current_settings = get_settings_map(db)
+    submitted_openai_key = (openai_api_key or "").strip()
+    stored_openai_key = "" if openai_clear_api_key == "yes" else (submitted_openai_key or current_settings.get('openai_api_key') or settings.openai_api_key or "")
     values = {
         'site_name': site_name,
         'editor_name': editor_name,
@@ -3778,7 +3948,7 @@ def save_settings(request: Request, site_name: str = Form('VREYC'), editor_name:
         'header_ad_slot': header_ad_slot.strip() if header_ad_slot is not None else None,
         'sidebar_ad_slot': sidebar_ad_slot.strip() if sidebar_ad_slot is not None else None,
         'article_ad_slot': article_ad_slot.strip() if article_ad_slot is not None else None,
-        'openai_api_key': openai_api_key.strip() if openai_api_key is not None else None,
+        'openai_api_key': stored_openai_key,
         'openai_model': openai_model if openai_model in OPENAI_MODEL_OPTIONS else 'gpt-5.5-mini',
         'ai_translation_enabled': 'enabled' if ai_translation_enabled == 'enabled' else 'disabled',
         'ai_seo_enabled': 'enabled' if ai_seo_enabled == 'enabled' else 'disabled',
