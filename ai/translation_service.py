@@ -2,6 +2,8 @@ import re
 from datetime import datetime
 from typing import Any
 
+from sqlalchemy.exc import IntegrityError
+
 from database.models import Article, ArticleNarration, ArticleTranslation, FetchLog
 from database.session import SessionLocal
 from ai.pipeline import AIEngine, openai_runtime_settings
@@ -80,15 +82,25 @@ def get_or_create_translation(db, article: Article, language: str) -> ArticleTra
     for pending in db.new:
         if (
             isinstance(pending, ArticleTranslation)
-            and pending.article_id == article.id
+            and (pending.article_id == article.id or getattr(pending, "article", None) is article)
             and (pending.language or "").lower() == language
         ):
             return pending
+
     row = db.query(ArticleTranslation).filter(ArticleTranslation.article_id == article.id, ArticleTranslation.language == language).first()
-    if not row:
-        row = ArticleTranslation(article_id=article.id, language=language, status="pending")
-        db.add(row)
+    if row:
+        return row
+
+    row = ArticleTranslation(article_id=article.id, language=language, status="pending")
+    db.add(row)
+    try:
         db.flush()
+    except IntegrityError:
+        db.rollback()
+        row = db.query(ArticleTranslation).filter(ArticleTranslation.article_id == article.id, ArticleTranslation.language == language).first()
+        if row:
+            return row
+        raise
     return row
 
 
