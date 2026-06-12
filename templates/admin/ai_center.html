@@ -14,6 +14,11 @@
   </div>
 </section>
 
+{% if request.query_params.get('warning') == 'ai_not_configured' or request.query_params.get('status') == 'ai_not_configured' %}<div class="alert danger">OpenAI API açarı konfiqurasiya edilməyib və ya seçilmiş AI funksiyası deaktivdir.</div>{% endif %}
+{% if request.query_params.get('queued') == 'translation' %}<div class="alert success">Tərcümə işi növbəyə əlavə edildi.</div>{% endif %}
+{% if request.query_params.get('status') == 'done' %}<div class="alert success">AI əməliyyatı tamamlandı və nəticə məqaləyə yazıldı.</div>{% endif %}
+{% if request.query_params.get('error') == 'missing_article' %}<div class="alert danger">Zəhmət olmasa AI əməliyyatı üçün məqalə seçin.</div>{% endif %}
+
 <section class="stats-grid dashboard-stats dashboard-stat-grid-v2 ai-center-stats" aria-label="AI publishing status cards">
   <article class="stat-card premium-stat-card accent-blue">
     <span>AI Status</span>
@@ -99,11 +104,11 @@
     </div>
     <div class="ai-action-grid">
       {% for source in source_placeholders %}
-      <button class="ai-placeholder-action" type="button" disabled>
+      <a class="ai-placeholder-action" href="{{ source.href }}">
         <span>{{ source.icon }}</span>
         <strong>{{ source.label }}</strong>
-        <small>Active workflow</small>
-      </button>
+        <small>İşlək keçid</small>
+      </a>
       {% endfor %}
     </div>
   </article>
@@ -113,18 +118,38 @@
       <div>
         <p class="eyebrow">AI tools</p>
         <h2>Assistant tools</h2>
-        <p class="muted">Premium editor tools are placeholders until backend AI services are approved.</p>
+        <p class="muted">Bu düymələr seçilən məqalədə real OpenAI nəticəsini yaradır və saxlayır.</p>
       </div>
+      <span class="status-pill {{ 'ok' if ai_center_stats.ai_configured else 'warn' }}">{{ ai_center_stats.api_status }}</span>
     </div>
-    <div class="ai-action-grid">
-      {% for tool in tool_placeholders %}
-      <button class="ai-placeholder-action" type="button" disabled>
-        <span>{{ tool.icon }}</span>
-        <strong>{{ tool.label }}</strong>
-        <small>Active workflow</small>
-      </button>
-      {% endfor %}
-    </div>
+    <form method="post" action="/admin/ai-center/run" class="settings-fields">
+      <label>Məqalə seç
+        <select name="article_id" required>
+          <option value="">Məqalə seçin</option>
+          {% for article in ai_action_articles %}<option value="{{ article.id }}">#{{ article.id }} — {{ article.title or 'Untitled' }}</option>{% endfor %}
+        </select>
+      </label>
+      <div class="ai-action-grid">
+        <button class="ai-placeholder-action" name="ai_action" value="translate" type="submit">
+          <span>TR</span><strong>Tərcümə et</strong><small>Çatışmayan dillər üçün draft yaradır</small>
+        </button>
+        <button class="ai-placeholder-action" name="ai_action" value="generate_seo" type="submit">
+          <span>SEO</span><strong>SEO yarat</strong><small>Meta, açar söz və Google News sahələri</small>
+        </button>
+        <button class="ai-placeholder-action" name="ai_action" value="generate_social" type="submit">
+          <span>SOC</span><strong>Sosial paylaşım yarat</strong><small>Facebook, Telegram və X mətni</small>
+        </button>
+        <button class="ai-placeholder-action" name="ai_action" value="rewrite_title" type="submit">
+          <span>HD</span><strong>Başlığı yenidən yaz</strong><small>Başlıq və SEO başlığı yenilənir</small>
+        </button>
+        <button class="ai-placeholder-action" name="ai_action" value="rewrite_article" type="submit">
+          <span>RW</span><strong>Məqaləni yenidən yaz</strong><small>Məzmun faktları qoruyaraq yenilənir</small>
+        </button>
+        <button class="ai-placeholder-action" name="ai_action" value="generate_tags" type="submit">
+          <span>TAG</span><strong>Tag yarat</strong><small>SEO etiketləri və açar sözlər</small>
+        </button>
+      </div>
+    </form>
   </article>
 </section>
 

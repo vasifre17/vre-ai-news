@@ -15,6 +15,21 @@ OPENAI_MODEL_OPTIONS = {
 DEFAULT_OPENAI_MODEL = "gpt-5.5-mini"
 
 
+LANGUAGE_NAMES = {
+    "az": "Azerbaijani",
+    "en": "English",
+    "ru": "Russian",
+    "tr": "Turkish",
+    "es": "Spanish",
+    "zh": "Chinese",
+}
+
+
+def _bounded(value: str | None, limit: int) -> str:
+    text = (value or "").strip()
+    return text[:limit].rstrip()
+
+
 def _clean_json(content: str | None) -> dict[str, Any]:
     if not content:
         return {}
@@ -69,6 +84,22 @@ class AIEngine:
         self.seo_enabled = bool(runtime["seo_enabled"])
         self.configured = bool(runtime["configured"])
         self.client = OpenAI(api_key=str(runtime["api_key"])) if self.configured else None
+
+    def _json_chat(self, system_prompt: str, payload: Dict[str, Any], max_payload_chars: int = 12000) -> Dict[str, Any]:
+        if not self.client:
+            return {}
+        serialized = json.dumps(payload, ensure_ascii=False)
+        if len(serialized) > max_payload_chars:
+            serialized = serialized[:max_payload_chars]
+        resp = self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": serialized},
+            ],
+            response_format={"type": "json_object"},
+        )
+        return _clean_json(resp.choices[0].message.content)
 
     def process_article(self, title: str, content: str) -> Dict[str, str]:
         if not self.client:
@@ -200,3 +231,78 @@ class AIEngine:
             response_format={"type": "json_object"},
         )
         return _clean_json(resp.choices[0].message.content)
+
+    def rewrite_title(self, article: Dict[str, str], language: str = "az") -> Dict[str, str]:
+        title = article.get("title", "")
+        fallback = {"title": title, "seo_title": article.get("seo_title") or title}
+        if not self.client or not self.seo_enabled:
+            return fallback
+        prompt = (
+            "You are a senior news headline editor. Return strict JSON with keys title and seo_title. "
+            "Rewrite the headline in the requested language, keep facts unchanged, avoid clickbait, "
+            "and keep title under 90 characters and seo_title under 70 characters."
+        )
+        out = self._json_chat(prompt, {"language": language, "language_name": LANGUAGE_NAMES.get(language, language), "article": article})
+        return {**fallback, **out}
+
+    def rewrite_article(self, article: Dict[str, str], language: str = "az") -> Dict[str, str]:
+        fallback = {
+            "title": article.get("title", ""),
+            "summary": article.get("summary", ""),
+            "content": article.get("content", ""),
+            "seo_title": article.get("seo_title", article.get("title", "")),
+            "tags": article.get("tags", ""),
+            "category": article.get("category", ""),
+        }
+        if not self.client:
+            return fallback
+        prompt = (
+            "You are a newsroom rewrite editor. Return strict JSON with keys title, summary, content, "
+            "seo_title, tags, category. Rewrite the article in the requested language with an original "
+            "journalistic style while preserving all verifiable facts, names, numbers, quotes, HTML structure, "
+            "and attribution. Do not invent facts."
+        )
+        out = self._json_chat(prompt, {"language": language, "language_name": LANGUAGE_NAMES.get(language, language), "article": article})
+        return {**fallback, **out}
+
+    def generate_summary(self, article: Dict[str, str], language: str = "az") -> Dict[str, str]:
+        fallback = {"summary": _bounded(article.get("summary") or re.sub(r"<[^>]+>", " ", article.get("content", "")), 280)}
+        if not self.client:
+            return fallback
+        prompt = (
+            "Return strict JSON with key summary. Write a concise 2-3 sentence news summary in the requested language. "
+            "Keep facts unchanged and avoid promotional language."
+        )
+        out = self._json_chat(prompt, {"language": language, "language_name": LANGUAGE_NAMES.get(language, language), "article": article})
+        return {**fallback, **out}
+
+    def generate_tags(self, article: Dict[str, str], language: str = "az") -> Dict[str, str]:
+        fallback = {"tags": article.get("tags") or "news"}
+        if not self.client or not self.seo_enabled:
+            return fallback
+        prompt = (
+            "Return strict JSON with key tags. Generate 6-10 SEO/news tags in the requested language as a comma-separated string. "
+            "Use only topics supported by the article."
+        )
+        out = self._json_chat(prompt, {"language": language, "language_name": LANGUAGE_NAMES.get(language, language), "article": article})
+        return {**fallback, **out}
+
+    def generate_social_share_pack(self, article: Dict[str, str], language: str = "az") -> Dict[str, str]:
+        title = article.get("title", "")
+        summary = article.get("summary", "")
+        fallback = {
+            "facebook_share_text": f"{title} — VREYC".strip(),
+            "telegram_share_text": f"{title}\n\n{summary}".strip(),
+            "x_share_text": f"{title} — VREYC"[:260].strip(),
+        }
+        if not self.client or not self.seo_enabled:
+            return fallback
+        prompt = (
+            "You are a social media editor for a news CMS. Return strict JSON with keys facebook_share_text, "
+            "telegram_share_text, x_share_text. Write ready-to-publish social copy in the requested language; "
+            "x_share_text must be under 280 characters. Do not add unsupported claims."
+        )
+        out = self._json_chat(prompt, {"language": language, "language_name": LANGUAGE_NAMES.get(language, language), "article": article})
+        merged = {**fallback, **out}
+        merged["x_share_text"] = _bounded(merged.get("x_share_text"), 279)
+        return merged

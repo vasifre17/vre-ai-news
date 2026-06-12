@@ -94,7 +94,8 @@
     <article class="settings-card status-card">
       <div class="settings-card-head"><div><span class="settings-card-kicker">F</span><h2>AI Settings</h2><p class="muted">Provider readiness for automation workflows.</p></div>{{ status_badge('Active' if openai_ready else 'Not configured', 'active' if openai_ready else 'not-configured') }}</div>
       <div class="settings-fields">
-        <label>OpenAI API Key<input name="openai_api_key" type="password" value="{{ settings_map.get('openai_api_key', '') }}" placeholder="sk-..."></label>
+        <label>OpenAI API Key<input name="openai_api_key" type="password" value="" placeholder="{{ 'Configured — enter a new key to replace' if openai_ready else 'sk-...' }}" autocomplete="off"><small class="muted">Təhlükəsizlik üçün saxlanmış açar göstərilmir. Boş saxlasanız mövcud açar qorunacaq.</small></label>
+        <label class="check"><input type="checkbox" name="openai_clear_api_key" value="yes"> Saxlanmış OpenAI API açarını sil</label>
         <label>Model selection<select name="openai_model">{% for model_id, model_label in openai_model_options.items() %}<option value="{{ model_id }}" {{ 'selected' if openai_runtime.model == model_id else '' }}>{{ model_label }}</option>{% endfor %}</select></label>
         <label>Translation active/passive<select name="ai_translation_enabled"><option value="enabled" {{ 'selected' if openai_runtime.translation_enabled else '' }}>Active</option><option value="disabled" {{ 'selected' if not openai_runtime.translation_enabled else '' }}>Passive</option></select></label>
         <label>SEO active/passive<select name="ai_seo_enabled"><option value="enabled" {{ 'selected' if openai_runtime.seo_enabled else '' }}>Active</option><option value="disabled" {{ 'selected' if not openai_runtime.seo_enabled else '' }}>Passive</option></select></label>
@@ -117,7 +118,7 @@
         {{ settings_row('2FA placeholder', 'Future two-factor authentication slot', 'Not configured', 'not-configured') }}
         {{ settings_row('Failed login protection placeholder', 'Rate limiter attached to admin login', 'Active', 'active') }}
       </div>
-      <p class="muted settings-card-note">Password and API secrets are configured through environment variables, not the browser.</p>
+      <p class="muted settings-card-note">OpenAI açarı settings cədvəlində saxlanır və server-side OpenAI SDK tərəfindən istifadə olunur; brauzerdə geri göstərilmir.</p>
     </article>
 
     <article class="settings-card status-card">
