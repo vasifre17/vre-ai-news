@@ -34,9 +34,11 @@ from database.session import SessionLocal, init_db
 from database.models import Article, ArticleRevision, ArticleView, FetchLog, Setting, ArticleNarration, ArticleTranslation, Category, MediaAsset
 from cms.auth.security import is_authenticated, set_session, clear_session, verify_password
 from scheduler.jobs import run_fetch_pipeline, queue_narration, generate_pending_narrations
+from ai.pipeline import AIEngine, OPENAI_MODEL_OPTIONS, openai_runtime_settings
 from ai.translation_service import (
     AI_TRANSLATION_WARNING,
     ai_translation_status,
+    enqueue_missing_translations,
     generate_all_missing_translations,
     generate_missing_translations,
     is_ai_translation_configured,
@@ -54,8 +56,9 @@ app.state.dashboard_analytics_cache = {"expires_at": 0.0, "payload": None}
 app.state.youtube_shorts_cache = {"expires_at": 0.0, "payload": None}
 app.state.youtube_shorts_cache_lock = threading.Lock()
 scheduler = BackgroundScheduler()
-SUPPORTED_LANGUAGES = ["az", "en", "ru", "tr", "zh", "es"]
-LANGUAGE_LABELS = {"az": "Azerbaijani", "en": "English", "ru": "Russian", "tr": "Turkish", "zh": "Chinese", "es": "Spanish"}
+SUPPORTED_LANGUAGES = ["az", "en", "ru", "tr", "es", "zh"]
+LANGUAGE_LABELS = {"az": "Azerbaijani", "en": "English", "ru": "Russian", "tr": "Turkish", "es": "Spanish", "zh": "Chinese"}
+LANGUAGE_NEWS_PATHS = {"az": "xeber", "en": "news", "ru": "news", "tr": "haber", "es": "noticia", "zh": "news"}
 UPLOAD_DIR = Path(settings.image_upload_dir)
 UPLOAD_URL_PREFIX = settings.image_upload_url_prefix
 LEGACY_UPLOAD_DIRS = (Path("uploads"), Path("static/uploads/images"), Path("/app/static/uploads/images"))
@@ -1205,6 +1208,7 @@ def canonical_url(request: Request, path: str = "") -> str:
 
 def article_url(language: str, slug: str) -> str:
     """Return the canonical language-aware public article URL."""
+    language = language if language in SUPPORTED_LANGUAGES else "az"
     return f"/{language}/{slug}"
 
 
@@ -1238,7 +1242,8 @@ def get_translation(article: Article, language: str):
         return article
     for translation in getattr(article, "translations", []) or []:
         if (translation.language or "").lower() == normalized_language:
-            return translation
+            if (getattr(translation, "status", None) or "published") == "published":
+                return translation
     return None
 
 
@@ -1269,6 +1274,13 @@ def localized_article_view(article: Article, language: str):
         seo_title=localized_value(article, translation, "seo_title"),
         meta_description=localized_value(article, translation, "meta_description"),
         tags=localized_value(article, translation, "tags"),
+        focus_keywords=localized_value(article, translation, "focus_keywords"),
+        google_news_description=localized_value(article, translation, "google_news_description"),
+        image_alt_text=localized_value(article, translation, "image_alt_text"),
+        reading_time_minutes=localized_value(article, translation, "reading_time_minutes"),
+        facebook_share_text=localized_value(article, translation, "facebook_share_text"),
+        telegram_share_text=localized_value(article, translation, "telegram_share_text"),
+        x_share_text=localized_value(article, translation, "x_share_text"),
         category=article.category,
         category_label=public_category_labels(language).get(article.category, article.category) if article.category else public_labels(language)["news"],
         language=language,
@@ -1318,10 +1330,10 @@ def find_published_article_by_slug(db, slug: str, language: str = "az") -> Artic
     language = language if language in SUPPORTED_LANGUAGES else "az"
     article = None
     if language != "az":
-        translation = db.query(ArticleTranslation).filter(ArticleTranslation.language == language, ArticleTranslation.slug == slug).first()
+        translation = db.query(ArticleTranslation).filter(ArticleTranslation.language == language, ArticleTranslation.slug == slug, ArticleTranslation.status == "published").first()
         if translation:
             article = db.query(Article).options(selectinload(Article.translations)).filter(Article.id == translation.article_id, public_article_visibility_filter()).first()
-    if not article:
+    if not article and language == "az":
         slug_filters = [Article.slug == slug]
         if slug.isdigit():
             slug_filters.append(Article.id == int(slug))
@@ -2347,6 +2359,36 @@ def article_form_context(db, article: Article | None = None) -> dict:
 
 
 
+def apply_ai_seo_pack(db, article: Article) -> dict:
+    runtime = openai_runtime_settings()
+    if not runtime["configured"] or not runtime["seo_enabled"]:
+        db.add(FetchLog(level="WARNING", message="AI SEO provider is not configured or SEO is disabled."))
+        db.commit()
+        return {"configured": False, "message": "AI SEO provider is not configured or SEO is disabled."}
+    engine = AIEngine()
+    payload = engine.generate_seo_pack({
+        "title": article.title or "",
+        "summary": article.summary or "",
+        "content": article.content or "",
+        "seo_title": article.seo_title or "",
+        "meta_description": article.meta_description or "",
+        "tags": article.tags or "",
+    }, article.language or "az")
+    article.seo_title = payload.get("seo_title") or article.seo_title or article.title
+    article.meta_description = payload.get("meta_description") or article.meta_description
+    article.focus_keywords = payload.get("focus_keywords") or article.focus_keywords or article.tags
+    article.google_news_description = payload.get("google_news_description") or article.google_news_description or article.summary
+    article.image_alt_text = payload.get("image_alt_text") or article.image_alt_text or article.title
+    article.reading_time_minutes = int(payload.get("reading_time_minutes") or article.reading_time_minutes or 1)
+    article.facebook_share_text = payload.get("facebook_share_text") or article.facebook_share_text
+    article.telegram_share_text = payload.get("telegram_share_text") or article.telegram_share_text
+    article.x_share_text = payload.get("x_share_text") or article.x_share_text
+    article.updated_at = datetime.utcnow()
+    db.add(FetchLog(level="INFO", message=f"AI SEO generated for article {article.id}."))
+    db.commit()
+    return {"configured": True, "message": "AI SEO generated."}
+
+
 def validate_image_references(db) -> list[str]:
     """Return missing local image paths without mutating records or deleting uploads."""
     missing: list[str] = []
@@ -2372,6 +2414,13 @@ def apply_schema_migrations(db) -> None:
         "ALTER TABLE articles ADD COLUMN slug VARCHAR(500)",
         "ALTER TABLE articles ADD COLUMN narration_enabled BOOLEAN DEFAULT true",
         "ALTER TABLE articles ADD COLUMN meta_description TEXT",
+        "ALTER TABLE articles ADD COLUMN focus_keywords VARCHAR(500)",
+        "ALTER TABLE articles ADD COLUMN google_news_description TEXT",
+        "ALTER TABLE articles ADD COLUMN image_alt_text VARCHAR(500)",
+        "ALTER TABLE articles ADD COLUMN reading_time_minutes INTEGER DEFAULT 1",
+        "ALTER TABLE articles ADD COLUMN facebook_share_text TEXT",
+        "ALTER TABLE articles ADD COLUMN telegram_share_text TEXT",
+        "ALTER TABLE articles ADD COLUMN x_share_text TEXT",
         "ALTER TABLE articles ADD COLUMN is_featured BOOLEAN DEFAULT false",
         "ALTER TABLE articles ADD COLUMN is_trending BOOLEAN DEFAULT false",
         "ALTER TABLE articles ADD COLUMN homepage_order INTEGER DEFAULT 100",
@@ -2379,7 +2428,16 @@ def apply_schema_migrations(db) -> None:
         f"ALTER TABLE articles ADD COLUMN publish_at {publish_at_type}",
         "ALTER TABLE article_translations ADD COLUMN slug VARCHAR(500)",
         "ALTER TABLE article_translations ADD COLUMN meta_description TEXT",
+        "ALTER TABLE article_translations ADD COLUMN focus_keywords VARCHAR(500)",
+        "ALTER TABLE article_translations ADD COLUMN google_news_description TEXT",
+        "ALTER TABLE article_translations ADD COLUMN image_alt_text VARCHAR(500)",
+        "ALTER TABLE article_translations ADD COLUMN reading_time_minutes INTEGER DEFAULT 1",
+        "ALTER TABLE article_translations ADD COLUMN facebook_share_text TEXT",
+        "ALTER TABLE article_translations ADD COLUMN telegram_share_text TEXT",
+        "ALTER TABLE article_translations ADD COLUMN x_share_text TEXT",
         "ALTER TABLE article_translations ADD COLUMN tags VARCHAR(500)",
+        "ALTER TABLE article_translations ADD COLUMN status VARCHAR(20) DEFAULT 'published'",
+        "ALTER TABLE article_translations ADD COLUMN error_message TEXT",
         "ALTER TABLE media_assets ADD COLUMN url VARCHAR(1000)",
         "ALTER TABLE media_assets ADD COLUMN mime_type VARCHAR(120)",
         "ALTER TABLE media_assets ADD COLUMN width INTEGER",
@@ -2400,6 +2458,7 @@ def apply_schema_migrations(db) -> None:
         "CREATE INDEX IF NOT EXISTS ix_article_translations_article_id ON article_translations (article_id)",
         "CREATE INDEX IF NOT EXISTS ix_article_translations_language ON article_translations (language)",
         "CREATE INDEX IF NOT EXISTS ix_article_translations_slug ON article_translations (slug)",
+        "CREATE INDEX IF NOT EXISTS ix_article_translations_status ON article_translations (status)",
         "CREATE UNIQUE INDEX IF NOT EXISTS ix_article_translations_article_language ON article_translations (article_id, language)",
         "CREATE INDEX IF NOT EXISTS ix_article_translations_language_slug ON article_translations (language, slug)",
         "CREATE INDEX IF NOT EXISTS ix_article_views_article_id ON article_views (article_id)",
@@ -2409,6 +2468,7 @@ def apply_schema_migrations(db) -> None:
         "CREATE INDEX IF NOT EXISTS ix_article_views_device_type ON article_views (device_type)",
         "CREATE INDEX IF NOT EXISTS ix_article_views_country_code ON article_views (country_code)",
         "CREATE INDEX IF NOT EXISTS ix_article_views_is_admin_traffic ON article_views (is_admin_traffic)",
+        "UPDATE article_translations SET status = 'published' WHERE status IS NULL OR status = ''",
         "UPDATE media_assets SET url = path WHERE url IS NULL OR url = ''",
         "UPDATE media_assets SET mime_type = content_type WHERE mime_type IS NULL OR mime_type = ''",
     ]:
@@ -2494,6 +2554,9 @@ def home(request: Request, language: str = "az", q: str = "", category: str = ""
     publish_due_scheduled_articles(db)
     ensure_categories(db)
     query = db.query(Article).options(selectinload(Article.translations)).filter(public_article_visibility_filter())
+    if language != "az":
+        translated_ids = db.query(ArticleTranslation.article_id).filter(ArticleTranslation.language == language, ArticleTranslation.status == "published")
+        query = query.filter(Article.id.in_(translated_ids.scalar_subquery()))
     if q:
         translation_matches = db.query(ArticleTranslation.article_id).filter(
             ArticleTranslation.language == language,
@@ -2879,8 +2942,16 @@ def admin_ai_center(request: Request, db=Depends(get_db), _=Depends(require_auth
     source_drafts = db.query(Article).filter(Article.status == 'draft', Article.source_url.isnot(None)).count()
     waiting_review = db.query(Article).filter(Article.status == 'draft').count()
     failed_tasks = db.query(FetchLog).filter(FetchLog.level == "ERROR", FetchLog.message.ilike("%AI%")).count()
+    translated_count = db.query(ArticleTranslation).filter(ArticleTranslation.status.in_(["draft", "published"])).count()
+    seo_generated_count = db.query(Article).filter(Article.focus_keywords.isnot(None), Article.focus_keywords != "").count()
+    recent_ai_logs = db.query(FetchLog).filter(FetchLog.message.ilike("%AI%") | FetchLog.message.ilike("%translation%") | FetchLog.message.ilike("%SEO%")).order_by(FetchLog.created_at.desc()).limit(8).all()
+    recent_ai_errors = db.query(FetchLog).filter(FetchLog.level == "ERROR", (FetchLog.message.ilike("%AI%") | FetchLog.message.ilike("%translation%") | FetchLog.message.ilike("%SEO%"))).order_by(FetchLog.created_at.desc()).limit(5).all()
+    runtime = openai_runtime_settings()
     ai_center_stats = {
-        "ai_configured": is_ai_translation_configured(),
+        "ai_configured": runtime["configured"],
+        "api_status": "Active" if runtime["configured"] else "Not configured",
+        "translated_count": translated_count,
+        "seo_generated_count": seo_generated_count,
         "drafts_generated": source_drafts,
         "waiting_review": waiting_review,
         "published_by_ai": 0,
@@ -2914,6 +2985,8 @@ def admin_ai_center(request: Request, db=Depends(get_db), _=Depends(require_auth
         'workflow_steps': workflow_steps,
         'source_placeholders': source_placeholders,
         'tool_placeholders': tool_placeholders,
+        'recent_ai_logs': recent_ai_logs,
+        'recent_ai_errors': recent_ai_errors,
     })
 
 
@@ -2942,6 +3015,7 @@ def admin_articles(
     articles = attach_real_view_counts(db, apply_admin_article_sort(query, sort).offset((page - 1) * per_page).limit(per_page).all())
     narration_map = {n.article_id: n for n in db.query(ArticleNarration).filter(ArticleNarration.article_id.in_([a.id for a in articles] or [0])).all()}
     translation_missing_map = {a.id: missing_translation_languages(a) for a in articles}
+    translation_rows_map = {a.id: {(row.language or "").lower(): row for row in getattr(a, "translations", []) or []} for a in articles}
     article_image_urls = [public_image_url(a.image_url) for a in articles if public_image_url(a.image_url)]
     media_alt_map = {
         public_image_url(asset.url or asset.path): asset.alt_text
@@ -3063,6 +3137,13 @@ async def create_article(request: Request, db=Depends(get_db), _=Depends(require
         content=sanitize_article_html(form.get('content_az', '')),
         seo_title=form.get('seo_title_az', ''),
         meta_description=form.get('meta_description_az', ''),
+        focus_keywords=form.get('focus_keywords_az', ''),
+        google_news_description=form.get('google_news_description_az', ''),
+        image_alt_text=form.get('image_alt_text_az', '') or form.get('hero_alt_text', ''),
+        reading_time_minutes=int(form.get('reading_time_minutes_az') or 1),
+        facebook_share_text=form.get('facebook_share_text_az', ''),
+        telegram_share_text=form.get('telegram_share_text_az', ''),
+        x_share_text=form.get('x_share_text_az', ''),
         tags=form.get('tags_az', ''),
         image_url=uploaded_image.path if uploaded_image else form.get('image_url', ''),
         category=form.get('category', ''),
@@ -3080,7 +3161,7 @@ async def create_article(request: Request, db=Depends(get_db), _=Depends(require
     for lang in SUPPORTED_LANGUAGES:
         if lang == 'az':
             continue
-        if any(form.get(f'{field}_{lang}', '') for field in ['title', 'summary', 'content', 'seo_title', 'meta_description', 'tags', 'slug']):
+        if any(form.get(f'{field}_{lang}', '') for field in ['title', 'summary', 'content', 'seo_title', 'meta_description', 'focus_keywords', 'google_news_description', 'image_alt_text', 'facebook_share_text', 'telegram_share_text', 'x_share_text', 'tags', 'slug']):
             row = ArticleTranslation(article_id=article.id, language=lang)
             row.title = form.get(f'title_{lang}', '')
             row.slug = unique_translation_slug(db, lang, form.get(f'slug_{lang}') or row.title or f'{article.slug}-{lang}')
@@ -3088,13 +3169,21 @@ async def create_article(request: Request, db=Depends(get_db), _=Depends(require
             row.content = sanitize_article_html(form.get(f'content_{lang}', ''))
             row.seo_title = form.get(f'seo_title_{lang}', '')
             row.meta_description = form.get(f'meta_description_{lang}', '')
+            row.focus_keywords = form.get(f'focus_keywords_{lang}', '')
+            row.google_news_description = form.get(f'google_news_description_{lang}', '')
+            row.image_alt_text = form.get(f'image_alt_text_{lang}', '')
+            row.reading_time_minutes = int(form.get(f'reading_time_minutes_{lang}') or 1)
+            row.facebook_share_text = form.get(f'facebook_share_text_{lang}', '')
+            row.telegram_share_text = form.get(f'telegram_share_text_{lang}', '')
+            row.x_share_text = form.get(f'x_share_text_{lang}', '')
             row.tags = form.get(f'tags_{lang}', '')
+            row.status = form.get(f'translation_status_{lang}') or 'published'
             db.add(row)
     if article.status == 'published':
         touch_sitemap_refresh(db)
+    if article.status == 'published':
+        enqueue_missing_translations(db, article)
     db.commit()
-    if is_ai_translation_configured():
-        scheduler.add_job(generate_missing_translations, args=[article.id], id=f"article_translation_{article.id}_{datetime.utcnow().timestamp()}", replace_existing=False)
     return RedirectResponse('/admin/articles', status_code=302)
 
 
@@ -3110,8 +3199,7 @@ def publish_article(article_id: int, request: Request, db=Depends(get_db), _=Dep
         touch_sitemap_refresh(db)
         db.commit()
         queue_narration(db, a)
-        if is_ai_translation_configured():
-            scheduler.add_job(generate_missing_translations, args=[a.id], id=f"article_translation_{a.id}_{datetime.utcnow().timestamp()}", replace_existing=False)
+        enqueue_missing_translations(db, a)
         db.commit()
     return RedirectResponse('/admin/articles?status=published', status_code=302)
 
@@ -3172,6 +3260,13 @@ async def edit_article(article_id: int, request: Request, db=Depends(get_db), _=
     a.content = sanitize_article_html(form.get('content_az', ''))
     a.seo_title = form.get('seo_title_az', '')
     a.meta_description = form.get('meta_description_az', '')
+    a.focus_keywords = form.get('focus_keywords_az', '')
+    a.google_news_description = form.get('google_news_description_az', '')
+    a.image_alt_text = form.get('image_alt_text_az', '') or form.get('hero_alt_text', '')
+    a.reading_time_minutes = int(form.get('reading_time_minutes_az') or 1)
+    a.facebook_share_text = form.get('facebook_share_text_az', '')
+    a.telegram_share_text = form.get('telegram_share_text_az', '')
+    a.x_share_text = form.get('x_share_text_az', '')
     a.tags = form.get('tags_az', '')
     a.image_url = uploaded_image.path if uploaded_image else form.get('image_url', '')
     a.category = form.get('category', '')
@@ -3190,7 +3285,7 @@ async def edit_article(article_id: int, request: Request, db=Depends(get_db), _=
     for lang in SUPPORTED_LANGUAGES:
         if lang == 'az':
             continue
-        has_content = any(form.get(f'{field}_{lang}', '') for field in ['title', 'summary', 'content', 'seo_title', 'meta_description', 'tags', 'slug'])
+        has_content = any(form.get(f'{field}_{lang}', '') for field in ['title', 'summary', 'content', 'seo_title', 'meta_description', 'focus_keywords', 'google_news_description', 'image_alt_text', 'facebook_share_text', 'telegram_share_text', 'x_share_text', 'tags', 'slug'])
         row = db.query(ArticleTranslation).filter(ArticleTranslation.article_id == a.id, ArticleTranslation.language == lang).first()
         if not has_content:
             continue
@@ -3203,15 +3298,32 @@ async def edit_article(article_id: int, request: Request, db=Depends(get_db), _=
         row.content = sanitize_article_html(form.get(f'content_{lang}', ''))
         row.seo_title = form.get(f'seo_title_{lang}', '')
         row.meta_description = form.get(f'meta_description_{lang}', '')
+        row.focus_keywords = form.get(f'focus_keywords_{lang}', '')
+        row.google_news_description = form.get(f'google_news_description_{lang}', '')
+        row.image_alt_text = form.get(f'image_alt_text_{lang}', '')
+        row.reading_time_minutes = int(form.get(f'reading_time_minutes_{lang}') or 1)
+        row.facebook_share_text = form.get(f'facebook_share_text_{lang}', '')
+        row.telegram_share_text = form.get(f'telegram_share_text_{lang}', '')
+        row.x_share_text = form.get(f'x_share_text_{lang}', '')
         row.tags = form.get(f'tags_{lang}', '')
+        row.status = form.get(f'translation_status_{lang}') or row.status or 'published'
         row.updated_at = datetime.utcnow()
     if a.status == 'published':
         touch_sitemap_refresh(db)
+    if a.status == 'published':
+        enqueue_missing_translations(db, a)
     db.commit()
-    translation_status = "queued" if is_ai_translation_configured() else "not_configured"
-    if is_ai_translation_configured():
-        scheduler.add_job(generate_missing_translations, args=[a.id], id=f"article_translation_{a.id}_{datetime.utcnow().timestamp()}", replace_existing=False)
-    return RedirectResponse(f'/admin/articles/{a.id}/edit?saved=1&translations={translation_status}', status_code=302)
+    return RedirectResponse(f'/admin/articles/{a.id}/edit?saved=1&translations=queued', status_code=302)
+
+
+@app.post('/admin/articles/{article_id}/seo/generate')
+def admin_generate_article_seo(article_id: int, request: Request, db=Depends(get_db), _=Depends(require_auth)):
+    article = db.query(Article).get(article_id)
+    if not article:
+        return RedirectResponse('/admin/articles', status_code=302)
+    result = apply_ai_seo_pack(db, article)
+    status = 'generated' if result.get('configured') else 'ai_not_configured'
+    return RedirectResponse(f'/admin/articles/{article_id}/edit?seo={status}', status_code=302)
 
 
 @app.post('/admin/articles/{article_id}/feature')
@@ -3260,6 +3372,13 @@ def duplicate_article(article_id: int, request: Request, db=Depends(get_db), _=D
         content=source.content,
         seo_title=source.seo_title,
         meta_description=source.meta_description,
+        focus_keywords=source.focus_keywords,
+        google_news_description=source.google_news_description,
+        image_alt_text=source.image_alt_text,
+        reading_time_minutes=source.reading_time_minutes,
+        facebook_share_text=source.facebook_share_text,
+        telegram_share_text=source.telegram_share_text,
+        x_share_text=source.x_share_text,
         tags=source.tags,
         category=source.category,
         image_url=source.image_url,
@@ -3286,7 +3405,15 @@ def duplicate_article(article_id: int, request: Request, db=Depends(get_db), _=D
             content=translation.content,
             seo_title=translation.seo_title,
             meta_description=translation.meta_description,
+            focus_keywords=translation.focus_keywords,
+            google_news_description=translation.google_news_description,
+            image_alt_text=translation.image_alt_text,
+            reading_time_minutes=translation.reading_time_minutes,
+            facebook_share_text=translation.facebook_share_text,
+            telegram_share_text=translation.telegram_share_text,
+            x_share_text=translation.x_share_text,
             tags=translation.tags,
+            status='draft',
             created_at=now,
             updated_at=now,
         ))
@@ -3619,11 +3746,11 @@ def settings_system_status(db) -> dict[str, bool]:
 @app.get('/admin/settings', response_class=HTMLResponse)
 def settings_page(request: Request, db=Depends(get_db), _=Depends(require_auth)):
     admin_settings = get_settings_map(db)
-    return templates.TemplateResponse('admin/settings.html', {'request': request, 'settings_map': admin_settings, 'config': settings, 'languages': SUPPORTED_LANGUAGES, 'ai_translation_status': ai_translation_status(), 'settings_system_status': settings_system_status(db)})
+    return templates.TemplateResponse('admin/settings.html', {'request': request, 'settings_map': admin_settings, 'config': settings, 'languages': SUPPORTED_LANGUAGES, 'ai_translation_status': ai_translation_status(), 'settings_system_status': settings_system_status(db), 'openai_runtime': openai_runtime_settings(), 'openai_model_options': OPENAI_MODEL_OPTIONS})
 
 
 @app.post('/admin/settings')
-def save_settings(request: Request, site_name: str = Form('VREYC'), editor_name: str = Form('Editor'), publish_mode: str = Form('manual'), default_language: str = Form('az'), site_description: str | None = Form(None), contact_email: str | None = Form(None), logo_url: str | None = Form(None), favicon_url: str | None = Form(None), organization_logo_url: str | None = Form(None), watermark_url: str | None = Form(None), facebook_url: str | None = Form(None), youtube_url: str | None = Form(None), tiktok_url: str | None = Form(None), instagram_url: str | None = Form(None), telegram_url: str | None = Form(None), mailru_url: str | None = Form(None), google_search_console_verification: str | None = Form(None), bing_webmaster_verification: str | None = Form(None), google_analytics_id: str | None = Form(None), google_tag_manager_id: str | None = Form(None), adsense_publisher_id: str | None = Form(None), ads_txt_status: str | None = Form(None), auto_ads_status: str | None = Form(None), header_ad_slot: str | None = Form(None), sidebar_ad_slot: str | None = Form(None), article_ad_slot: str | None = Form(None), db=Depends(get_db), _=Depends(require_auth)):
+def save_settings(request: Request, site_name: str = Form('VREYC'), editor_name: str = Form('Editor'), publish_mode: str = Form('manual'), default_language: str = Form('az'), site_description: str | None = Form(None), contact_email: str | None = Form(None), logo_url: str | None = Form(None), favicon_url: str | None = Form(None), organization_logo_url: str | None = Form(None), watermark_url: str | None = Form(None), facebook_url: str | None = Form(None), youtube_url: str | None = Form(None), tiktok_url: str | None = Form(None), instagram_url: str | None = Form(None), telegram_url: str | None = Form(None), mailru_url: str | None = Form(None), google_search_console_verification: str | None = Form(None), bing_webmaster_verification: str | None = Form(None), google_analytics_id: str | None = Form(None), google_tag_manager_id: str | None = Form(None), adsense_publisher_id: str | None = Form(None), ads_txt_status: str | None = Form(None), auto_ads_status: str | None = Form(None), header_ad_slot: str | None = Form(None), sidebar_ad_slot: str | None = Form(None), article_ad_slot: str | None = Form(None), openai_api_key: str | None = Form(None), openai_model: str = Form('gpt-5.5-mini'), ai_translation_enabled: str | None = Form(None), ai_seo_enabled: str | None = Form(None), db=Depends(get_db), _=Depends(require_auth)):
     values = {
         'site_name': site_name,
         'editor_name': editor_name,
@@ -3651,6 +3778,10 @@ def save_settings(request: Request, site_name: str = Form('VREYC'), editor_name:
         'header_ad_slot': header_ad_slot.strip() if header_ad_slot is not None else None,
         'sidebar_ad_slot': sidebar_ad_slot.strip() if sidebar_ad_slot is not None else None,
         'article_ad_slot': article_ad_slot.strip() if article_ad_slot is not None else None,
+        'openai_api_key': openai_api_key.strip() if openai_api_key is not None else None,
+        'openai_model': openai_model if openai_model in OPENAI_MODEL_OPTIONS else 'gpt-5.5-mini',
+        'ai_translation_enabled': 'enabled' if ai_translation_enabled == 'enabled' else 'disabled',
+        'ai_seo_enabled': 'enabled' if ai_seo_enabled == 'enabled' else 'disabled',
     }
     for key, value in values.items():
         if value is not None:
@@ -3663,6 +3794,7 @@ def save_settings(request: Request, site_name: str = Form('VREYC'), editor_name:
 def admin_translations(request: Request, db=Depends(get_db), _=Depends(require_auth)):
     articles = db.query(Article).options(selectinload(Article.translations)).order_by(Article.updated_at.desc(), Article.created_at.desc()).all()
     translation_missing_map = {a.id: missing_translation_languages(a) for a in articles}
+    translation_rows_map = {a.id: {(row.language or "").lower(): row for row in getattr(a, "translations", []) or []} for a in articles}
     total_articles = len(articles)
     fully_translated = sum(1 for article in articles if not translation_missing_map.get(article.id))
     language_coverage = []
@@ -3676,7 +3808,11 @@ def admin_translations(request: Request, db=Depends(get_db), _=Depends(require_a
         })
     translation_status_map = {
         article.id: {
-            "existing": [language for language in SUPPORTED_LANGUAGES if language not in translation_missing_map.get(article.id, [])],
+            "existing": [language for language in SUPPORTED_LANGUAGES if language == "az" or translation_rows_map.get(article.id, {}).get(language)],
+            "draft": [language for language, row in translation_rows_map.get(article.id, {}).items() if (row.status or "pending") == "draft"],
+            "pending": [language for language, row in translation_rows_map.get(article.id, {}).items() if (row.status or "pending") in {"pending", "generating"}],
+            "failed": [language for language, row in translation_rows_map.get(article.id, {}).items() if (row.status or "pending") == "failed"],
+            "rows": translation_rows_map.get(article.id, {}),
             "complete": not translation_missing_map.get(article.id),
         }
         for article in articles
@@ -3694,6 +3830,8 @@ def admin_translations(request: Request, db=Depends(get_db), _=Depends(require_a
         "total_articles": total_articles,
         "fully_translated": fully_translated,
         "missing_translations": sum(len(missing) for missing in translation_missing_map.values()),
+        "draft_translations": sum(1 for rows in translation_rows_map.values() for row in rows.values() if (row.status or "pending") == "draft"),
+        "pending_translations": sum(1 for rows in translation_rows_map.values() for row in rows.values() if (row.status or "pending") in {"pending", "generating"}),
         "supported_languages": len(SUPPORTED_LANGUAGES),
     }
     return templates.TemplateResponse('admin/translations.html', {
@@ -3730,6 +3868,31 @@ def admin_generate_all_missing_translations(request: Request, db=Depends(get_db)
         return RedirectResponse('/admin/translations?warning=ai_not_configured', status_code=302)
     scheduler.add_job(generate_all_missing_translations, id=f"bulk_article_translations_{datetime.utcnow().timestamp()}", replace_existing=False)
     return RedirectResponse('/admin/translations?queued=bulk', status_code=302)
+
+
+@app.post('/admin/translations/{article_id}/generate/{language}')
+def admin_generate_translation_language(article_id: int, language: str, request: Request, db=Depends(get_db), _=Depends(require_auth)):
+    if language not in [lang for lang in SUPPORTED_LANGUAGES if lang != 'az']:
+        return RedirectResponse('/admin/translations?queued=bad_language', status_code=302)
+    if not db.query(Article).get(article_id):
+        return RedirectResponse('/admin/translations?queued=missing_article', status_code=302)
+    if not is_ai_translation_configured():
+        db.add(FetchLog(level="WARNING", message=AI_TRANSLATION_WARNING))
+        db.commit()
+        return RedirectResponse('/admin/translations?warning=ai_not_configured', status_code=302)
+    scheduler.add_job(generate_missing_translations, args=[article_id, language], id=f"manual_article_translation_{article_id}_{language}_{datetime.utcnow().timestamp()}", replace_existing=False)
+    return RedirectResponse('/admin/translations?queued=article', status_code=302)
+
+
+@app.post('/admin/translations/{translation_id}/publish')
+def admin_publish_translation(translation_id: int, request: Request, db=Depends(get_db), _=Depends(require_auth)):
+    row = db.query(ArticleTranslation).get(translation_id)
+    if row:
+        row.status = 'published'
+        row.error_message = None
+        row.updated_at = datetime.utcnow()
+        db.commit()
+    return RedirectResponse('/admin/translations?published=translation', status_code=302)
 
 
 @app.post('/admin/articles/{article_id}/translations/generate')
@@ -3778,6 +3941,15 @@ def set_mode(request: Request, mode: str = Form(...), db=Depends(get_db), _=Depe
     save_setting(db, 'publish_mode', mode)
     db.commit()
     return RedirectResponse('/admin/settings', status_code=302)
+
+
+@app.get("/{language}/{section}/{slug}", response_class=HTMLResponse)
+def article_by_language_section_slug(language: str, section: str, slug: str, request: Request, db=Depends(get_db)):
+    language = language if language in SUPPORTED_LANGUAGES else "az"
+    expected_section = LANGUAGE_NEWS_PATHS.get(language, "news")
+    if section != expected_section:
+        return RedirectResponse(article_url(language, slug), status_code=301)
+    return render_article_page(slug, request, language, db)
 
 
 @app.get("/{language}/{slug}", response_class=HTMLResponse)

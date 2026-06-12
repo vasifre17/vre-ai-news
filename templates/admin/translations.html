@@ -28,6 +28,7 @@
   {% if request.query_params.get('queued') == 'bulk' %}<div class="alert">Bulk translation generation was queued in the background.</div>{% endif %}
   {% if request.query_params.get('queued') == 'article' %}<div class="alert">Article translation generation was queued in the background.</div>{% endif %}
   {% if request.query_params.get('queued') == 'missing_article' %}<div class="alert danger">Article was not found.</div>{% endif %}
+  {% if request.query_params.get('published') == 'translation' %}<div class="alert success">Translation approved and published.</div>{% endif %}
   {% if request.query_params.get('warning') == 'ai_not_configured' %}<div class="translation-warning-card compact" role="alert"><div class="translation-warning-icon">!</div><div><strong>AI translation provider is not configured</strong><p>Configure the provider before queueing translation jobs.</p></div></div>{% endif %}
 
   <div class="translation-stat-grid">
@@ -47,9 +48,9 @@
       <small>Language versions to complete</small>
     </article>
     <article class="stat-card translation-stat-card">
-      <span>Supported languages</span>
-      <strong>{{ translation_stats.supported_languages }}</strong>
-      <small>AZ, EN, RU, TR, ZH, ES</small>
+      <span>Pending / draft</span>
+      <strong>{{ translation_stats.pending_translations }} / {{ translation_stats.draft_translations }}</strong>
+      <small>Queued and waiting approval</small>
     </article>
   </div>
 
@@ -117,6 +118,9 @@
               <span class="badge-label">Missing languages</span>
               <div class="translation-badges">
                 {% if missing %}{% for lang in missing %}<span class="language-badge missing">{{ lang|upper }}</span>{% endfor %}{% else %}<span class="language-badge complete">Complete</span>{% endif %}
+                {% for lang in status.draft %}<span class="language-badge existing">{{ lang|upper }} draft</span>{% endfor %}
+                {% for lang in status.pending %}<span class="language-badge missing">{{ lang|upper }} pending</span>{% endfor %}
+                {% for lang in status.failed %}<span class="language-badge missing">{{ lang|upper }} failed</span>{% endfor %}
               </div>
             </div>
           </div>
@@ -124,8 +128,15 @@
         <div class="translation-article-side">
           <span class="translation-status-pill {{ 'complete' if not missing else 'warning' }}">{{ 'Complete' if not missing else 'Needs translation' }}</span>
           <form method="post" action="/admin/translations/{{ a.id }}/generate">
-            <button class="btn small primary" type="submit">Generate missing translations</button>
+            <button class="btn small primary" type="submit">Tərcümələri yarat</button>
           </form>
+          <div class="actions vertical">
+            {% for lang in languages if lang != 'az' %}
+            <form method="post" action="/admin/translations/{{ a.id }}/generate/{{ lang }}"><button class="btn small" type="submit">{{ lang|upper }} tərcümə et</button></form>
+            {% set row = status.rows.get(lang) %}
+            {% if row and row.status == 'draft' %}<form method="post" action="/admin/translations/{{ row.id }}/publish"><button class="btn small" type="submit">{{ lang|upper }} publish</button></form>{% endif %}
+            {% endfor %}
+          </div>
         </div>
       </article>
       {% else %}
