@@ -76,6 +76,14 @@ def unique_translation_slug(db, language: str, requested_slug: str, current_tran
 
 
 def get_or_create_translation(db, article: Article, language: str) -> ArticleTranslation:
+    language = (language or "").lower()
+    for pending in db.new:
+        if (
+            isinstance(pending, ArticleTranslation)
+            and pending.article_id == article.id
+            and (pending.language or "").lower() == language
+        ):
+            return pending
     row = db.query(ArticleTranslation).filter(ArticleTranslation.article_id == article.id, ArticleTranslation.language == language).first()
     if not row:
         row = ArticleTranslation(article_id=article.id, language=language, status="pending")

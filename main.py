@@ -1305,6 +1305,14 @@ def unique_article_slug(db, requested_slug: str, current_id: int | None = None) 
 
 
 def get_or_create_translation(db, article: Article, language: str) -> ArticleTranslation:
+    language = (language or "").lower()
+    for pending in db.new:
+        if (
+            isinstance(pending, ArticleTranslation)
+            and pending.article_id == article.id
+            and (pending.language or "").lower() == language
+        ):
+            return pending
     row = db.query(ArticleTranslation).filter(ArticleTranslation.article_id == article.id, ArticleTranslation.language == language).first()
     if not row:
         row = ArticleTranslation(article_id=article.id, language=language)
@@ -3299,9 +3307,9 @@ async def create_article(request: Request, db=Depends(get_db), _=Depends(require
         if lang == 'az':
             continue
         if any(form.get(f'{field}_{lang}', '') for field in ['title', 'summary', 'content', 'seo_title', 'meta_description', 'focus_keywords', 'google_news_description', 'image_alt_text', 'facebook_share_text', 'telegram_share_text', 'x_share_text', 'tags', 'slug']):
-            row = ArticleTranslation(article_id=article.id, language=lang)
+            row = get_or_create_translation(db, article, lang)
             row.title = form.get(f'title_{lang}', '')
-            row.slug = unique_translation_slug(db, lang, form.get(f'slug_{lang}') or row.title or f'{article.slug}-{lang}')
+            row.slug = unique_translation_slug(db, lang, form.get(f'slug_{lang}') or row.slug or row.title or f'{article.slug}-{lang}', row.id)
             row.summary = form.get(f'summary_{lang}', '')
             row.content = sanitize_article_html(form.get(f'content_{lang}', ''))
             row.seo_title = form.get(f'seo_title_{lang}', '')
@@ -3315,7 +3323,7 @@ async def create_article(request: Request, db=Depends(get_db), _=Depends(require
             row.x_share_text = form.get(f'x_share_text_{lang}', '')
             row.tags = form.get(f'tags_{lang}', '')
             row.status = form.get(f'translation_status_{lang}') or 'published'
-            db.add(row)
+    db.flush()
     if article.status == 'published':
         touch_sitemap_refresh(db)
     if article.status == 'published':
