@@ -121,3 +121,73 @@ def test_enqueue_missing_translations_recovers_existing_row_after_duplicate_inte
         assert db.query(ArticleTranslation).filter(ArticleTranslation.article_id == article.id, ArticleTranslation.language == "en").count() == 1
     finally:
         db.close()
+
+
+def _set_setting(db, key, value):
+    from database.models import Setting
+
+    row = db.query(Setting).filter(Setting.key == key).first()
+    if not row:
+        row = Setting(key=key)
+        db.add(row)
+    row.value = value
+    db.commit()
+
+
+def _clear_ai_settings(db):
+    from database.models import Setting
+
+    db.query(Setting).filter(Setting.key.in_(["openai_api_key", "ai_translation_enabled", "ai_seo_enabled"])).delete(synchronize_session=False)
+    db.commit()
+
+
+def test_ai_translation_configured_uses_valid_env_key_when_database_key_missing(monkeypatch):
+    prepare_translation_service_test()
+    db = SessionLocal()
+    try:
+        _clear_ai_settings(db)
+        monkeypatch.setattr(translation_service.openai_runtime_settings.__globals__["settings"], "openai_api_key", "sk-env-valid")
+
+        runtime = translation_service.openai_runtime_settings()
+
+        assert runtime["configured"] is True
+        assert runtime["api_key"] == "sk-env-valid"
+        assert runtime["translation_enabled"] is True
+        assert runtime["seo_enabled"] is True
+        assert translation_service.is_ai_translation_configured() is True
+    finally:
+        db.close()
+
+
+def test_ai_translation_configured_uses_valid_env_key_when_database_key_invalid(monkeypatch):
+    prepare_translation_service_test()
+    db = SessionLocal()
+    try:
+        _clear_ai_settings(db)
+        _set_setting(db, "openai_api_key", "")
+        monkeypatch.setattr(translation_service.openai_runtime_settings.__globals__["settings"], "openai_api_key", "sk-env-valid")
+
+        runtime = translation_service.openai_runtime_settings()
+
+        assert runtime["configured"] is True
+        assert runtime["api_key"] == "sk-env-valid"
+        assert translation_service.is_ai_translation_configured() is True
+    finally:
+        db.close()
+
+
+def test_ai_translation_configured_uses_valid_database_key_without_env(monkeypatch):
+    prepare_translation_service_test()
+    db = SessionLocal()
+    try:
+        _clear_ai_settings(db)
+        _set_setting(db, "openai_api_key", "sk-db-valid")
+        monkeypatch.setattr(translation_service.openai_runtime_settings.__globals__["settings"], "openai_api_key", "")
+
+        runtime = translation_service.openai_runtime_settings()
+
+        assert runtime["configured"] is True
+        assert runtime["api_key"] == "sk-db-valid"
+        assert translation_service.is_ai_translation_configured() is True
+    finally:
+        db.close()

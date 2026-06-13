@@ -53,14 +53,21 @@ def _setting_value(key: str, default: str = "") -> str:
         db.close()
 
 
+def _valid_openai_api_key(api_key: str | None) -> bool:
+    key = (api_key or "").strip()
+    return bool(key and key not in PLACEHOLDER_VALUES and key != "test_key" and key.startswith("sk-"))
+
+
 def openai_runtime_settings() -> dict[str, str | bool]:
-    api_key = (_setting_value("openai_api_key") or settings.openai_api_key or "").strip()
+    stored_api_key = _setting_value("openai_api_key").strip()
+    env_api_key = (settings.openai_api_key or "").strip()
+    api_key = stored_api_key if _valid_openai_api_key(stored_api_key) else env_api_key
     model = (_setting_value("openai_model", DEFAULT_OPENAI_MODEL) or DEFAULT_OPENAI_MODEL).strip()
     if model not in OPENAI_MODEL_OPTIONS:
         model = DEFAULT_OPENAI_MODEL
     translation_enabled = (_setting_value("ai_translation_enabled", "enabled") or "enabled") == "enabled"
     seo_enabled = (_setting_value("ai_seo_enabled", "enabled") or "enabled") == "enabled"
-    configured = bool(api_key and api_key not in PLACEHOLDER_VALUES and api_key != "test_key" and api_key.startswith("sk-"))
+    configured = _valid_openai_api_key(stored_api_key) or _valid_openai_api_key(env_api_key)
     return {
         "api_key": api_key,
         "model": model,
