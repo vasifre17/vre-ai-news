@@ -37,6 +37,7 @@ from scheduler.jobs import run_fetch_pipeline, queue_narration, generate_pending
 from ai.pipeline import AIEngine, OPENAI_MODEL_OPTIONS, openai_runtime_settings
 from ai.translation_service import (
     AI_TRANSLATION_WARNING,
+    TRANSLATION_LANGUAGES,
     ai_translation_status,
     enqueue_missing_translations,
     generate_all_missing_translations,
@@ -56,9 +57,9 @@ app.state.dashboard_analytics_cache = {"expires_at": 0.0, "payload": None}
 app.state.youtube_shorts_cache = {"expires_at": 0.0, "payload": None}
 app.state.youtube_shorts_cache_lock = threading.Lock()
 scheduler = BackgroundScheduler()
-SUPPORTED_LANGUAGES = ["az", "en", "ru", "tr", "es", "zh"]
-LANGUAGE_LABELS = {"az": "Azerbaijani", "en": "English", "ru": "Russian", "tr": "Turkish", "es": "Spanish", "zh": "Chinese"}
-LANGUAGE_NEWS_PATHS = {"az": "xeber", "en": "news", "ru": "news", "tr": "haber", "es": "noticia", "zh": "news"}
+SUPPORTED_LANGUAGES = ["az", "en", "ru", "tr"]
+LANGUAGE_LABELS = {"az": "Azerbaijani", "en": "English", "ru": "Russian", "tr": "Turkish"}
+LANGUAGE_NEWS_PATHS = {"az": "xeber", "en": "news", "ru": "news", "tr": "haber"}
 UPLOAD_DIR = Path(settings.image_upload_dir)
 UPLOAD_URL_PREFIX = settings.image_upload_url_prefix
 LEGACY_UPLOAD_DIRS = (Path("uploads"), Path("static/uploads/images"), Path("/app/static/uploads/images"))
@@ -293,70 +294,6 @@ PUBLIC_LABELS = {
         "email": "E-posta",
         "more_categories": "Daha fazla kategori",
     },
-    "zh": {
-        "latest": "最新",
-        "latest_news": "最新新闻",
-        "most_watched": "新闻流",
-        "date_label": "日期",
-        "views_label": "浏览",
-        "related": "相关新闻",
-        "more_stories": "更多报道",
-        "search": "搜索",
-        "search_placeholder": "搜索",
-        "news": "新闻",
-        "top_story": "头条",
-        "audio_narration": "音频播报",
-        "share": "分享",
-        "play": "播放",
-        "pause": "暂停",
-        "download": "下载",
-        "narration_pending": "音频播报正在准备中。文章发布不会受阻。",
-        "no_articles": "暂无已发布文章。请稍后再查看。",
-        "related_empty": "随着 newsroom 内容增长，相关新闻将显示在这里。",
-        "footer_tagline": "高端 AI 新闻情报",
-        "about": "About",
-        "contact": "Contact",
-        "site_name": "Name",
-        "domain_owner": "Domain owner",
-        "mobile_whatsapp": "Mobile and WhatsApp",
-        "youtube": "YouTube",
-        "tiktok": "TikTok",
-        "founder_ceo": "VREYC founder and chief executive is Vasif Jabrayilli.",
-        "email": "电子邮件",
-        "more_categories": "更多分类",
-    },
-    "es": {
-        "latest": "Último",
-        "latest_news": "Últimas noticias",
-        "most_watched": "Feed de noticias",
-        "date_label": "Fecha",
-        "views_label": "Vistas",
-        "related": "Relacionadas",
-        "more_stories": "Más historias",
-        "search": "Buscar",
-        "search_placeholder": "Buscar",
-        "news": "Noticia",
-        "top_story": "Noticia principal",
-        "audio_narration": "Narración de audio",
-        "share": "Compartir",
-        "play": "Reproducir",
-        "pause": "Pausa",
-        "download": "Descargar",
-        "narration_pending": "La narración se está preparando. La publicación del artículo no se bloquea.",
-        "no_articles": "Aún no hay artículos publicados. Vuelve pronto.",
-        "related_empty": "Los artículos relacionados aparecerán aquí a medida que crezca la redacción.",
-        "footer_tagline": "Inteligencia premium de noticias con AI",
-        "about": "About",
-        "contact": "Contact",
-        "site_name": "Name",
-        "domain_owner": "Domain owner",
-        "mobile_whatsapp": "Mobile and WhatsApp",
-        "youtube": "YouTube",
-        "tiktok": "TikTok",
-        "founder_ceo": "VREYC founder and chief executive is Vasif Jabrayilli.",
-        "email": "Correo",
-        "more_categories": "Más categorías",
-    },
 }
 
 CATEGORY_LABELS = {
@@ -364,8 +301,6 @@ CATEGORY_LABELS = {
     "en": {"Politics": "Politics", "World": "World", "Economy": "Economy", "Technology": "Technology", "Business": "Business", "Sports": "Sports", "Health": "Health", "Country": "Country", "Incident": "Incident", "Science and Education": "Science & Education", "Show Business": "Show Business", "Agriculture": "Agriculture"},
     "ru": {"Politics": "Политика", "World": "Мир", "Economy": "Экономика", "Technology": "Технологии", "Business": "Бизнес", "Sports": "Спорт", "Health": "Здоровье", "Country": "Страна", "Incident": "Происшествия", "Science and Education": "Наука и образование", "Show Business": "Шоу-бизнес", "Agriculture": "Сельское хозяйство"},
     "tr": {"Politics": "Siyaset", "World": "Dünya", "Economy": "Ekonomi", "Technology": "Teknoloji", "Business": "İş dünyası", "Sports": "Spor", "Health": "Sağlık", "Country": "Ülke", "Incident": "Olay", "Science and Education": "Bilim ve Eğitim", "Show Business": "Şov Biznes", "Agriculture": "Tarım"},
-    "zh": {"Politics": "政治", "World": "世界", "Economy": "经济", "Technology": "科技", "Business": "商业", "Sports": "体育", "Health": "健康", "Country": "国内", "Incident": "事件", "Science and Education": "科学与教育", "Show Business": "娱乐圈", "Agriculture": "农业"},
-    "es": {"Politics": "Política", "World": "Mundo", "Economy": "Economía", "Technology": "Tecnología", "Business": "Negocios", "Sports": "Deportes", "Health": "Salud", "Country": "País", "Incident": "Sucesos", "Science and Education": "Ciencia y educación", "Show Business": "Espectáculos", "Agriculture": "Agricultura"},
 }
 
 
@@ -1233,7 +1168,7 @@ def admin_traffic_filter():
 def get_translation(article: Article, language: str):
     """Return the stored translation row for a public language, if one exists.
 
-    Azerbaijani content is stored directly on the Article row. EN/RU/TR/ZH/ES
+    Azerbaijani content is stored directly on the Article row. EN/RU/TR
     content is stored in ArticleTranslation rows created by the admin form or
     translation generator.
     """
@@ -1891,7 +1826,7 @@ COUNTRY_NAMES = {
     "BR": "Brazil",
     "MX": "Mexico",
 }
-LANGUAGE_COUNTRY_FALLBACKS = {"az": "AZ", "en": "US", "ru": "RU", "tr": "TR", "es": "ES", "zh": "CN"}
+LANGUAGE_COUNTRY_FALLBACKS = {"az": "AZ", "en": "US", "ru": "RU", "tr": "TR"}
 
 
 def country_flag(country_code: str) -> str:
@@ -2569,6 +2504,8 @@ def apply_schema_migrations(db) -> None:
         "CREATE INDEX IF NOT EXISTS ix_article_views_country_code ON article_views (country_code)",
         "CREATE INDEX IF NOT EXISTS ix_article_views_is_admin_traffic ON article_views (is_admin_traffic)",
         "UPDATE article_translations SET status = 'published' WHERE status IS NULL OR status = ''",
+        "DELETE FROM article_translations WHERE lower(language) IN ('es', 'zh')",
+        "DELETE FROM article_narrations WHERE lower(language) IN ('es', 'zh')",
         "UPDATE media_assets SET url = path WHERE url IS NULL OR url = ''",
         "UPDATE media_assets SET mime_type = content_type WHERE mime_type IS NULL OR mime_type = ''",
     ]:
@@ -2625,7 +2562,8 @@ def read_newsletter_emails() -> set[str]:
 
 @app.post("/{language}/newsletter/subscribe")
 def newsletter_subscribe(request: Request, language: str, email: str = Form("")):
-    language = language if language in SUPPORTED_LANGUAGES else "az"
+    if language not in SUPPORTED_LANGUAGES:
+        raise HTTPException(404)
     labels = public_labels(language)
     normalized_email = (email or "").strip().lower()
     if not EMAIL_PATTERN.fullmatch(normalized_email):
@@ -2650,7 +2588,8 @@ def newsletter_subscribe(request: Request, language: str, email: str = Form(""))
 @app.get("/", response_class=HTMLResponse)
 @app.get("/{language}/", response_class=HTMLResponse)
 def home(request: Request, language: str = "az", q: str = "", category: str = "", db=Depends(get_db)):
-    language = language if language in SUPPORTED_LANGUAGES else "az"
+    if language not in SUPPORTED_LANGUAGES:
+        raise HTTPException(404)
     publish_due_scheduled_articles(db)
     ensure_categories(db)
     query = db.query(Article).options(selectinload(Article.translations)).filter(public_article_visibility_filter())
@@ -3150,7 +3089,10 @@ def admin_articles(
     articles = attach_real_view_counts(db, apply_admin_article_sort(query, sort).offset((page - 1) * per_page).limit(per_page).all())
     narration_map = {n.article_id: n for n in db.query(ArticleNarration).filter(ArticleNarration.article_id.in_([a.id for a in articles] or [0])).all()}
     translation_missing_map = {a.id: missing_translation_languages(a) for a in articles}
-    translation_rows_map = {a.id: {(row.language or "").lower(): row for row in getattr(a, "translations", []) or []} for a in articles}
+    translation_rows_map = {
+        a.id: {(row.language or "").lower(): row for row in getattr(a, "translations", []) or [] if (row.language or "").lower() in TRANSLATION_LANGUAGES}
+        for a in articles
+    }
     article_image_urls = [public_image_url(a.image_url) for a in articles if public_image_url(a.image_url)]
     media_alt_map = {
         public_image_url(asset.url or asset.path): asset.alt_text
@@ -3972,7 +3914,10 @@ def save_settings(request: Request, site_name: str = Form('VREYC'), editor_name:
 def admin_translations(request: Request, db=Depends(get_db), _=Depends(require_auth)):
     articles = db.query(Article).options(selectinload(Article.translations)).order_by(Article.updated_at.desc(), Article.created_at.desc()).all()
     translation_missing_map = {a.id: missing_translation_languages(a) for a in articles}
-    translation_rows_map = {a.id: {(row.language or "").lower(): row for row in getattr(a, "translations", []) or []} for a in articles}
+    translation_rows_map = {
+        a.id: {(row.language or "").lower(): row for row in getattr(a, "translations", []) or [] if (row.language or "").lower() in TRANSLATION_LANGUAGES}
+        for a in articles
+    }
     total_articles = len(articles)
     fully_translated = sum(1 for article in articles if not translation_missing_map.get(article.id))
     language_coverage = []
@@ -3987,9 +3932,9 @@ def admin_translations(request: Request, db=Depends(get_db), _=Depends(require_a
     translation_status_map = {
         article.id: {
             "existing": [language for language in SUPPORTED_LANGUAGES if language == "az" or translation_rows_map.get(article.id, {}).get(language)],
-            "draft": [language for language, row in translation_rows_map.get(article.id, {}).items() if (row.status or "pending") == "draft"],
-            "pending": [language for language, row in translation_rows_map.get(article.id, {}).items() if (row.status or "pending") in {"pending", "generating"}],
-            "failed": [language for language, row in translation_rows_map.get(article.id, {}).items() if (row.status or "pending") == "failed"],
+            "draft": [language for language, row in translation_rows_map.get(article.id, {}).items() if language in TRANSLATION_LANGUAGES and (row.status or "pending") == "draft"],
+            "pending": [language for language, row in translation_rows_map.get(article.id, {}).items() if language in TRANSLATION_LANGUAGES and (row.status or "pending") in {"pending", "generating"}],
+            "failed": [language for language, row in translation_rows_map.get(article.id, {}).items() if language in TRANSLATION_LANGUAGES and (row.status or "pending") == "failed"],
             "rows": translation_rows_map.get(article.id, {}),
             "complete": not translation_missing_map.get(article.id),
         }
@@ -4050,7 +3995,7 @@ def admin_generate_all_missing_translations(request: Request, db=Depends(get_db)
 
 @app.post('/admin/translations/{article_id}/generate/{language}')
 def admin_generate_translation_language(article_id: int, language: str, request: Request, db=Depends(get_db), _=Depends(require_auth)):
-    if language not in [lang for lang in SUPPORTED_LANGUAGES if lang != 'az']:
+    if language not in TRANSLATION_LANGUAGES:
         return RedirectResponse('/admin/translations?queued=bad_language', status_code=302)
     if not db.query(Article).get(article_id):
         return RedirectResponse('/admin/translations?queued=missing_article', status_code=302)
@@ -4123,7 +4068,8 @@ def set_mode(request: Request, mode: str = Form(...), db=Depends(get_db), _=Depe
 
 @app.get("/{language}/{section}/{slug}", response_class=HTMLResponse)
 def article_by_language_section_slug(language: str, section: str, slug: str, request: Request, db=Depends(get_db)):
-    language = language if language in SUPPORTED_LANGUAGES else "az"
+    if language not in SUPPORTED_LANGUAGES:
+        raise HTTPException(404)
     expected_section = LANGUAGE_NEWS_PATHS.get(language, "news")
     if section != expected_section:
         return RedirectResponse(article_url(language, slug), status_code=301)

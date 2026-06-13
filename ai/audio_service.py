@@ -7,7 +7,7 @@ from openai import OpenAI
 
 from config import settings
 
-SUPPORTED_LANGUAGES = {"az", "en", "ru", "tr", "zh", "es"}
+SUPPORTED_LANGUAGES = {"az", "en", "ru", "tr"}
 
 
 class AudioNarrationService:

@@ -65,7 +65,7 @@ def test_new_article_does_not_duplicate_manual_translation_when_queueing_missing
         article = db.query(Article).filter(Article.slug == "yeni-azerbaycan-xeberi").one()
         translations = db.query(ArticleTranslation).filter(ArticleTranslation.article_id == article.id).all()
         languages = sorted(row.language for row in translations)
-        assert languages == ["en", "es", "ru", "tr", "zh"]
+        assert languages == ["en", "ru", "tr"]
         assert sum(1 for row in translations if row.language == "en") == 1
         en_translation = next(row for row in translations if row.language == "en")
         assert en_translation.title == "New Azerbaijani news"
@@ -73,3 +73,12 @@ def test_new_article_does_not_duplicate_manual_translation_when_queueing_missing
         assert article.language == "az"
     finally:
         db.close()
+
+
+def test_legacy_spanish_and_chinese_public_urls_return_404():
+    prepare_article_translation_test()
+
+    with TestClient(app) as client:
+        for path in ["/es/", "/zh/", "/es/legacy-slug", "/zh/news/legacy-slug"]:
+            response = client.get(path, follow_redirects=False)
+            assert response.status_code == 404

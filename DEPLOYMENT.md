@@ -91,7 +91,7 @@ python scripts/production_smoke_check.py
 
 Then verify the live site:
 - [ ] `https://vreyc.com/` loads the public home page.
-- [ ] `https://vreyc.com/az/`, `/en/`, `/ru/`, `/tr/`, `/zh/`, and `/es/` load multilingual home pages.
+- [ ] `https://vreyc.com/az/`, `/en/`, `/ru/`, and `/tr/` load multilingual home pages; `/es/` and `/zh/` should return 404 or redirect safely.
 - [ ] A published translated article shows correct `hreflang`, canonical metadata, and translated content.
 - [ ] AI narration appears on published article pages after the background narration job completes.
 - [ ] `https://vreyc.com/sitemap.xml` contains only `https://vreyc.com` URLs.
