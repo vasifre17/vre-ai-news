@@ -9,7 +9,7 @@ from database.session import SessionLocal
 from ai.pipeline import AIEngine, openai_runtime_settings
 
 PRIMARY_LANGUAGE = "az"
-TRANSLATION_LANGUAGES = ["en", "ru", "tr", "es", "zh"]
+TRANSLATION_LANGUAGES = ["en", "ru", "tr"]
 AI_TRANSLATION_WARNING = "AI translation provider is not configured."
 
 

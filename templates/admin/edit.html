@@ -10,7 +10,7 @@
 {% if request.query_params.get('error') == 'publish_at_required' %}<div class="alert danger">Publish at is required when status is Scheduled.</div>{% endif %}
 <form method="post" enctype="multipart/form-data" class="article-editor">
   <section class="panel editor-main">
-    <div class="panel-head wrap"><div><h2>Multilingual content</h2><p class="muted">Manage localized fields for AZ, EN, RU, TR, ZH and ES.</p></div><button class="btn primary" type="submit">Save article</button></div>
+    <div class="panel-head wrap"><div><h2>Multilingual content</h2><p class="muted">Manage localized fields for AZ, EN, RU and TR.</p></div><button class="btn primary" type="submit">Save article</button></div>
     <div class="language-editor">
       {% for lang in languages %}
       {% set item = translations.get(lang) %}

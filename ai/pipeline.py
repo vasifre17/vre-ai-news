@@ -20,8 +20,6 @@ LANGUAGE_NAMES = {
     "en": "English",
     "ru": "Russian",
     "tr": "Turkish",
-    "es": "Spanish",
-    "zh": "Chinese",
 }
 
 
