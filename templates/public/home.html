@@ -141,6 +141,26 @@
         </div>
         {% if sidebar_articles|length > 20 %}<button class="sidebar-load-more" type="button" data-sidebar-load-more>{{ ui.load_more }}</button>{% endif %}
       </section>
+
+      {% if market_panel %}
+      <section class="market-panel" aria-labelledby="market-panel-title">
+        <div class="market-panel-head">
+          <p class="eyebrow">Markets</p>
+          <h2 id="market-panel-title">{{ ui.market_panel_title }}</h2>
+        </div>
+        {% for section in market_panel.sections %}
+        <div class="market-section">
+          <h3>{{ ui.get('market_' ~ section.group, section.group|title) }}</h3>
+          <div class="market-quote-list">
+            {% for quote in section.items %}
+            <div class="market-quote-row"><span>{{ quote.label }}</span><strong>{{ '%.4f'|format(quote.value) if quote.value < 10 else '%.2f'|format(quote.value) }} {{ quote.quote_currency }}</strong></div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+        {% if market_panel.latest_updated_at %}<small class="market-updated">{{ ui.market_last_updated }}: {{ market_panel.latest_updated_at|format_public_published_at }}</small>{% endif %}
+      </section>
+      {% endif %}
       <section><h2>{{ ui.most_viewed }}</h2><div class="trending-list ranked-list">{% for row in most_viewed_articles %}<a href="{{ row.url }}"><span>{{ loop.index }}</span><div><strong>{{ row.title }}</strong><small>{{ row.view_count }} {{ ui.views_label|lower }} • {{ row.article.published_at|format_public_published_at }}</small></div></a>{% endfor %}</div></section>
     </aside>
   </div>

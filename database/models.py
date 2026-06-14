@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, UniqueConstraint, Float
 from sqlalchemy.orm import declarative_base, relationship
 
 Base = declarative_base()
@@ -164,6 +164,17 @@ class Setting(Base):
     id = Column(Integer, primary_key=True)
     key = Column(String(100), unique=True)
     value = Column(String(500))
+
+
+class MarketQuote(Base):
+    __tablename__ = "market_quotes"
+    id = Column(Integer, primary_key=True)
+    key = Column(String(100), unique=True, index=True)
+    label = Column(String(50))
+    value = Column(Float)
+    quote_currency = Column(String(10), default="USD")
+    source = Column(String(120))
+    updated_at = Column(DateTime, default=datetime.utcnow, index=True)
 
 
 class FetchLog(Base):

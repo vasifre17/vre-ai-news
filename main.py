@@ -31,10 +31,11 @@ import requests
 
 from config import PLACEHOLDER_VALUES, settings
 from database.session import SessionLocal, init_db
-from database.models import Article, ArticleRevision, ArticleView, FetchLog, Setting, ArticleNarration, ArticleTranslation, Category, MediaAsset
+from database.models import Article, ArticleRevision, ArticleView, FetchLog, Setting, ArticleNarration, ArticleTranslation, Category, MediaAsset, MarketQuote
 from cms.auth.security import is_authenticated, set_session, clear_session, verify_password
 from scheduler.jobs import run_fetch_pipeline, queue_narration, generate_pending_narrations
 from ai.pipeline import AIEngine, OPENAI_MODEL_OPTIONS, openai_runtime_settings
+from market_data import market_panel_context, refresh_market_quotes
 from ai.translation_service import (
     AI_TRANSLATION_WARNING,
     TRANSLATION_LANGUAGES,
@@ -700,6 +701,15 @@ for _lang, _labels in PUBLIC_LEGAL_LABELS.items():
 
 CATEGORY_UI_KEYS = {'az': {'politics': 'Siyasət', 'world': 'Dünya', 'economy': 'İqtisadiyyat', 'technology': 'Texnologiya', 'business': 'Biznes', 'sports': 'İdman', 'health': 'Sağlamlıq', 'country': 'Ölkə', 'incident': 'Hadisə', 'science_and_education': 'Elm və Təhsil', 'show_business': 'Şou Biznes', 'agriculture': 'Kənd təsərrüfatı'}, 'en': {'politics': 'Politics', 'world': 'World', 'economy': 'Economy', 'technology': 'Technology', 'business': 'Business', 'sports': 'Sports', 'health': 'Health', 'country': 'Country', 'incident': 'Incident', 'science_and_education': 'Science and Education', 'show_business': 'Show Business', 'agriculture': 'Agriculture'}, 'ru': {'politics': 'Политика', 'world': 'Мир', 'economy': 'Экономика', 'technology': 'Технологии', 'business': 'Бизнес', 'sports': 'Спорт', 'health': 'Здоровье', 'country': 'Страна', 'incident': 'Происшествия', 'science_and_education': 'Наука и образование', 'show_business': 'Шоу-бизнес', 'agriculture': 'Сельское хозяйство'}, 'tr': {'politics': 'Siyaset', 'world': 'Dünya', 'economy': 'Ekonomi', 'technology': 'Teknoloji', 'business': 'İş dünyası', 'sports': 'Spor', 'health': 'Sağlık', 'country': 'Ülke', 'incident': 'Olay', 'science_and_education': 'Bilim ve Eğitim', 'show_business': 'Şov Biznes', 'agriculture': 'Tarım'}}
 for _lang, _labels in CATEGORY_UI_KEYS.items():
+    PUBLIC_LABELS[_lang].update(_labels)
+
+MARKET_UI_LABELS = {
+    "az": {"market_panel_title": "Valyuta, Qızıl və Kripto", "market_currency": "Valyuta", "market_gold": "Qızıl", "market_crypto": "Kripto", "market_last_updated": "Son yenilənmə"},
+    "en": {"market_panel_title": "Currency, Gold and Crypto", "market_currency": "Currency", "market_gold": "Gold", "market_crypto": "Crypto", "market_last_updated": "Last updated"},
+    "ru": {"market_panel_title": "Валюта, золото и крипто", "market_currency": "Валюта", "market_gold": "Золото", "market_crypto": "Крипто", "market_last_updated": "Последнее обновление"},
+    "tr": {"market_panel_title": "Döviz, Altın ve Kripto", "market_currency": "Döviz", "market_gold": "Altın", "market_crypto": "Kripto", "market_last_updated": "Son güncelleme"},
+}
+for _lang, _labels in MARKET_UI_LABELS.items():
     PUBLIC_LABELS[_lang].update(_labels)
 
 def t(key: str, lang: str = "az") -> str:
@@ -2768,6 +2778,7 @@ def apply_schema_migrations(db) -> None:
     ArticleTranslation.__table__.create(bind=bind, checkfirst=True)
     ArticleView.__table__.create(bind=bind, checkfirst=True)
     MediaAsset.__table__.create(bind=bind, checkfirst=True)
+    MarketQuote.__table__.create(bind=bind, checkfirst=True)
     publish_at_type = "DATETIME" if bind.dialect.name == "sqlite" else "TIMESTAMP"
     for statement in [
         "ALTER TABLE articles ADD COLUMN slug VARCHAR(500)",
@@ -2827,6 +2838,8 @@ def apply_schema_migrations(db) -> None:
         "CREATE INDEX IF NOT EXISTS ix_article_views_device_type ON article_views (device_type)",
         "CREATE INDEX IF NOT EXISTS ix_article_views_country_code ON article_views (country_code)",
         "CREATE INDEX IF NOT EXISTS ix_article_views_is_admin_traffic ON article_views (is_admin_traffic)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS ix_market_quotes_key ON market_quotes (key)",
+        "CREATE INDEX IF NOT EXISTS ix_market_quotes_updated_at ON market_quotes (updated_at)",
         "UPDATE article_translations SET status = 'published' WHERE status IS NULL OR status = ''",
         "DELETE FROM article_translations WHERE lower(language) IN ('es', 'zh')",
         "DELETE FROM article_narrations WHERE lower(language) IN ('es', 'zh')",
@@ -2857,6 +2870,9 @@ def startup() -> None:
     scheduler.add_job(run_fetch_pipeline, "interval", minutes=max(13, min(17, settings.fetch_interval_min)), id="fetch_job", replace_existing=True)
     scheduler.add_job(generate_pending_narrations, "interval", seconds=45, id="narration_job", replace_existing=True)
     scheduler.add_job(run_scheduled_publish_check, "interval", seconds=60, id="scheduled_publish_job", replace_existing=True)
+    scheduler.add_job(refresh_market_quotes, "interval", days=1, args=["currency"], id="market_currency_job", replace_existing=True)
+    scheduler.add_job(refresh_market_quotes, "interval", minutes=30, args=["gold"], id="market_gold_job", replace_existing=True)
+    scheduler.add_job(refresh_market_quotes, "interval", minutes=5, args=["crypto"], id="market_crypto_job", replace_existing=True)
     if not scheduler.running:
         scheduler.start()
 
@@ -2984,7 +3000,7 @@ def home(request: Request, language: str = "az", q: str = "", category: str = ""
         build_website_schema(settings_map, language),
         build_breadcrumb_schema([("Home", canonical)]),
     ]
-    return templates.TemplateResponse("public/home.html", {"request": request, "articles": article_cards, "latest_articles": latest_cards, "sidebar_articles": sidebar_cards, "trending_articles": trending_cards, "most_viewed_articles": most_viewed_cards, "breaking_articles": breaking_cards, "hero_slides": hero_slides, "latest_news_count": latest_news_count, "today_views": today_views, "category_blocks": category_blocks, "hero": hero, "categories": categories["primary"], "secondary_categories": categories["secondary"], "q": q, "category": category, "site_url": settings.site_url, "canonical": canonical, "language": language, "languages": SUPPORTED_LANGUAGES, "alt_links": alt_links, "ui": public_labels(language), "category_labels": category_labels, "settings_map": settings_map, "verification_meta": seo_verification_meta(settings_map), "schema_graph": schema_graph, "site_name": site_name_from_settings(settings_map), "youtube_widget": youtube_widget, "app_version": APP_VERSION})
+    return templates.TemplateResponse("public/home.html", {"request": request, "articles": article_cards, "latest_articles": latest_cards, "sidebar_articles": sidebar_cards, "trending_articles": trending_cards, "most_viewed_articles": most_viewed_cards, "breaking_articles": breaking_cards, "hero_slides": hero_slides, "latest_news_count": latest_news_count, "today_views": today_views, "category_blocks": category_blocks, "hero": hero, "categories": categories["primary"], "secondary_categories": categories["secondary"], "q": q, "category": category, "site_url": settings.site_url, "canonical": canonical, "language": language, "languages": SUPPORTED_LANGUAGES, "alt_links": alt_links, "ui": public_labels(language), "category_labels": category_labels, "settings_map": settings_map, "verification_meta": seo_verification_meta(settings_map), "schema_graph": schema_graph, "site_name": site_name_from_settings(settings_map), "youtube_widget": youtube_widget, "market_panel": market_panel_context(db), "app_version": APP_VERSION})
 
 
 @app.get("/{language}/privacy", response_class=HTMLResponse)
@@ -3249,6 +3265,12 @@ def admin_dashboard_analytics(db=Depends(get_db), _=Depends(require_auth)):
     return JSONResponse(cached_dashboard_analytics(db))
 
 
+@app.post('/admin/market/refresh')
+def admin_market_refresh(db=Depends(get_db), _=Depends(require_auth)):
+    refresh_market_quotes("all")
+    return RedirectResponse('/admin?market_refreshed=1', status_code=302)
+
+
 @app.post('/admin/seo/generate-missing-meta-descriptions')
 def admin_generate_missing_meta_descriptions(db=Depends(get_db), _=Depends(require_auth)):
     updated = fix_missing_meta_descriptions(db)
@@ -3299,7 +3321,7 @@ def admin_dashboard(request: Request, db=Depends(get_db), _=Depends(require_auth
     most_viewed_articles = [setattr(article, "real_view_count", int(real_view_count or 0)) or article for article, real_view_count in most_viewed_articles]
     analytics = analytics_summary(db)
     dashboard_status = dashboard_status_context(db, total_articles, published, drafts, scheduled)
-    return templates.TemplateResponse('admin/dashboard.html', {'request': request, 'drafts': drafts, 'published': published, 'scheduled': scheduled, 'next_scheduled_article': next_scheduled_article, 'total_articles': total_articles, 'categories': categories, 'media_count': media_count, 'logs': logs, 'recent_articles': latest_articles, 'latest_articles': latest_articles, 'most_viewed_articles': most_viewed_articles, 'analytics': analytics, 'dashboard_status': dashboard_status, 'top_categories': top_category_rows(db), 'traffic_charts': traffic_charts(db), "languages": SUPPORTED_LANGUAGES, "ai_translation_status": ai_translation_status()})
+    return templates.TemplateResponse('admin/dashboard.html', {'request': request, 'drafts': drafts, 'published': published, 'scheduled': scheduled, 'next_scheduled_article': next_scheduled_article, 'total_articles': total_articles, 'categories': categories, 'media_count': media_count, 'logs': logs, 'recent_articles': latest_articles, 'latest_articles': latest_articles, 'most_viewed_articles': most_viewed_articles, 'analytics': analytics, 'dashboard_status': dashboard_status, 'top_categories': top_category_rows(db), 'traffic_charts': traffic_charts(db), "languages": SUPPORTED_LANGUAGES, "ai_translation_status": ai_translation_status(), "market_panel": market_panel_context(db)})
 
 
 @app.get('/admin/ai-center', response_class=HTMLResponse)
