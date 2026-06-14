@@ -35,7 +35,7 @@ from database.models import Article, ArticleRevision, ArticleView, FetchLog, Set
 from cms.auth.security import is_authenticated, set_session, clear_session, verify_password
 from scheduler.jobs import run_fetch_pipeline, queue_narration, generate_pending_narrations
 from ai.pipeline import AIEngine, OPENAI_MODEL_OPTIONS, openai_runtime_settings
-from market_data import market_panel_context, refresh_market_quotes
+from market_data import ensure_market_settings, market_panel_context, refresh_market_quotes, seed_market_fallbacks
 from ai.translation_service import (
     AI_TRANSLATION_WARNING,
     TRANSLATION_LANGUAGES,
@@ -2861,6 +2861,8 @@ def startup() -> None:
     preserve_legacy_uploads()
     db = SessionLocal()
     apply_schema_migrations(db)
+    ensure_market_settings(db)
+    seed_market_fallbacks(db)
     ensure_categories(db)
     ensure_slugs(db)
     missing_images = validate_image_references(db)

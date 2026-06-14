@@ -1,44 +1,73 @@
+"""No-key market data fetch, cache, and presentation helpers."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
+from types import SimpleNamespace
 import logging
-import xml.etree.ElementTree as ET
 
 import requests
 
-from database.models import FetchLog, MarketQuote
+from database.models import MarketQuote, Setting
 from database.session import SessionLocal
 
 logger = logging.getLogger(__name__)
-HTTP_TIMEOUT = 6
-USER_AGENT = "VREYC-News/1.0 (+https://vreyc.com)"
 
-MARKET_GROUPS = {
-    "currency": ["market_usd_azn", "market_eur_azn", "market_try_azn", "market_rub_azn"],
-    "gold": ["market_gold_usd"],
-    "crypto": ["market_btc_usd", "market_eth_usd", "market_usdt_usd", "market_bnb_usd"],
+CURRENCY_KEYS = ["market_usd_azn", "market_eur_azn", "market_try_azn", "market_rub_azn"]
+GOLD_KEYS = ["market_gold_azn"]
+CRYPTO_KEYS = ["market_btc_usd", "market_eth_usd", "market_usdt_usd", "market_bnb_usd"]
+MARKET_ORDER = CURRENCY_KEYS + GOLD_KEYS + CRYPTO_KEYS
+
+DEFAULT_QUOTES = {
+    "market_usd_azn": ("USD/AZN", 1.7000, "AZN", "fallback"),
+    "market_eur_azn": ("EUR/AZN", 1.8300, "AZN", "fallback"),
+    "market_try_azn": ("TRY/AZN", 0.0520, "AZN", "fallback"),
+    "market_rub_azn": ("RUB/AZN", 0.0190, "AZN", "fallback"),
+    "market_gold_azn": ("Gold", 4000.00, "AZN/oz", "fallback"),
+    "market_btc_usd": ("BTC", 0.0, "USD", "fallback"),
+    "market_eth_usd": ("ETH", 0.0, "USD", "fallback"),
+    "market_usdt_usd": ("USDT", 1.0, "USD", "fallback"),
+    "market_bnb_usd": ("BNB", 0.0, "USD", "fallback"),
 }
 
-QUOTE_META = {
-    "market_usd_azn": ("USD/AZN", "AZN"),
-    "market_eur_azn": ("EUR/AZN", "AZN"),
-    "market_try_azn": ("TRY/AZN", "AZN"),
-    "market_rub_azn": ("RUB/AZN", "AZN"),
-    "market_gold_usd": ("Gold / XAU", "USD"),
-    "market_btc_usd": ("BTC/USD", "USD"),
-    "market_eth_usd": ("ETH/USD", "USD"),
-    "market_usdt_usd": ("USDT/USD", "USD"),
-    "market_bnb_usd": ("BNB/USD", "USD"),
+SETTING_DEFAULTS = {
+    "market_enabled": "1",
+    "market_currency_provider": "open.er-api.com",
+    "market_gold_provider": "coingecko:pax-gold",
+    "market_crypto_provider": "coingecko",
+    "market_last_refresh_status": "never",
+    "market_last_refresh_error": "",
+    "market_last_refreshed_at": "",
 }
 
 
-def _log(db, level: str, message: str) -> None:
-    logger.log(logging.ERROR if level == "ERROR" else logging.INFO, message)
-    db.add(FetchLog(level=level, message=message[:1000]))
+def _utcnow() -> datetime:
+    return datetime.utcnow()
 
 
-def _upsert(db, key: str, value: float, source: str) -> None:
-    label, quote_currency = QUOTE_META[key]
+def _request_json(url: str, timeout: int = 8) -> dict:
+    response = requests.get(url, timeout=timeout, headers={"User-Agent": "VREYC-market-widget/1.0"})
+    response.raise_for_status()
+    return response.json()
+
+
+def _save_setting(db, key: str, value: str) -> None:
+    row = db.query(Setting).filter(Setting.key == key).first()
+    if row:
+        row.value = value[:500]
+    else:
+        db.add(Setting(key=key, value=value[:500]))
+
+
+def ensure_market_settings(db) -> None:
+    for key, value in SETTING_DEFAULTS.items():
+        if not db.query(Setting).filter(Setting.key == key).first():
+            db.add(Setting(key=key, value=value))
+    db.commit()
+
+
+def _upsert_quote(db, key: str, label: str, value: float, quote_currency: str, source: str, updated_at: datetime | None = None) -> None:
+    if value is None:
+        return
     row = db.query(MarketQuote).filter(MarketQuote.key == key).first()
     if not row:
         row = MarketQuote(key=key)
@@ -47,90 +76,95 @@ def _upsert(db, key: str, value: float, source: str) -> None:
     row.value = float(value)
     row.quote_currency = quote_currency
     row.source = source
-    row.updated_at = datetime.utcnow()
+    row.updated_at = updated_at or _utcnow()
 
 
-def fetch_currency_quotes(db) -> int:
-    today = datetime.utcnow().strftime("%d.%m.%Y")
-    url = f"https://www.cbar.az/currencies/{today}.xml"
-    response = requests.get(url, headers={"User-Agent": USER_AGENT}, timeout=HTTP_TIMEOUT)
-    response.raise_for_status()
-    root = ET.fromstring(response.content)
-    code_to_key = {"USD": "market_usd_azn", "EUR": "market_eur_azn", "TRY": "market_try_azn", "RUB": "market_rub_azn"}
-    updated = 0
-    for valute in root.findall(".//Valute"):
-        code = valute.attrib.get("Code")
-        key = code_to_key.get(code or "")
-        if not key:
-            continue
-        nominal = float((valute.findtext("Nominal") or "1").replace(",", "."))
-        value = float((valute.findtext("Value") or "0").replace(",", ".")) / nominal
-        _upsert(db, key, value, "Central Bank of Azerbaijan")
-        updated += 1
-    return updated
+def _fetch_currency_quotes() -> dict[str, tuple[str, float, str, str]]:
+    data = _request_json("https://open.er-api.com/v6/latest/AZN")
+    rates = data.get("rates") or {}
+    quotes = {}
+    for code, key in [("USD", "market_usd_azn"), ("EUR", "market_eur_azn"), ("TRY", "market_try_azn"), ("RUB", "market_rub_azn")]:
+        per_azn = float(rates[code])
+        quotes[key] = (f"{code}/AZN", 1 / per_azn, "AZN", "open.er-api.com")
+    return quotes
 
 
-def fetch_gold_quote(db) -> int:
-    response = requests.get("https://stooq.com/q/l/?s=xauusd&f=sd2t2ohlcv&h&e=csv", headers={"User-Agent": USER_AGENT}, timeout=HTTP_TIMEOUT)
-    response.raise_for_status()
-    lines = response.text.strip().splitlines()
-    if len(lines) < 2:
-        return 0
-    fields = lines[1].split(",")
-    close = fields[6] if len(fields) > 6 else "N/D"
-    if close in {"N/D", ""}:
-        return 0
-    _upsert(db, "market_gold_usd", float(close), "Stooq XAUUSD")
-    return 1
+def _fetch_crypto_quotes() -> dict[str, tuple[str, float, str, str]]:
+    ids = "bitcoin,ethereum,tether,binancecoin"
+    data = _request_json(f"https://api.coingecko.com/api/v3/simple/price?ids={ids}&vs_currencies=usd")
+    mapping = {"market_btc_usd": ("BTC", "bitcoin"), "market_eth_usd": ("ETH", "ethereum"), "market_usdt_usd": ("USDT", "tether"), "market_bnb_usd": ("BNB", "binancecoin")}
+    return {key: (label, float(data[coin]["usd"]), "USD", "coingecko") for key, (label, coin) in mapping.items()}
 
 
-def fetch_crypto_quotes(db) -> int:
-    symbols = {"BTCUSDT": "market_btc_usd", "ETHUSDT": "market_eth_usd", "USDTUSDC": "market_usdt_usd", "BNBUSDT": "market_bnb_usd"}
-    response = requests.get("https://api.binance.com/api/v3/ticker/price", headers={"User-Agent": USER_AGENT}, timeout=HTTP_TIMEOUT)
-    response.raise_for_status()
-    prices = {item.get("symbol"): item.get("price") for item in response.json()}
-    updated = 0
-    for symbol, key in symbols.items():
-        if prices.get(symbol):
-            _upsert(db, key, float(prices[symbol]), "Binance public ticker")
-            updated += 1
-    return updated
+def _fetch_gold_quote(usd_azn: float | None = None) -> dict[str, tuple[str, float, str, str]]:
+    data = _request_json("https://api.coingecko.com/api/v3/simple/price?ids=pax-gold&vs_currencies=usd")
+    usd_value = float(data["pax-gold"]["usd"])
+    value = usd_value * (usd_azn or DEFAULT_QUOTES["market_usd_azn"][1])
+    return {"market_gold_azn": ("Gold", value, "AZN/oz", "coingecko:pax-gold")}
 
 
-def refresh_market_quotes(group: str = "all") -> None:
+def _current_usd_azn(db) -> float:
+    row = db.query(MarketQuote).filter(MarketQuote.key == "market_usd_azn").first()
+    return float(row.value) if row and row.value else DEFAULT_QUOTES["market_usd_azn"][1]
+
+
+def _refresh_group(db, group: str) -> int:
+    fetched = {}
+    if group in {"currency", "all"}:
+        fetched.update(_fetch_currency_quotes())
+    if group in {"gold", "all"}:
+        fetched.update(_fetch_gold_quote(fetched.get("market_usd_azn", (None, _current_usd_azn(db)))[1]))
+    if group in {"crypto", "all"}:
+        fetched.update(_fetch_crypto_quotes())
+    now = _utcnow()
+    for key, payload in fetched.items():
+        _upsert_quote(db, key, *payload, updated_at=now)
+    _save_setting(db, "market_last_refreshed_at", now.isoformat())
+    _save_setting(db, "market_last_refresh_status", "ok")
+    _save_setting(db, "market_last_refresh_error", "")
+    return len(fetched)
+
+
+def seed_market_fallbacks(db) -> None:
+    existing = {row.key for row in db.query(MarketQuote.key).all()}
+    stale_time = _utcnow() - timedelta(days=1)
+    for key, payload in DEFAULT_QUOTES.items():
+        if key not in existing:
+            _upsert_quote(db, key, *payload, updated_at=stale_time)
+    db.commit()
+
+
+def refresh_market_quotes(group: str = "all") -> int:
     db = SessionLocal()
     try:
-        tasks = []
-        if group in {"all", "currency"}:
-            tasks.append(("currency", fetch_currency_quotes))
-        if group in {"all", "gold"}:
-            tasks.append(("gold", fetch_gold_quote))
-        if group in {"all", "crypto"}:
-            tasks.append(("crypto", fetch_crypto_quotes))
-        for name, fn in tasks:
-            try:
-                count = fn(db)
-                _log(db, "INFO", f"Market {name} refresh updated {count} quote(s).")
-                db.commit()
-            except Exception as exc:
-                db.rollback()
-                _log(db, "ERROR", f"Market {name} refresh failed: {exc}")
-                db.commit()
+        ensure_market_settings(db)
+        count = _refresh_group(db, group)
+        db.commit()
+        return count
+    except Exception as exc:  # graceful fallback: keep stale cache
+        db.rollback()
+        logger.warning("Market refresh failed for %s: %s", group, exc)
+        try:
+            ensure_market_settings(db)
+            seed_market_fallbacks(db)
+            _save_setting(db, "market_last_refresh_status", "fallback")
+            _save_setting(db, "market_last_refresh_error", str(exc))
+            db.commit()
+        except Exception:
+            db.rollback()
+        return 0
     finally:
         db.close()
 
 
-def market_panel_context(db) -> dict | None:
-    rows = db.query(MarketQuote).filter(MarketQuote.value.isnot(None)).all()
-    by_key = {row.key: row for row in rows}
-    if not by_key:
-        return None
+def market_panel_context(db):
+    ensure_market_settings(db)
+    seed_market_fallbacks(db)
+    rows = {row.key: row for row in db.query(MarketQuote).filter(MarketQuote.key.in_(MARKET_ORDER)).all()}
     sections = []
-    for group, keys in MARKET_GROUPS.items():
-        items = [by_key[key] for key in keys if key in by_key]
+    for group, keys in [("currency", CURRENCY_KEYS), ("gold", GOLD_KEYS), ("crypto", CRYPTO_KEYS)]:
+        items = [rows[key] for key in keys if key in rows and rows[key].value is not None]
         if items:
-            sections.append({"group": group, "items": items})
-    if not sections:
-        return None
-    latest = max((row.updated_at for row in by_key.values() if row.updated_at), default=None)
-    return {"sections": sections, "latest_updated_at": latest}
+            sections.append(SimpleNamespace(group=group, items=items))
+    latest = max((row.updated_at for row in rows.values() if row.updated_at), default=None)
+    return SimpleNamespace(sections=sections, latest_updated_at=latest) if sections else None
