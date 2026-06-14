@@ -15,7 +15,7 @@
 </head>
 <body>
 <header class="site-header glass">
-  <nav class="nav container"><a class="logo brand-logo" href="/{{ language }}/" aria-label="Vasif REYC home"><img class="logo-avatar" src="https://vreyc.com/static/uploads/images/v-99fe872e6408.png" alt="Vasif REYC"><span class="logo-name">Vasif REYC</span></a><form class="search-wrap" action="/{{ language }}/" role="search"><input type="search" name="q" placeholder="{{ ui.search_placeholder }}" aria-label="{{ ui.search }}"></form><div class="header-actions"><details class="language-switcher" aria-label="{{ ui.get('language_label', 'Language') }}"><summary><span>{{ language|upper }}</span><span class="language-arrow" aria-hidden="true">▾</span></summary><div class="language-dropdown">{% for lang in languages %}<a href="{{alt_links[lang]}}" {% if lang == language %}aria-current="page"{% endif %}>{{lang|upper}}</a>{% endfor %}</div></details></div></nav>
+  <nav class="nav container"><a class="logo brand-logo" href="/{{ language }}/" aria-label="Vasif REYC {{ ui.home|lower }}"><img class="logo-avatar" src="https://vreyc.com/static/uploads/images/v-99fe872e6408.png" alt="Vasif REYC"><span class="logo-name">Vasif REYC</span></a><form class="search-wrap" action="/{{ language }}/" role="search"><input type="search" name="q" placeholder="{{ ui.search_placeholder }}" aria-label="{{ ui.search }}"></form><div class="header-actions"><details class="language-switcher" aria-label="{{ ui.get('language_label', 'Language') }}"><summary><span>{{ language|upper }}</span><span class="language-arrow" aria-hidden="true">▾</span></summary><div class="language-dropdown">{% for lang in languages %}<a href="{{alt_links[lang]}}" {% if lang == language %}aria-current="page"{% endif %}>{{lang|upper}}</a>{% endfor %}</div></details></div></nav>
   <nav class="categories container" aria-label="{{ ui.news }}">
     <div class="primary-categories">{% for c in categories %}<a href="/{{ language }}/?category={{ c.name }}" style="--cat-color: {{ c.color or '#48a6ff' }}">{{ category_labels.get(c.name, c.name) }}</a>{% endfor %}</div>
     {% if secondary_categories %}<div class="category-menu">
@@ -24,8 +24,8 @@
     </div>{% endif %}
   </nav>
 </header>
-<nav class="fixed-social-sidebar" aria-label="Social links and theme switcher">
-  <button id="themeToggle" class="social-button theme-lamp-button" type="button" aria-label="Switch to dark mode" aria-pressed="false"><span class="theme-icon" aria-hidden="true">💡</span></button>
+<nav class="fixed-social-sidebar" aria-label="{{ ui.get('social_links', 'Social links and theme switcher') }}">
+  <button id="themeToggle" class="social-button theme-lamp-button" type="button" aria-label="{{ ui.get('switch_dark_mode', 'Switch to dark mode') }}" aria-pressed="false"><span class="theme-icon" aria-hidden="true">💡</span></button>
   <a class="social-button social-facebook" href="https://www.facebook.com/sharer/sharer.php?u={{ share_url }}" target="_blank" rel="noopener" aria-label="Facebook">
     <svg class="social-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14.2 8.4V6.7c0-.8.2-1.3 1.4-1.3H17V2.2c-.7-.1-1.6-.2-2.7-.2-2.8 0-4.7 1.7-4.7 4.8v1.6H6.5V12h3.1v10h3.8V12h3.1l.5-3.6h-3z"/></svg>
   </a>
@@ -39,7 +39,7 @@
     <svg class="social-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2.1C6.3 2.1 2 6.3 2 12c0 5.6 4.2 9.9 10 9.9 1.9 0 3.8-.5 5.3-1.4l-1.1-2.1c-1.2.7-2.6 1.1-4.2 1.1-4.2 0-7.3-3.2-7.3-7.5S7.8 4.5 12 4.5s7.3 3.1 7.3 7.3c0 2.1-.8 3.3-1.8 3.3-.7 0-1-.4-.9-1.1l.7-6.1h-2.6l-.1.9A4 4 0 0 0 11.5 7c-2.8 0-5 2.2-5 5.2 0 2.9 1.8 4.9 4.4 4.9 1.3 0 2.5-.5 3.4-1.5.5 1.1 1.5 1.6 2.8 1.6 2.8 0 4.9-2.2 4.9-5.4 0-5.5-4.3-9.7-10-9.7zm-.5 12.6c-1.3 0-2.2-1-2.2-2.6s1-2.7 2.4-2.7 2.3 1 2.3 2.5c0 1.7-1.1 2.8-2.5 2.8z"/></svg>
   </a>
 </nav>
-<div class="container ad-zone ad-zone-top article-ad-top" role="complementary" aria-label="Advertisement"><span>Reklam yeri</span></div>
+<div class="container ad-zone ad-zone-top article-ad-top" role="complementary" aria-label="{{ ui.get('advertisement', 'Advertisement') }}"><span>{{ ui.get('advertisement_slot', 'Reklam yeri') }}</span></div>
 <main class="article-page">
   <section class="article-hero premium-article-hero">
     <div class="container article-hero-copy">
@@ -48,14 +48,14 @@
     </div>
   </section>
   <div class="container section page-shell article-shell">
-    <aside class="ad-zone ad-zone-vertical ad-zone-left" role="complementary" aria-label="Advertisement"><span>Reklam yeri</span></aside>
+    <aside class="ad-zone ad-zone-vertical ad-zone-left" role="complementary" aria-label="{{ ui.get('advertisement', 'Advertisement') }}"><span>{{ ui.get('advertisement_slot', 'Reklam yeri') }}</span></aside>
     <div class="article-layout article-detail-layout">
       <article class="glass article premium-article-card" itemscope itemtype="https://schema.org/NewsArticle">
         <figure class="article-image-frame">
           {% if image_exists %}{% set article_srcset = root_article.image_url|image_srcset %}<img src="{{root_article.image_url|public_image_url}}" {% if article_srcset %}srcset="{{ article_srcset }}" sizes="(max-width: 1050px) 92vw, 860px"{% endif %} alt="{{article.title}}" loading="eager" fetchpriority="high" decoding="async" itemprop="image">{% else %}<div class="image-placeholder article-image-placeholder">VREYC</div>{% endif %}
         </figure>
-        <div class="article-meta-panel" aria-label="Article metadata">
-          <span>{{ article_published_at|format_article_meta_datetime }} • {{ root_article.real_view_count or 0 }} baxış</span>
+        <div class="article-meta-panel" aria-label="{{ ui.article_metadata }}">
+          <span>{{ article_published_at|format_article_meta_datetime }} • {{ root_article.real_view_count or 0 }} {{ ui.views_label|lower }}</span>
           <span>{{ ui.reading_time_prefix }}: {{ reading_time_minutes }} {{ ui.reading_time_minute }}</span>
         </div>
         <div class="share-row article-share-row article-share-row-top" aria-label="{{ ui.share }}">
@@ -66,9 +66,9 @@
           <a class="btn small share-action share-x js-native-share" href="https://twitter.com/intent/tweet?url={{ share_url|urlencode }}&text={{ article.title|urlencode }}" target="_blank" rel="noopener" data-share-title="{{ article.title|e }}" data-share-text="{{ article.summary|default(article.title, true)|e }}" data-share-url="{{ share_url }}">X (Twitter)</a>
           <button class="btn small share-action share-copy js-copy-link" type="button" data-copy-url="{{ share_url }}" data-copy-label="{{ ui.copy_link }}" data-copy-success="{{ ui.copy_success }}">{{ ui.copy_link }}</button>
         </div>
-        <div class="ad-zone ad-zone-article" role="complementary" aria-label="Advertisement"><span>Reklam yeri</span></div>
+        <div class="ad-zone ad-zone-article" role="complementary" aria-label="{{ ui.get('advertisement', 'Advertisement') }}"><span>{{ ui.get('advertisement_slot', 'Reklam yeri') }}</span></div>
         <section class="glass audio-news" data-audio-ready="{{ '1' if narration and narration.status == 'ready' else '0' }}"><h3>{{ ui.audio_narration }}</h3>{% if narration and narration.status == 'ready' and narration.audio_path %}<audio id="narration" preload="none" src="{{narration.audio_path}}"></audio><div class="audio-controls"><button class="btn" id="playBtn" type="button">{{ ui.play }}</button><button class="btn" id="pauseBtn" type="button">{{ ui.pause }}</button><input id="seek" type="range" value="0" min="0" step="1"><span id="time">0:00 / 0:00</span><select id="speed"><option>1</option><option>1.25</option><option>1.5</option><option>1.75</option><option>2</option></select>{% if narration.allow_download %}<a class="btn" href="{{narration.audio_path}}" download>{{ ui.download }}</a>{% endif %}</div>{% else %}<p>{{ ui.narration_pending }}</p>{% endif %}</section>
-        <div class="article-content" itemprop="articleBody">{{ article.content_html|safe }}<div class="ad-zone ad-zone-content" role="complementary" aria-label="Advertisement"><span>Reklam yeri</span></div></div>
+        <div class="article-content" itemprop="articleBody">{{ article.content_html|safe }}<div class="ad-zone ad-zone-content" role="complementary" aria-label="{{ ui.get('advertisement', 'Advertisement') }}"><span>{{ ui.get('advertisement_slot', 'Reklam yeri') }}</span></div></div>
         <section class="article-engagement-panel glass" aria-labelledby="article-reaction-title">
           <div class="reader-reaction-block">
             <h2 id="article-reaction-title">{{ ui.reader_reaction_title }}</h2>
@@ -79,7 +79,7 @@
               <button class="reaction-button" type="button">{{ ui.reaction_useful }}</button>
             </div>
           </div>
-          <div class="article-like-actions" aria-label="Like or dislike">
+          <div class="article-like-actions" aria-label="{{ ui.like_or_dislike }}">
             <button class="like-button" type="button">{{ ui.like_label }}</button>
             <button class="like-button dislike-button" type="button">{{ ui.dislike_label }}</button>
           </div>
@@ -96,15 +96,15 @@
           <p class="eyebrow">{{ ui.related }}</p><h2 id="related-title">{{ ui.related }}</h2>
           <div class="related-grid">{% for row in related_articles %}<a class="related-card" href="{{ row.url }}">{% if row.image_exists %}{% set related_srcset = row.article.image_url|image_srcset %}<img src="{{ row.article.image_url|public_image_url }}" {% if related_srcset %}srcset="{{ related_srcset }}" sizes="(max-width: 700px) 100vw, 180px"{% endif %} alt="{{ row.title }}" loading="lazy" decoding="async">{% else %}<div class="image-placeholder related-placeholder">VREYC</div>{% endif %}<div><span class="badge">{{ row.category_label }}</span><strong>{{ row.title }}</strong><small>{{ row.article.published_at|format_public_published_at }}</small></div></a>{% else %}<p class="muted">{{ ui.related_empty }}</p>{% endfor %}</div>
         </section>
-        <div class="ad-zone ad-zone-bottom" role="complementary" aria-label="Advertisement"><span>Reklam yeri</span></div>
+        <div class="ad-zone ad-zone-bottom" role="complementary" aria-label="{{ ui.get('advertisement', 'Advertisement') }}"><span>{{ ui.get('advertisement_slot', 'Reklam yeri') }}</span></div>
       </article>
-      <aside class="article-sidebar premium-sidebar glass" aria-label="{{ ui.get('sidebar_label', 'News sidebar') }}">
+      <aside class="article-sidebar premium-sidebar glass" aria-label="{{ ui.sidebar_label }}">
         <section><h2>{{ ui.most_viewed }}</h2><div class="trending-list ranked-list">{% for row in most_viewed_articles %}<a href="{{ row.url }}"><span>{{ loop.index }}</span><div><strong>{{ row.title }}</strong><small>{{ row.view_count }} {{ ui.views_label|lower }} • {{ row.category_label }}</small></div></a>{% else %}<p class="muted">{{ ui.related_empty }}</p>{% endfor %}</div></section>
         <section><h2>{{ ui.trending_label }}</h2><div class="trending-list">{% for row in trending_articles %}<a href="{{ row.url }}"><div><strong>{{ row.title }}</strong><small>{{ row.category_label }} • {{ row.article.published_at|format_public_published_at }}</small></div></a>{% else %}<p class="muted">{{ ui.related_empty }}</p>{% endfor %}</div></section>
-        <div class="ad-zone ad-zone-sidebar" role="complementary" aria-label="Advertisement"><span>Reklam yeri</span></div>
+        <div class="ad-zone ad-zone-sidebar" role="complementary" aria-label="{{ ui.get('advertisement', 'Advertisement') }}"><span>{{ ui.get('advertisement_slot', 'Reklam yeri') }}</span></div>
       </aside>
     </div>
-    <aside class="ad-zone ad-zone-vertical ad-zone-right" role="complementary" aria-label="Advertisement"><span>Reklam yeri</span></aside>
+    <aside class="ad-zone ad-zone-vertical ad-zone-right" role="complementary" aria-label="{{ ui.get('advertisement', 'Advertisement') }}"><span>{{ ui.get('advertisement_slot', 'Reklam yeri') }}</span></aside>
   </div>
 </main>
 <footer class="footer container">
@@ -112,12 +112,12 @@
     <strong>VREYC</strong>
     <span>{{ ui.footer_tagline }}</span>
     <div class="footer-languages">{% for lang in languages %}<a href="/{{lang}}/">{{lang|upper}}</a>{% endfor %}</div>
-    <div class="footer-policy-links"><a class="footer-policy-link" href="/privacy">Privacy Policy</a><a class="footer-policy-link" href="/terms">Terms of Use</a></div>
+    <div class="footer-policy-links"><a class="footer-policy-link" href="/privacy">{{ ui.privacy_policy }}</a><a class="footer-policy-link" href="/terms">{{ ui.terms_of_use }}</a></div>
   </div>
   <section class="footer-panel footer-about" aria-labelledby="footer-about-title">
     <h2 id="footer-about-title">{{ ui.about }}</h2>
-    <p>"vreyc.com" saytı 2026-cı ilin mayın 31-də fəaliyyətə başlayıb və müstəqil informasiya siyasəti həyata keçirən media qurumudur.</p>
-    <p>www.vreyc.com saytında Azərbaycanın ictimai, siyasi, sosial və mədəni həyatında baş verən yeniliklərlə yanaşı, digər Qafqaz ölkələrində və dünyada baş verən maraqlı xəbərlər oxuculara çatdırılır. Saytda müxtəlif sahələri əhatə edən müsahibələr, təhlillər, reportajlar, müəllif yazıları və aktual informasiya materialları yayımlanır.</p>
+    <p>{{ ui.about_text_1 }}</p>
+    <p>{{ ui.about_text_2 }}</p>
     <p>{{ ui.founder_ceo }}</p>
   </section>
   <section class="footer-panel footer-contact" aria-labelledby="footer-contact-title">
@@ -131,6 +131,7 @@
       <div><dt>{{ ui.tiktok }}:</dt><dd><a class="footer-social-link" href="https://www.tiktok.com/@vasifreyc" target="_blank" rel="noopener noreferrer">Vasif REYC</a></dd></div>
     </dl>
   </section>
+  <p class="footer-copyright">{{ ui.copyright }} © 2026 VREYC. {{ ui.all_rights_reserved }}</p>
 </footer>
 <script>(()=>{const w=document.querySelector('.audio-news');if(!w||w.dataset.audioReady!=='1')return;const a=document.getElementById('narration'),play=document.getElementById('playBtn'),pause=document.getElementById('pauseBtn'),seek=document.getElementById('seek'),speed=document.getElementById('speed'),time=document.getElementById('time');const fmt=t=>`${Math.floor(t/60)}:${String(Math.floor(t%60)).padStart(2,'0')}`;play.onclick=()=>a.play();pause.onclick=()=>a.pause();speed.onchange=()=>a.playbackRate=parseFloat(speed.value);a.onloadedmetadata=()=>{seek.max=Math.floor(a.duration||0);time.textContent=`0:00 / ${fmt(a.duration||0)}`};a.ontimeupdate=()=>{seek.value=Math.floor(a.currentTime);time.textContent=`${fmt(a.currentTime)} / ${fmt(a.duration||0)}`};seek.oninput=()=>{a.currentTime=Number(seek.value)}})();</script>
 <script src="/assets/app.js?v={{ app_version }}" defer></script>
