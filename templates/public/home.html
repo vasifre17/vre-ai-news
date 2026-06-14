@@ -21,7 +21,7 @@
   <nav class="nav container premium-nav">
     <a class="logo brand-logo" href="/{{ language }}/" aria-label="Vasif REYC {{ ui.home|lower }}"><img class="logo-avatar" src="https://vreyc.com/static/uploads/images/v-99fe872e6408.png" alt="Vasif REYC"><span class="logo-mark logo-name" aria-label="Vasif REYC">Vasif REYC</span></a>
     <form class="search-wrap desktop-search" action="/{{ language }}/" role="search"><input type="search" name="q" value="{{q}}" placeholder="{{ ui.search_placeholder }}" aria-label="{{ ui.search }}"></form>
-    <div class="header-actions"><details class="language-switcher" aria-label="{{ ui.get('language_label', 'Language') }}"><summary><span>AZ</span><span class="language-arrow" aria-hidden="true">▾</span></summary><div class="language-dropdown">{% for lang in ['en', 'ru', 'tr'] %}<a href="{{ alt_links.get(lang, '/' ~ lang ~ '/') }}">{{lang|upper}}</a>{% endfor %}</div></details><button class="mobile-menu-toggle" id="mobileMenuToggle" type="button" aria-label="{{ ui.get('open_menu', 'Open menu') }}" aria-expanded="false" aria-controls="mobile-menu-{{ language }}"><span></span><span></span><span></span></button></div>
+    <div class="header-actions"><details class="language-switcher" aria-label="{{ ui.get('language_label', 'Language') }}"><summary><span>{{ language|upper }}</span><span class="language-arrow" aria-hidden="true">▾</span></summary><div class="language-dropdown">{% for lang in languages %}<a href="{{ alt_links.get(lang, '/' ~ lang ~ '/') }}" {% if lang == language %}aria-current="page"{% endif %}>{{lang|upper}}</a>{% endfor %}</div></details><button class="mobile-menu-toggle" id="mobileMenuToggle" type="button" aria-label="{{ ui.get('open_menu', 'Open menu') }}" aria-expanded="false" aria-controls="mobile-menu-{{ language }}"><span></span><span></span><span></span></button></div>
   </nav>
   <nav class="categories container" aria-label="{{ ui.news }}">
     <div class="primary-categories">{% for c in categories %}<a href="/{{ language }}/?category={{ c.name }}" style="--cat-color: {{ c.color or '#48a6ff' }}">{{ category_labels.get(c.name, c.name) }}</a>{% endfor %}</div>
@@ -169,7 +169,7 @@
     <strong>VREYC</strong>
     <span>{{ ui.footer_tagline }}</span>
     <div class="footer-languages">{% for lang in languages %}<a href="/{{lang}}/">{{lang|upper}}</a>{% endfor %}</div>
-    <div class="footer-policy-links"><a class="footer-policy-link" href="/privacy">{{ ui.privacy_policy }}</a><a class="footer-policy-link" href="/terms">{{ ui.terms_of_use }}</a><a class="footer-policy-link" href="/sitemap.xml">{{ ui.get('sitemap_label', 'Sitemap') }}</a></div>
+    <div class="footer-policy-links"><a class="footer-policy-link" href="{{ '/privacy' if language == 'en' else '/' ~ language ~ '/privacy' }}">{{ ui.privacy_policy }}</a><a class="footer-policy-link" href="{{ '/terms' if language == 'en' else '/' ~ language ~ '/terms' }}">{{ ui.terms_of_use }}</a><a class="footer-policy-link" href="/sitemap.xml">{{ ui.get('sitemap_label', 'Sitemap') }}</a></div>
   </div>
   <section class="footer-panel footer-about" aria-labelledby="footer-about-title">
     <h2 id="footer-about-title">{{ ui.about }}</h2>

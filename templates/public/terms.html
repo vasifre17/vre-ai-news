@@ -1,117 +1,16 @@
 <!doctype html>
-<html lang="en" data-theme="light">
+<html lang="{{ language }}" data-theme="light">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{{ ui.get('terms_of_use', 'Terms of Use') }} — {{ site_name }}</title>
-  <meta name="description" content="Read the VREYC {{ ui.get('terms_of_use', 'Terms of Use') }} covering content ownership, user responsibilities, copyright, disclaimers and contact information.">
-  <meta name="robots" content="index,follow,max-image-preview:large">
-  <link rel="stylesheet" href="/assets/styles.css?v={{ app_version }}">
-  {% include "public/_brand_assets.html" %}
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ ui.terms_of_use }} — {{ site_name }}</title>
+  <meta name="description" content="{{ ui.terms_meta_description }}"><meta name="robots" content="index,follow,max-image-preview:large">
+  <link rel="stylesheet" href="/assets/styles.css?v={{ app_version }}">{% include "public/_brand_assets.html" %}
   {% if verification_meta.google %}<meta name="google-site-verification" content="{{ verification_meta.google }}">{% endif %}{% if verification_meta.bing %}<meta name="msvalidate.01" content="{{ verification_meta.bing }}">{% endif %}
-  <link rel="canonical" href="{{ canonical }}"><link rel="alternate" hreflang="en" href="{{ site_url }}/terms"><link rel="alternate" hreflang="x-default" href="{{ site_url }}/terms">
-  <meta property="og:type" content="website"><meta property="og:site_name" content="{{ site_name }}"><meta property="og:title" content="{{ ui.get('terms_of_use', 'Terms of Use') }} — {{ site_name }}"><meta property="og:description" content="The terms for using VREYC content, services and website features."><meta property="og:url" content="{{ canonical }}"><meta property="og:image" content="{{ site_url }}/assets/og-cover.jpg">
-  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="{{ ui.get('terms_of_use', 'Terms of Use') }} — {{ site_name }}"><meta name="twitter:description" content="The terms for using VREYC content, services and website features."><meta name="twitter:image" content="{{ site_url }}/assets/og-cover.jpg">
-  <script type="application/ld+json">{{ {"@context":"https://schema.org", "@graph": schema_graph}|tojson }}</script>
-  {% include "public/_analytics.html" %}
-</head>
-<body>
-<header class="site-header glass">
-  <nav class="nav container">
-    <a class="logo brand-logo" href="/en/" aria-label="Vasif REYC {{ ui.home|lower }}"><img class="logo-avatar" src="https://vreyc.com/static/uploads/images/v-99fe872e6408.png" alt="Vasif REYC"><span class="logo-name">Vasif REYC</span></a>
-    <form class="search-wrap" action="/en/" role="search"><input type="search" name="q" value="{{q}}" placeholder="{{ ui.search_placeholder }}" aria-label="{{ ui.search }}"></form>
-    <div class="header-actions"><details class="language-switcher" aria-label="Language"><summary><span>{{ (language or 'az')|upper }}</span><span class="language-arrow" aria-hidden="true">▾</span></summary><div class="language-dropdown">{% for lang in languages %}<a href="/{{lang}}/" {% if lang == language %}aria-current="page"{% endif %}>{{lang|upper}}</a>{% endfor %}</div></details></div>
-  </nav>
-  <nav class="categories container" aria-label="{{ ui.news }}">
-    <div class="primary-categories">{% for c in categories %}<a href="/en/?category={{ c.name }}" style="--cat-color: {{ c.color or '#48a6ff' }}">{{ category_labels.get(c.name, c.name) }}</a>{% endfor %}</div>
-    {% if secondary_categories %}<div class="category-menu">
-      <button class="category-menu-button" type="button" aria-label="{{ ui.more_categories }}" aria-haspopup="true" aria-expanded="false" aria-controls="category-dropdown-terms"><span aria-hidden="true">☰</span></button>
-      <div class="category-dropdown" id="category-dropdown-terms" hidden>{% for c in categories %}{% if loop.index > 3 %}<a class="mobile-only-category" href="/en/?category={{ c.name }}" style="--cat-color: {{ c.color or '#48a6ff' }}">{{ category_labels.get(c.name, c.name) }}</a>{% endif %}{% endfor %}{% for c in secondary_categories %}<a href="/en/?category={{ c.name }}" style="--cat-color: {{ c.color or '#48a6ff' }}">{{ category_labels.get(c.name, c.name) }}</a>{% endfor %}</div>
-    </div>{% endif %}
-  </nav>
-</header>
-<nav class="fixed-social-sidebar" aria-label="{{ ui.get('social_links', 'Social links and theme switcher') }}">
-  <button id="themeToggle" class="social-button theme-lamp-button" type="button" aria-label="{{ ui.get('switch_dark_mode', 'Switch to dark mode') }}" aria-pressed="false"><span class="theme-icon" aria-hidden="true">💡</span></button>
-  <a class="social-button social-facebook" href="https://www.facebook.com/sharer/sharer.php?u={{ canonical }}" target="_blank" rel="noopener" aria-label="Facebook"><svg class="social-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14.2 8.4V6.7c0-.8.2-1.3 1.4-1.3H17V2.2c-.7-.1-1.6-.2-2.7-.2-2.8 0-4.7 1.7-4.7 4.8v1.6H6.5V12h3.1v10h3.8V12h3.1l.5-3.6h-3z"/></svg></a>
-  <a class="social-button social-youtube" href="https://www.youtube.com/@vasifreyc" target="_blank" rel="noopener noreferrer" aria-label="YouTube"><svg class="social-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M21.6 7.2c-.2-1.1-1-1.9-2.1-2.1C17.6 4.6 12 4.6 12 4.6s-5.6 0-7.5.5c-1.1.2-1.9 1-2.1 2.1C2 9.1 2 12 2 12s0 2.9.4 4.8c.2 1.1 1 1.9 2.1 2.1 1.9.5 7.5.5 7.5.5s5.6 0 7.5-.5c1.1-.2 1.9-1 2.1-2.1.4-1.9.4-4.8.4-4.8s0-2.9-.4-4.8zM10 15.5v-7l6 3.5-6 3.5z"/></svg></a>
-  <a class="social-button social-tiktok" href="https://www.tiktok.com/@vasifreyc" target="_blank" rel="noopener noreferrer" aria-label="TikTok"><svg class="social-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M16.7 2c.4 3 2.1 4.8 5.1 5v3.4c-1.8.2-3.4-.4-5-1.5v6.3c0 7.9-8.6 10.4-12.1 4.7-2.3-3.7-.9-10.1 6.4-10.4v3.6c-.6.1-1.3.3-1.9.6-1.8 1-2.4 2.8-1.7 4.4 1.4 3.1 5.8 2 5.8-2V2h3.4z"/></svg></a>
-  <a class="social-button social-mailru" href="https://mail.ru/" target="_blank" rel="noopener noreferrer" aria-label="Mail.ru"><svg class="social-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2.1C6.3 2.1 2 6.3 2 12c0 5.6 4.2 9.9 10 9.9 1.9 0 3.8-.5 5.3-1.4l-1.1-2.1c-1.2.7-2.6 1.1-4.2 1.1-4.2 0-7.3-3.2-7.3-7.5S7.8 4.5 12 4.5s7.3 3.1 7.3 7.3c0 2.1-.8 3.3-1.8 3.3-.7 0-1-.4-.9-1.1l.7-6.1h-2.6l-.1.9A4 4 0 0 0 11.5 7c-2.8 0-5 2.2-5 5.2 0 2.9 1.8 4.9 4.4 4.9 1.3 0 2.5-.5 3.4-1.5.5 1.1 1.5 1.6 2.8 1.6 2.8 0 4.9-2.2 4.9-5.4 0-5.5-4.3-9.7-10-9.7zm-.5 12.6c-1.4 0-2.3-1-2.3-2.6 0-1.6 1.1-2.8 2.6-2.8 1.4 0 2.3 1 2.3 2.6 0 1.6-1.1 2.8-2.6 2.8z"/></svg></a>
-</nav>
-<main class="section privacy-page">
-  <section class="privacy-hero container glass">
-    <span class="eyebrow">Legal</span>
-    <h1>{{ ui.get('terms_of_use', 'Terms of Use') }}</h1>
-    <p>These {{ ui.get('terms_of_use', 'Terms of Use') }} explain the rules for accessing VREYC, using our news content and interacting with our website. By using this site, you agree to follow these terms.</p>
-    <div class="privacy-updated">Last updated: June 5, 2026</div>
-  </section>
-  <div class="privacy-layout container">
-    <aside class="privacy-toc glass" aria-label="{{ ui.get('terms_of_use', 'Terms of Use') }} sections">
-      <strong>On this page</strong>
-      <a href="#ownership">Content ownership</a>
-      <a href="#responsibilities">User responsibilities</a>
-      <a href="#copyright">Copyright notice</a>
-      <a href="#disclaimer">Disclaimer</a>
-      <a href="#contact">Contact</a>
-    </aside>
-    <article class="privacy-card glass">
-      <section id="ownership" class="privacy-section">
-        <h2>Content ownership</h2>
-        <p>All articles, headlines, summaries, images, graphics, audio, design elements and other materials published on VREYC are owned by VREYC or used with permission from their respective owners.</p>
-        <p>You may read, share and link to VREYC pages for personal, non-commercial purposes. You may not copy, republish, sell, scrape, redistribute or create derivative works from our content without prior written permission.</p>
-      </section>
-      <section id="responsibilities" class="privacy-section">
-        <h2>User responsibilities</h2>
-        <p>When using VREYC, you agree to use the website lawfully and respectfully. You are responsible for how you access, share or rely on content available through this service.</p>
-        <ul>
-          <li>Do not attempt to disrupt, overload, reverse engineer or compromise the website or its systems.</li>
-          <li>Do not use automated tools to harvest content, metadata or user-facing information without permission.</li>
-          <li>Do not misuse VREYC content in a misleading, defamatory, fraudulent or unlawful manner.</li>
-        </ul>
-      </section>
-      <section id="copyright" class="privacy-section">
-        <h2>Copyright notice</h2>
-        <p>Copyright © 2026 VREYC. All rights reserved unless otherwise stated.</p>
-        <p>Third-party names, platforms, logos and materials remain the property of their respective owners. If you believe content on VREYC infringes your rights, please contact us with enough information to identify the material and your claim.</p>
-      </section>
-      <section id="disclaimer" class="privacy-section">
-        <h2>Disclaimer</h2>
-        <p>VREYC provides news, analysis and informational content for general awareness. While we aim for accuracy and timely updates, we do not guarantee that every item will be complete, current or error-free.</p>
-        <p>Content on this site is not professional legal, financial, medical or investment advice. You should verify important information independently before making decisions based on any article or feature.</p>
-      </section>
-      <section id="contact" class="privacy-section privacy-contact-box">
-        <h2>Contact</h2>
-        <p>For questions about these {{ ui.get('terms_of_use', 'Terms of Use') }}, copyright permissions or rights concerns, contact VREYC at:</p>
-        <a class="privacy-email" href="mailto:vreyc.com@gmail.com">vreyc.com@gmail.com</a>
-      </section>
-    </article>
-  </div>
-</main>
-<footer class="footer container">
-  <div class="footer-brand">
-    <strong>VREYC</strong>
-    <span>{{ ui.footer_tagline }}</span>
-    <div class="footer-languages">{% for lang in languages %}<a href="/{{lang}}/">{{lang|upper}}</a>{% endfor %}</div>
-    <div class="footer-policy-links"><a class="footer-policy-link" href="/privacy">{{ ui.privacy_policy }}</a><a class="footer-policy-link" href="/terms">{{ ui.terms_of_use }}</a></div>
-  </div>
-  <section class="footer-panel footer-about" aria-labelledby="footer-about-title">
-    <h2 id="footer-about-title">{{ ui.about }}</h2>
-    <p>{{ ui.about_text_1 }}</p>
-    <p>{{ ui.about_text_2 }}</p>
-    <p>{{ ui.founder_ceo }}</p>
-  </section>
-  <section class="footer-panel footer-contact" aria-labelledby="footer-contact-title">
-    <h2 id="footer-contact-title">{{ ui.contact }}</h2>
-    <dl>
-      <div><dt>{{ ui.site_name }}:</dt><dd>vreyc.com</dd></div>
-      <div><dt>{{ ui.domain_owner }}:</dt><dd>Vasif Cəbrayıllı</dd></div>
-      <div><dt>{{ ui.mobile_whatsapp }}:</dt><dd><a href="tel:+994554444730">(055) 444-47-30</a></dd></div>
-      <div><dt>{{ ui.email }}:</dt><dd><a href="mailto:vreyc.com@gmail.com">vreyc.com@gmail.com</a></dd></div>
-      <div><dt>{{ ui.youtube }}:</dt><dd><a class="footer-social-link" href="https://www.youtube.com/@vasifreyc" target="_blank" rel="noopener noreferrer">Vasif REYC</a></dd></div>
-      <div><dt>{{ ui.tiktok }}:</dt><dd><a class="footer-social-link" href="https://www.tiktok.com/@vasifreyc" target="_blank" rel="noopener noreferrer">Vasif REYC</a></dd></div>
-    </dl>
-  </section>
-  <p class="footer-copyright">{{ ui.copyright }} © 2026 VREYC. {{ ui.all_rights_reserved }}</p>
-</footer>
-<script src="/assets/app.js?v={{ app_version }}" defer></script>
-</body>
-</html>
+  <link rel="canonical" href="{{ canonical }}">{% for lang, link in alt_links.items() %}<link rel="alternate" hreflang="{{lang}}" href="{{site_url}}{{link}}">{% endfor %}<link rel="alternate" hreflang="x-default" href="{{ site_url }}/en/terms">
+  <meta property="og:type" content="website"><meta property="og:site_name" content="{{ site_name }}"><meta property="og:title" content="{{ ui.terms_of_use }} — {{ site_name }}"><meta property="og:description" content="{{ ui.terms_og_description }}"><meta property="og:url" content="{{ canonical }}"><meta property="og:image" content="{{ site_url }}/assets/og-cover.jpg">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="{{ ui.terms_of_use }} — {{ site_name }}"><meta name="twitter:description" content="{{ ui.terms_og_description }}"><meta name="twitter:image" content="{{ site_url }}/assets/og-cover.jpg">
+  <script type="application/ld+json">{{ {"@context":"https://schema.org", "@graph": schema_graph}|tojson }}</script>{% include "public/_analytics.html" %}
+</head><body>
+<header class="site-header glass"><nav class="nav container"><a class="logo brand-logo" href="/{{ language }}/" aria-label="Vasif REYC {{ ui.home|lower }}"><img class="logo-avatar" src="https://vreyc.com/static/uploads/images/v-99fe872e6408.png" alt="Vasif REYC"><span class="logo-name">Vasif REYC</span></a><form class="search-wrap" action="/{{ language }}/" role="search"><input type="search" name="q" value="{{q}}" placeholder="{{ ui.search_placeholder }}" aria-label="{{ ui.search }}"></form><div class="header-actions"><details class="language-switcher" aria-label="{{ ui.language_label }}"><summary><span>{{ language|upper }}</span><span class="language-arrow" aria-hidden="true">▾</span></summary><div class="language-dropdown">{% for lang in languages %}<a href="{{ alt_links.get(lang, '/' ~ lang ~ '/terms') }}" {% if lang == language %}aria-current="page"{% endif %}>{{lang|upper}}</a>{% endfor %}</div></details></div></nav><nav class="categories container" aria-label="{{ ui.news }}"><div class="primary-categories">{% for c in categories %}<a href="/{{ language }}/?category={{ c.name }}" style="--cat-color: {{ c.color or '#48a6ff' }}">{{ category_labels.get(c.name, c.name) }}</a>{% endfor %}</div>{% if secondary_categories %}<div class="category-menu"><button class="category-menu-button" type="button" aria-label="{{ ui.more_categories }}" aria-haspopup="true" aria-expanded="false" aria-controls="category-dropdown-terms"><span aria-hidden="true">☰</span></button><div class="category-dropdown" id="category-dropdown-terms" hidden>{% for c in categories %}{% if loop.index > 3 %}<a class="mobile-only-category" href="/{{ language }}/?category={{ c.name }}" style="--cat-color: {{ c.color or '#48a6ff' }}">{{ category_labels.get(c.name, c.name) }}</a>{% endif %}{% endfor %}{% for c in secondary_categories %}<a href="/{{ language }}/?category={{ c.name }}" style="--cat-color: {{ c.color or '#48a6ff' }}">{{ category_labels.get(c.name, c.name) }}</a>{% endfor %}</div></div>{% endif %}</nav></header>
+<main class="section privacy-page"><section class="privacy-hero container glass"><span class="eyebrow">{{ ui.terms_eyebrow }}</span><h1>{{ ui.terms_of_use }}</h1><p>{{ ui.terms_intro }}</p><div class="privacy-updated">{{ ui.last_updated }}</div></section><div class="privacy-layout container"><aside class="privacy-toc glass" aria-label="{{ ui.terms_sections_label }}"><strong>{{ ui.on_this_page }}</strong><a href="#ownership">{{ ui.terms_ownership_title }}</a><a href="#responsibilities">{{ ui.terms_responsibilities_title }}</a><a href="#copyright">{{ ui.terms_copyright_title }}</a><a href="#disclaimer">{{ ui.terms_disclaimer_title }}</a><a href="#contact">{{ ui.contact }}</a></aside><article class="privacy-card glass"><section id="ownership" class="privacy-section"><h2>{{ ui.terms_ownership_title }}</h2><p>{{ ui.terms_ownership_p1 }}</p><p>{{ ui.terms_ownership_p2 }}</p></section><section id="responsibilities" class="privacy-section"><h2>{{ ui.terms_responsibilities_title }}</h2><p>{{ ui.terms_responsibilities_p1 }}</p><ul><li>{{ ui.terms_responsibilities_li1 }}</li><li>{{ ui.terms_responsibilities_li2 }}</li><li>{{ ui.terms_responsibilities_li3 }}</li></ul></section><section id="copyright" class="privacy-section"><h2>{{ ui.terms_copyright_title }}</h2><p>{{ ui.terms_copyright_p1 }}</p><p>{{ ui.terms_copyright_p2 }}</p></section><section id="disclaimer" class="privacy-section"><h2>{{ ui.terms_disclaimer_title }}</h2><p>{{ ui.terms_disclaimer_p1 }}</p><p>{{ ui.terms_disclaimer_p2 }}</p></section><section id="contact" class="privacy-section privacy-contact-box"><h2>{{ ui.contact }}</h2><p>{{ ui.terms_contact_p }}</p><a class="privacy-email" href="mailto:vreyc.com@gmail.com">vreyc.com@gmail.com</a></section></article></div></main>
+<footer class="footer container"><div class="footer-brand"><strong>VREYC</strong><span>{{ ui.footer_tagline }}</span><div class="footer-languages">{% for lang in languages %}<a href="/{{lang}}/">{{lang|upper}}</a>{% endfor %}</div><div class="footer-policy-links"><a class="footer-policy-link" href="{{ '/privacy' if language == 'en' else '/' ~ language ~ '/privacy' }}">{{ ui.privacy_policy }}</a><a class="footer-policy-link" href="{{ '/terms' if language == 'en' else '/' ~ language ~ '/terms' }}">{{ ui.terms_of_use }}</a></div></div><section class="footer-panel footer-about" aria-labelledby="footer-about-title"><h2 id="footer-about-title">{{ ui.about }}</h2><p>{{ ui.about_text_1 }}</p><p>{{ ui.about_text_2 }}</p><p>{{ ui.founder_ceo }}</p></section><section class="footer-panel footer-contact" aria-labelledby="footer-contact-title"><h2 id="footer-contact-title">{{ ui.contact }}</h2><dl><div><dt>{{ ui.site_name }}:</dt><dd>vreyc.com</dd></div><div><dt>{{ ui.domain_owner }}:</dt><dd>Vasif Cəbrayıllı</dd></div><div><dt>{{ ui.mobile_whatsapp }}:</dt><dd><a href="tel:+994554444730">(055) 444-47-30</a></dd></div><div><dt>{{ ui.email }}:</dt><dd><a href="mailto:vreyc.com@gmail.com">vreyc.com@gmail.com</a></dd></div><div><dt>{{ ui.youtube }}:</dt><dd><a class="footer-social-link" href="https://www.youtube.com/@vasifreyc" target="_blank" rel="noopener noreferrer">Vasif REYC</a></dd></div><div><dt>{{ ui.tiktok }}:</dt><dd><a class="footer-social-link" href="https://www.tiktok.com/@vasifreyc" target="_blank" rel="noopener noreferrer">Vasif REYC</a></dd></div></dl></section><p class="footer-copyright">{{ ui.copyright }} © 2026 VREYC. {{ ui.all_rights_reserved }}</p></footer><script src="/assets/app.js?v={{ app_version }}" defer></script></body></html>
