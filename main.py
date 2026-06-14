@@ -567,6 +567,137 @@ PUBLIC_LABELS["tr"].update({
     "like_or_dislike": "Beğen veya beğenme",
 })
 
+
+PUBLIC_LEGAL_LABELS = {
+    "az": {
+        "privacy_meta_description": "VREYC-in kukilər, Google AdSense, analitika, istifadəçi məxfilik hüquqları və əlaqə məlumatları üzrə Məxfilik Siyasətini oxuyun.",
+        "privacy_og_description": "VREYC-in kukilər, reklam, analitika və oxucu məxfilik hüquqları ilə necə işlədiyi.",
+        "privacy_eyebrow": "Redaksiya şəffaflığı",
+        "privacy_intro": "VREYC oxucu məxfiliyinə hörmət edir. Bu siyasət peşəkar xəbər təcrübəsi təqdim etmək üçün kukilərdən, reklamdan, analitika alətlərindən və əsas əməliyyat məlumatlarından necə istifadə etdiyimizi izah edir.",
+        "last_updated": "Son yenilənmə: 5 iyun 2026",
+        "on_this_page": "Bu səhifədə",
+        "privacy_sections_label": "Məxfilik siyasəti bölmələri",
+        "privacy_information_title": "Topladığımız məlumatlar",
+        "privacy_information_p1": "VREYC-ə daxil olduğunuz zaman brauzer növü, cihaz növü, təxmini yer, baxılan səhifələr, yönləndirən səhifələr, vaxt qeydləri və qarşılıqlı əlaqə hadisələri kimi məhdud texniki məlumatları emal edə bilərik. Bizimlə birbaşa əlaqə saxlasanız, e-poçt ünvanınızı və mesajınızda paylaşdığınız məlumatları ala bilərik.",
+        "privacy_information_p2": "Bu məlumatlardan saytı idarə etmək, təhlükəsizliyi qorumaq, auditoriya marağını anlamaq və redaksiya təqdimatını yaxşılaşdırmaq üçün istifadə edirik.",
+        "privacy_cookies_title": "Kuki siyasəti",
+        "privacy_cookies_p1": "Kukilər və oxşar texnologiyalar seçimləri yadda saxlamaq, təhlükəsizliyi dəstəkləmək, performansı ölçmək, trafik nümunələrini anlamaq və reklamı fərdiləşdirmək və ya ölçmək üçün istifadə edilə bilər.",
+        "privacy_essential_cookies": "Vacib kukilər: saytın yüklənməsinə, əsas funksionallığa və sui-istifadədən qorunmağa kömək edir.",
+        "privacy_preference_cookies": "Seçim kukiləri: ekran və ya baxış seçimlərini yadda saxlaya bilər.",
+        "privacy_ad_cookies": "Reklam və ölçmə kukiləri: reklamları təqdim etməyə, məhdudlaşdırmağa, fərdiləşdirməyə və qiymətləndirməyə kömək edə bilər.",
+        "privacy_adsense_title": "Google AdSense istifadəsi",
+        "privacy_adsense_p1": "VREYC Google AdSense və ya əlaqəli Google reklam xidmətləri tərəfindən təqdim olunan reklamları göstərə bilər. Google və tərəfdaşları qanun və ayarlarınız icazə verdikdə reklam göstərmək, ölçmək, saxtakarlığın qarşısını almaq və reklamı fərdiləşdirmək üçün kukilərdən və oxşar texnologiyalardan istifadə edə bilər.",
+        "privacy_adsense_p2": "Google reklam fərdiləşdirməsini Google hesab ayarlarınız və ya brauzer məxfilik idarəetmələri vasitəsilə idarə edə bilərsiniz.",
+        "privacy_analytics_title": "Analitika istifadəsi",
+        "privacy_analytics_p1": "Oxucuların saytı necə tapdığını və istifadə etdiyini anlamaq üçün analitika xidmətlərindən istifadə edə bilərik. Analitika məlumatları populyar xəbərləri müəyyənləşdirməyə, naviqasiyanı yaxşılaşdırmağa və etibarlı xəbər otağı təcrübəsini qorumağa kömək edir.",
+        "privacy_analytics_p2": "Analitika məlumatları mümkün olduqda ümumi şəkildə nəzərdən keçirilir və fərdi oxucuları birbaşa müəyyən etmək məqsədi daşımır.",
+        "privacy_rights_title": "İstifadəçi məxfilik hüquqları",
+        "privacy_rights_p1": "Yerinizdən asılı olaraq şəxsi məlumatlara giriş, düzəliş, silinmə, məhdudlaşdırma, etiraz və ya daşınma hüquqlarınız ola bilər.",
+        "privacy_rights_p2": "Məxfilik hüquqlarınızı həyata keçirmək üçün aşağıdakı e-poçt vasitəsilə bizimlə əlaqə saxlayın. Hərəkət etməzdən əvvəl sorğunuzu təsdiqləməyimiz lazım ola bilər.",
+        "privacy_contact_p": "Məxfilik sualları, sorğuları və ya narahatlıqları üçün VREYC ilə əlaqə saxlayın:",
+        "terms_meta_description": "Məzmun mülkiyyəti, istifadəçi məsuliyyətləri, müəllif hüquqları, imtinalar və əlaqə məlumatlarını əhatə edən VREYC İstifadə Şərtlərini oxuyun.",
+        "terms_og_description": "VREYC məzmunu, xidmətləri və veb-sayt funksiyalarından istifadə qaydaları.",
+        "terms_eyebrow": "Hüquqi",
+        "terms_intro": "Bu İstifadə Şərtləri VREYC-ə giriş, xəbər məzmunumuzdan istifadə və veb-saytımızla qarşılıqlı əlaqə qaydalarını izah edir. Saytdan istifadə etməklə bu şərtlərə əməl etməyə razılaşırsınız.",
+        "terms_sections_label": "İstifadə şərtləri bölmələri",
+        "terms_ownership_title": "Məzmun mülkiyyəti",
+        "terms_ownership_p1": "VREYC-də yayımlanan bütün məqalələr, başlıqlar, xülasələr, şəkillər, qrafiklər, audio, dizayn elementləri və digər materiallar VREYC-ə məxsusdur və ya müvafiq sahiblərin icazəsi ilə istifadə olunur.",
+        "terms_ownership_p2": "VREYC səhifələrini şəxsi, qeyri-kommersiya məqsədləri üçün oxuya, paylaşa və link verə bilərsiniz. Əvvəlcədən yazılı icazə olmadan məzmunumuzu kopyalamaq, yenidən dərc etmək, satmaq, toplamaq, yaymaq və ya törəmə işlər yaratmaq olmaz.",
+        "terms_responsibilities_title": "İstifadəçi məsuliyyətləri",
+        "terms_responsibilities_p1": "VREYC-dən istifadə edərkən veb-saytdan qanuni və hörmətli şəkildə istifadə etməyə razılaşırsınız.",
+        "terms_responsibilities_li1": "Veb-saytı və ya sistemlərini pozmağa, yükləməyə, tərsinə mühəndislik etməyə və ya təhlükəyə atmağa cəhd etməyin.",
+        "terms_responsibilities_li2": "İcazəsiz məzmun, metadata və ya istifadəçiyə görünən məlumatları toplamaq üçün avtomatlaşdırılmış alətlərdən istifadə etməyin.",
+        "terms_responsibilities_li3": "VREYC məzmunundan aldadıcı, böhtan xarakterli, saxta və ya qanunsuz şəkildə istifadə etməyin.",
+        "terms_copyright_title": "Müəllif hüquqları bildirişi",
+        "terms_copyright_p1": "Müəllif hüquqları © 2026 VREYC. Başqa cür göstərilməyibsə, bütün hüquqlar qorunur.",
+        "terms_copyright_p2": "Üçüncü tərəf adları, platformaları, loqoları və materialları müvafiq sahiblərinin mülkiyyəti olaraq qalır.",
+        "terms_disclaimer_title": "İmtina",
+        "terms_disclaimer_p1": "VREYC ümumi məlumatlandırma üçün xəbər, təhlil və informasiya məzmunu təqdim edir. Dəqiqliyə və operativ yenilənmələrə çalışsaq da, hər materialın tam, aktual və səhvsiz olacağına zəmanət vermirik.",
+        "terms_disclaimer_p2": "Saytdakı məzmun peşəkar hüquqi, maliyyə, tibbi və ya investisiya məsləhəti deyil.",
+        "terms_contact_p": "Bu İstifadə Şərtləri, müəllif hüquqları icazələri və ya hüquq narahatlıqları ilə bağlı VREYC ilə əlaqə saxlayın:",
+    },
+}
+PUBLIC_LEGAL_LABELS["en"] = {
+    "privacy_meta_description": "Read the VREYC Privacy Policy covering cookies, Google AdSense, analytics, user privacy rights and contact information.",
+    "privacy_og_description": "How VREYC handles cookies, advertising, analytics and user privacy rights.",
+    "privacy_eyebrow": "Editorial transparency", "privacy_intro": "VREYC respects reader privacy. This policy explains how we use cookies, advertising, analytics tools and basic operational data to deliver a professional news experience.", "last_updated": "Last updated: June 5, 2026", "on_this_page": "On this page", "privacy_sections_label": "Privacy policy sections", "privacy_information_title": "Information we collect", "privacy_information_p1": "When you visit VREYC, we may process limited technical information such as browser type, device type, approximate location, pages viewed, referring pages, timestamps and interaction events. If you contact us directly, we may receive your email address and the information you choose to include in your message.", "privacy_information_p2": "We use this information to operate the website, protect site security, understand audience engagement and improve editorial presentation.", "privacy_cookies_title": "Cookies policy", "privacy_cookies_p1": "Cookies and similar technologies may be used to remember preferences, support security, measure performance, understand traffic patterns and personalize or measure advertising. You can control or delete cookies through your browser settings, though some site features may not work as expected if cookies are disabled.", "privacy_essential_cookies": "Essential cookies: help the site load, maintain basic functionality and protect against misuse.", "privacy_preference_cookies": "Preference cookies: may remember choices such as display or browsing preferences.", "privacy_ad_cookies": "Advertising and measurement cookies: may help deliver, limit, personalize and evaluate advertisements.", "privacy_adsense_title": "Google AdSense usage", "privacy_adsense_p1": "VREYC may display ads served by Google AdSense or related Google advertising services. Google and its partners may use cookies, device identifiers or similar technologies to serve ads, measure ad performance, prevent fraud and personalize advertising where permitted by law and your settings.", "privacy_adsense_p2": "You can manage Google ad personalization through your Google account ad settings or browser privacy controls.", "privacy_analytics_title": "Analytics usage", "privacy_analytics_p1": "We may use analytics services to understand how readers find and use the site. Analytics data helps us identify popular stories, improve navigation, measure page performance and maintain a reliable newsroom experience.", "privacy_analytics_p2": "Analytics information is reviewed in aggregate whenever practical and is not intended to identify individual readers directly.", "privacy_rights_title": "User privacy rights", "privacy_rights_p1": "Depending on your location, you may have rights to request access, correction, deletion, restriction, objection or portability of personal information.", "privacy_rights_p2": "To exercise privacy rights, please contact us using the email below. We may need to verify your request before taking action.", "privacy_contact_p": "For privacy questions, requests or concerns, contact VREYC at:",
+    "terms_meta_description": "Read the VREYC Terms of Use covering content ownership, user responsibilities, copyright, disclaimers and contact information.", "terms_og_description": "The terms for using VREYC content, services and website features.", "terms_eyebrow": "Legal", "terms_intro": "These Terms of Use explain the rules for accessing VREYC, using our news content and interacting with our website. By using this site, you agree to follow these terms.", "terms_sections_label": "Terms of Use sections", "terms_ownership_title": "Content ownership", "terms_ownership_p1": "All articles, headlines, summaries, images, graphics, audio, design elements and other materials published on VREYC are owned by VREYC or used with permission from their respective owners.", "terms_ownership_p2": "You may read, share and link to VREYC pages for personal, non-commercial purposes. You may not copy, republish, sell, scrape, redistribute or create derivative works from our content without prior written permission.", "terms_responsibilities_title": "User responsibilities", "terms_responsibilities_p1": "When using VREYC, you agree to use the website lawfully and respectfully. You are responsible for how you access, share or rely on content available through this service.", "terms_responsibilities_li1": "Do not attempt to disrupt, overload, reverse engineer or compromise the website or its systems.", "terms_responsibilities_li2": "Do not use automated tools to harvest content, metadata or user-facing information without permission.", "terms_responsibilities_li3": "Do not misuse VREYC content in a misleading, defamatory, fraudulent or unlawful manner.", "terms_copyright_title": "Copyright notice", "terms_copyright_p1": "Copyright © 2026 VREYC. All rights reserved unless otherwise stated.", "terms_copyright_p2": "Third-party names, platforms, logos and materials remain the property of their respective owners.", "terms_disclaimer_title": "Disclaimer", "terms_disclaimer_p1": "VREYC provides news, analysis and informational content for general awareness. While we aim for accuracy and timely updates, we do not guarantee that every item will be complete, current or error-free.", "terms_disclaimer_p2": "Content on this site is not professional legal, financial, medical or investment advice. You should verify important information independently before making decisions based on any article or feature.", "terms_contact_p": "For questions about these Terms of Use, copyright permissions or rights concerns, contact VREYC at:",
+}
+PUBLIC_LEGAL_LABELS["ru"] = {k: v for k, v in PUBLIC_LEGAL_LABELS["az"].items()}
+PUBLIC_LEGAL_LABELS["ru"].update({"privacy_policy":"Политика конфиденциальности", "terms_of_use":"Условия использования", "privacy_eyebrow":"Редакционная прозрачность", "terms_eyebrow":"Правовая информация", "last_updated":"Обновлено: 5 июня 2026", "on_this_page":"На этой странице", "privacy_information_title":"Какие данные мы собираем", "privacy_cookies_title":"Политика cookie", "privacy_adsense_title":"Использование Google AdSense", "privacy_analytics_title":"Использование аналитики", "privacy_rights_title":"Права пользователей на конфиденциальность", "terms_ownership_title":"Право собственности на контент", "terms_responsibilities_title":"Обязанности пользователя", "terms_copyright_title":"Уведомление об авторских правах", "terms_disclaimer_title":"Отказ от ответственности"})
+PUBLIC_LEGAL_LABELS["tr"] = {k: v for k, v in PUBLIC_LEGAL_LABELS["az"].items()}
+PUBLIC_LEGAL_LABELS["tr"].update({"privacy_policy":"Gizlilik Politikası", "terms_of_use":"Kullanım Şartları", "privacy_eyebrow":"Editoryal şeffaflık", "terms_eyebrow":"Hukuki", "last_updated":"Son güncelleme: 5 Haziran 2026", "on_this_page":"Bu sayfada", "privacy_information_title":"Topladığımız bilgiler", "privacy_cookies_title":"Çerez politikası", "privacy_adsense_title":"Google AdSense kullanımı", "privacy_analytics_title":"Analitik kullanımı", "privacy_rights_title":"Kullanıcı gizlilik hakları", "terms_ownership_title":"İçerik sahipliği", "terms_responsibilities_title":"Kullanıcı sorumlulukları", "terms_copyright_title":"Telif hakkı bildirimi", "terms_disclaimer_title":"Sorumluluk reddi"})
+PUBLIC_LEGAL_LABELS["ru"].update({
+    "privacy_meta_description":"Ознакомьтесь с политикой конфиденциальности VREYC о cookie, Google AdSense, аналитике, правах пользователей и контактах.",
+    "privacy_og_description":"Как VREYC обрабатывает cookie, рекламу, аналитику и права пользователей.",
+    "privacy_intro":"VREYC уважает конфиденциальность читателей. Эта политика объясняет, как мы используем cookie, рекламу, аналитические инструменты и базовые операционные данные для профессионального новостного опыта.",
+    "privacy_sections_label":"Разделы политики конфиденциальности",
+    "privacy_information_p1":"При посещении VREYC мы можем обрабатывать ограниченную техническую информацию: тип браузера, устройство, примерное местоположение, просмотренные страницы, источники перехода, время и действия на сайте.",
+    "privacy_information_p2":"Мы используем эти данные для работы сайта, защиты безопасности, понимания аудитории и улучшения редакционной подачи.",
+    "privacy_cookies_p1":"Cookie и похожие технологии могут использоваться для сохранения настроек, поддержки безопасности, измерения производительности, понимания трафика и оценки рекламы.",
+    "privacy_essential_cookies":"Необходимые cookie: помогают сайту загружаться, поддерживать базовые функции и защищаться от злоупотреблений.",
+    "privacy_preference_cookies":"Cookie предпочтений: могут запоминать настройки отображения или просмотра.",
+    "privacy_ad_cookies":"Рекламные и измерительные cookie: помогают показывать, ограничивать, персонализировать и оценивать рекламу.",
+    "privacy_adsense_p1":"VREYC может показывать рекламу Google AdSense или связанных рекламных сервисов Google. Google и партнеры могут использовать cookie и похожие технологии для показа и измерения рекламы, предотвращения мошенничества и персонализации, если это разрешено законом и вашими настройками.",
+    "privacy_adsense_p2":"Персонализацией рекламы Google можно управлять в настройках аккаунта Google или браузера.",
+    "privacy_analytics_p1":"Мы можем использовать аналитику, чтобы понимать, как читатели находят и используют сайт. Эти данные помогают определять популярные материалы, улучшать навигацию и надежность сайта.",
+    "privacy_analytics_p2":"Аналитическая информация по возможности рассматривается в агрегированном виде и не предназначена для прямой идентификации отдельных читателей.",
+    "privacy_rights_p1":"В зависимости от вашего местоположения у вас могут быть права на доступ, исправление, удаление, ограничение, возражение или перенос персональных данных.",
+    "privacy_rights_p2":"Чтобы воспользоваться правами, свяжитесь с нами по указанной ниже электронной почте. Нам может потребоваться подтвердить ваш запрос.",
+    "privacy_contact_p":"По вопросам, запросам или опасениям о конфиденциальности свяжитесь с VREYC:",
+    "terms_meta_description":"Ознакомьтесь с условиями использования VREYC о правах на контент, обязанностях пользователей, авторском праве, отказах и контактах.",
+    "terms_og_description":"Условия использования контента, сервисов и функций сайта VREYC.",
+    "terms_intro":"Эти Условия использования объясняют правила доступа к VREYC, использования нашего новостного контента и взаимодействия с сайтом. Используя сайт, вы соглашаетесь соблюдать эти условия.",
+    "terms_sections_label":"Разделы условий использования",
+    "terms_ownership_p1":"Все статьи, заголовки, краткие описания, изображения, графика, аудио, элементы дизайна и другие материалы VREYC принадлежат VREYC или используются с разрешения правообладателей.",
+    "terms_ownership_p2":"Вы можете читать, делиться и ссылаться на страницы VREYC в личных некоммерческих целях. Копирование, перепубликация, продажа, сбор, распространение или создание производных материалов без письменного разрешения запрещены.",
+    "terms_responsibilities_p1":"Используя VREYC, вы соглашаетесь пользоваться сайтом законно и уважительно.",
+    "terms_responsibilities_li1":"Не пытайтесь нарушать работу, перегружать, декомпилировать или компрометировать сайт и его системы.",
+    "terms_responsibilities_li2":"Не используйте автоматизированные инструменты для сбора контента, метаданных или пользовательской информации без разрешения.",
+    "terms_responsibilities_li3":"Не используйте контент VREYC вводящим в заблуждение, клеветническим, мошенническим или незаконным образом.",
+    "terms_copyright_p1":"Авторское право © 2026 VREYC. Все права защищены, если не указано иное.",
+    "terms_copyright_p2":"Названия, платформы, логотипы и материалы третьих лиц остаются собственностью их владельцев.",
+    "terms_disclaimer_p1":"VREYC предоставляет новости, аналитику и информационный контент для общего ознакомления. Мы стремимся к точности и актуальности, но не гарантируем полноту, актуальность или отсутствие ошибок в каждом материале.",
+    "terms_disclaimer_p2":"Контент сайта не является профессиональной юридической, финансовой, медицинской или инвестиционной консультацией.",
+    "terms_contact_p":"По вопросам об этих Условиях использования, разрешениях на авторские права или правах свяжитесь с VREYC:",
+})
+PUBLIC_LEGAL_LABELS["tr"].update({
+    "privacy_meta_description":"Çerezler, Google AdSense, analitik, kullanıcı gizlilik hakları ve iletişim bilgilerini kapsayan VREYC Gizlilik Politikası'nı okuyun.",
+    "privacy_og_description":"VREYC'in çerezleri, reklamları, analitiği ve kullanıcı gizlilik haklarını nasıl ele aldığı.",
+    "privacy_intro":"VREYC okuyucu gizliliğine saygı duyar. Bu politika, profesyonel bir haber deneyimi sunmak için çerezleri, reklamları, analitik araçlarını ve temel operasyonel verileri nasıl kullandığımızı açıklar.",
+    "privacy_sections_label":"Gizlilik politikası bölümleri",
+    "privacy_information_p1":"VREYC'i ziyaret ettiğinizde tarayıcı türü, cihaz türü, yaklaşık konum, görüntülenen sayfalar, yönlendiren sayfalar, zaman damgaları ve etkileşimler gibi sınırlı teknik bilgileri işleyebiliriz.",
+    "privacy_information_p2":"Bu bilgileri web sitesini işletmek, güvenliği korumak, kitle etkileşimini anlamak ve editoryal sunumu iyileştirmek için kullanırız.",
+    "privacy_cookies_p1":"Çerezler ve benzer teknolojiler tercihleri hatırlamak, güvenliği desteklemek, performansı ölçmek, trafik kalıplarını anlamak ve reklamları ölçmek için kullanılabilir.",
+    "privacy_essential_cookies":"Zorunlu çerezler: sitenin yüklenmesine, temel işlevlere ve kötüye kullanıma karşı korumaya yardımcı olur.",
+    "privacy_preference_cookies":"Tercih çerezleri: görüntüleme veya gezinme tercihlerini hatırlayabilir.",
+    "privacy_ad_cookies":"Reklam ve ölçüm çerezleri: reklamları sunmaya, sınırlamaya, kişiselleştirmeye ve değerlendirmeye yardımcı olabilir.",
+    "privacy_adsense_p1":"VREYC, Google AdSense veya ilgili Google reklam hizmetleri tarafından sunulan reklamları gösterebilir. Google ve ortakları, yasalar ve ayarlarınız izin verdiğinde reklam sunmak, ölçmek, sahtekarlığı önlemek ve kişiselleştirmek için çerezler kullanabilir.",
+    "privacy_adsense_p2":"Google reklam kişiselleştirmesini Google hesap ayarlarınız veya tarayıcı gizlilik kontrollerinizden yönetebilirsiniz.",
+    "privacy_analytics_p1":"Okuyucuların siteyi nasıl bulduğunu ve kullandığını anlamak için analitik hizmetleri kullanabiliriz. Bu veriler popüler haberleri belirlemeye, gezinmeyi iyileştirmeye ve güvenilir deneyimi sürdürmeye yardımcı olur.",
+    "privacy_analytics_p2":"Analitik bilgiler mümkün olduğunda toplu olarak incelenir ve bireysel okuyucuları doğrudan tanımlamayı amaçlamaz.",
+    "privacy_rights_p1":"Konumunuza bağlı olarak kişisel verilere erişim, düzeltme, silme, kısıtlama, itiraz veya taşınabilirlik haklarınız olabilir.",
+    "privacy_rights_p2":"Gizlilik haklarınızı kullanmak için aşağıdaki e-posta ile bizimle iletişime geçin. İşlem yapmadan önce talebinizi doğrulamamız gerekebilir.",
+    "privacy_contact_p":"Gizlilik soruları, talepleri veya endişeleri için VREYC ile iletişime geçin:",
+    "terms_meta_description":"İçerik sahipliği, kullanıcı sorumlulukları, telif hakkı, sorumluluk reddi ve iletişim bilgilerini kapsayan VREYC Kullanım Şartları'nı okuyun.",
+    "terms_og_description":"VREYC içeriği, hizmetleri ve web sitesi özelliklerini kullanma şartları.",
+    "terms_intro":"Bu Kullanım Şartları, VREYC'e erişme, haber içeriğimizi kullanma ve web sitemizle etkileşim kurma kurallarını açıklar. Siteyi kullanarak bu şartlara uymayı kabul edersiniz.",
+    "terms_sections_label":"Kullanım şartları bölümleri",
+    "terms_ownership_p1":"VREYC'te yayımlanan tüm makaleler, başlıklar, özetler, görseller, grafikler, sesler, tasarım öğeleri ve diğer materyaller VREYC'e aittir veya sahiplerinin izniyle kullanılır.",
+    "terms_ownership_p2":"VREYC sayfalarını kişisel, ticari olmayan amaçlarla okuyabilir, paylaşabilir ve bağlantı verebilirsiniz. Yazılı izin olmadan içeriği kopyalayamaz, yeniden yayımlayamaz, satamaz, toplayamaz, dağıtamaz veya türev çalışmalar oluşturamazsınız.",
+    "terms_responsibilities_p1":"VREYC'i kullanırken web sitesini yasal ve saygılı biçimde kullanmayı kabul edersiniz.",
+    "terms_responsibilities_li1":"Web sitesini veya sistemlerini aksatmaya, aşırı yüklemeye, tersine mühendislik yapmaya veya tehlikeye atmaya çalışmayın.",
+    "terms_responsibilities_li2":"İzin olmadan içerik, metadata veya kullanıcıya açık bilgileri toplamak için otomatik araçlar kullanmayın.",
+    "terms_responsibilities_li3":"VREYC içeriğini yanıltıcı, karalayıcı, hileli veya yasa dışı biçimde kullanmayın.",
+    "terms_copyright_p1":"Telif hakkı © 2026 VREYC. Aksi belirtilmedikçe tüm hakları saklıdır.",
+    "terms_copyright_p2":"Üçüncü taraf adları, platformları, logoları ve materyalleri ilgili sahiplerinin mülkiyetinde kalır.",
+    "terms_disclaimer_p1":"VREYC genel bilgilendirme amacıyla haber, analiz ve bilgilendirici içerik sunar. Doğruluk ve güncellik için çalışsak da her içeriğin eksiksiz, güncel veya hatasız olacağını garanti etmeyiz.",
+    "terms_disclaimer_p2":"Bu sitedeki içerik profesyonel hukuki, finansal, tıbbi veya yatırım tavsiyesi değildir.",
+    "terms_contact_p":"Bu Kullanım Şartları, telif izinleri veya hak endişeleri hakkında VREYC ile iletişime geçin:",
+})
+for _lang, _labels in PUBLIC_LEGAL_LABELS.items():
+    PUBLIC_LABELS[_lang].update(_labels)
+
 CATEGORY_UI_KEYS = {'az': {'politics': 'Siyasət', 'world': 'Dünya', 'economy': 'İqtisadiyyat', 'technology': 'Texnologiya', 'business': 'Biznes', 'sports': 'İdman', 'health': 'Sağlamlıq', 'country': 'Ölkə', 'incident': 'Hadisə', 'science_and_education': 'Elm və Təhsil', 'show_business': 'Şou Biznes', 'agriculture': 'Kənd təsərrüfatı'}, 'en': {'politics': 'Politics', 'world': 'World', 'economy': 'Economy', 'technology': 'Technology', 'business': 'Business', 'sports': 'Sports', 'health': 'Health', 'country': 'Country', 'incident': 'Incident', 'science_and_education': 'Science and Education', 'show_business': 'Show Business', 'agriculture': 'Agriculture'}, 'ru': {'politics': 'Политика', 'world': 'Мир', 'economy': 'Экономика', 'technology': 'Технологии', 'business': 'Бизнес', 'sports': 'Спорт', 'health': 'Здоровье', 'country': 'Страна', 'incident': 'Происшествия', 'science_and_education': 'Наука и образование', 'show_business': 'Шоу-бизнес', 'agriculture': 'Сельское хозяйство'}, 'tr': {'politics': 'Siyaset', 'world': 'Dünya', 'economy': 'Ekonomi', 'technology': 'Teknoloji', 'business': 'İş dünyası', 'sports': 'Spor', 'health': 'Sağlık', 'country': 'Ülke', 'incident': 'Olay', 'science_and_education': 'Bilim ve Eğitim', 'show_business': 'Şov Biznes', 'agriculture': 'Tarım'}}
 for _lang, _labels in CATEGORY_UI_KEYS.items():
     PUBLIC_LABELS[_lang].update(_labels)
@@ -2856,18 +2987,19 @@ def home(request: Request, language: str = "az", q: str = "", category: str = ""
     return templates.TemplateResponse("public/home.html", {"request": request, "articles": article_cards, "latest_articles": latest_cards, "sidebar_articles": sidebar_cards, "trending_articles": trending_cards, "most_viewed_articles": most_viewed_cards, "breaking_articles": breaking_cards, "hero_slides": hero_slides, "latest_news_count": latest_news_count, "today_views": today_views, "category_blocks": category_blocks, "hero": hero, "categories": categories["primary"], "secondary_categories": categories["secondary"], "q": q, "category": category, "site_url": settings.site_url, "canonical": canonical, "language": language, "languages": SUPPORTED_LANGUAGES, "alt_links": alt_links, "ui": public_labels(language), "category_labels": category_labels, "settings_map": settings_map, "verification_meta": seo_verification_meta(settings_map), "schema_graph": schema_graph, "site_name": site_name_from_settings(settings_map), "youtube_widget": youtube_widget, "app_version": APP_VERSION})
 
 
+@app.get("/{language}/privacy", response_class=HTMLResponse)
 @app.get("/privacy", response_class=HTMLResponse)
-def privacy_policy(request: Request, db=Depends(get_db)):
-    language = "en"
+def privacy_policy(request: Request, language: str = "en", db=Depends(get_db)):
+    language = language if language in SUPPORTED_LANGUAGES else "en"
     ensure_categories(db)
     categories = public_category_navigation(db)
     category_labels = public_category_labels(language)
     settings_map = get_settings_map(db)
-    canonical = canonical_url(request, "privacy")
+    canonical = canonical_url(request, f"{language}/privacy")
     schema_graph = [
         build_organization_schema(settings_map),
         build_website_schema(settings_map, language),
-        build_breadcrumb_schema([("Home", f"{settings.site_url.rstrip('/')}/en/"), ("Privacy Policy", canonical)]),
+        build_breadcrumb_schema([("Home", f"{settings.site_url.rstrip('/')}/{language}/"), (public_labels(language)["privacy_policy"], canonical)]),
     ]
     return templates.TemplateResponse("public/privacy.html", {
         "request": request,
@@ -2878,7 +3010,7 @@ def privacy_policy(request: Request, db=Depends(get_db)):
         "canonical": canonical,
         "language": language,
         "languages": SUPPORTED_LANGUAGES,
-        "alt_links": {"en": "/privacy"},
+        "alt_links": {lang: f"/{lang}/privacy" for lang in SUPPORTED_LANGUAGES},
         "ui": public_labels(language),
         "category_labels": category_labels,
         "settings_map": settings_map,
@@ -2889,18 +3021,19 @@ def privacy_policy(request: Request, db=Depends(get_db)):
     })
 
 
+@app.get("/{language}/terms", response_class=HTMLResponse)
 @app.get("/terms", response_class=HTMLResponse)
-def terms_of_use(request: Request, db=Depends(get_db)):
-    language = "en"
+def terms_of_use(request: Request, language: str = "en", db=Depends(get_db)):
+    language = language if language in SUPPORTED_LANGUAGES else "en"
     ensure_categories(db)
     categories = public_category_navigation(db)
     category_labels = public_category_labels(language)
     settings_map = get_settings_map(db)
-    canonical = canonical_url(request, "terms")
+    canonical = canonical_url(request, f"{language}/terms")
     schema_graph = [
         build_organization_schema(settings_map),
         build_website_schema(settings_map, language),
-        build_breadcrumb_schema([("Home", f"{settings.site_url.rstrip('/')}/en/"), ("Terms of Use", canonical)]),
+        build_breadcrumb_schema([("Home", f"{settings.site_url.rstrip('/')}/{language}/"), (public_labels(language)["terms_of_use"], canonical)]),
     ]
     return templates.TemplateResponse("public/terms.html", {
         "request": request,
@@ -2911,7 +3044,7 @@ def terms_of_use(request: Request, db=Depends(get_db)):
         "canonical": canonical,
         "language": language,
         "languages": SUPPORTED_LANGUAGES,
-        "alt_links": {"en": "/terms"},
+        "alt_links": {lang: f"/{lang}/terms" for lang in SUPPORTED_LANGUAGES},
         "ui": public_labels(language),
         "category_labels": category_labels,
         "settings_map": settings_map,

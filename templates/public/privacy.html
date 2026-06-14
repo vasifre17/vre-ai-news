@@ -1,123 +1,16 @@
 <!doctype html>
-<html lang="en" data-theme="light">
+<html lang="{{ language }}" data-theme="light">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{{ ui.get('privacy_policy', 'Privacy Policy') }} — {{ site_name }}</title>
-  <meta name="description" content="Read the VREYC {{ ui.get('privacy_policy', 'Privacy Policy') }} covering cookies, Google AdSense, analytics, user privacy rights and contact information.">
-  <meta name="robots" content="index,follow,max-image-preview:large">
-  <link rel="stylesheet" href="/assets/styles.css?v={{ app_version }}">
-  {% include "public/_brand_assets.html" %}
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ ui.privacy_policy }} — {{ site_name }}</title>
+  <meta name="description" content="{{ ui.privacy_meta_description }}"><meta name="robots" content="index,follow,max-image-preview:large">
+  <link rel="stylesheet" href="/assets/styles.css?v={{ app_version }}">{% include "public/_brand_assets.html" %}
   {% if verification_meta.google %}<meta name="google-site-verification" content="{{ verification_meta.google }}">{% endif %}{% if verification_meta.bing %}<meta name="msvalidate.01" content="{{ verification_meta.bing }}">{% endif %}
-  <link rel="canonical" href="{{ canonical }}"><link rel="alternate" hreflang="en" href="{{ site_url }}/privacy"><link rel="alternate" hreflang="x-default" href="{{ site_url }}/privacy">
-  <meta property="og:type" content="website"><meta property="og:site_name" content="{{ site_name }}"><meta property="og:title" content="{{ ui.get('privacy_policy', 'Privacy Policy') }} — {{ site_name }}"><meta property="og:description" content="How VREYC handles cookies, advertising, analytics and user privacy rights."><meta property="og:url" content="{{ canonical }}"><meta property="og:image" content="{{ site_url }}/assets/og-cover.jpg">
-  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="{{ ui.get('privacy_policy', 'Privacy Policy') }} — {{ site_name }}"><meta name="twitter:description" content="How VREYC handles cookies, advertising, analytics and user privacy rights."><meta name="twitter:image" content="{{ site_url }}/assets/og-cover.jpg">
-  <script type="application/ld+json">{{ {"@context":"https://schema.org", "@graph": schema_graph}|tojson }}</script>
-  {% include "public/_analytics.html" %}
-</head>
-<body>
-<header class="site-header glass">
-  <nav class="nav container">
-    <a class="logo brand-logo" href="/en/" aria-label="Vasif REYC {{ ui.home|lower }}"><img class="logo-avatar" src="https://vreyc.com/static/uploads/images/v-99fe872e6408.png" alt="Vasif REYC"><span class="logo-name">Vasif REYC</span></a>
-    <form class="search-wrap" action="/en/" role="search"><input type="search" name="q" value="{{q}}" placeholder="{{ ui.search_placeholder }}" aria-label="{{ ui.search }}"></form>
-    <div class="header-actions"><details class="language-switcher" aria-label="Language"><summary><span>{{ (language or 'az')|upper }}</span><span class="language-arrow" aria-hidden="true">▾</span></summary><div class="language-dropdown">{% for lang in languages %}<a href="/{{lang}}/" {% if lang == language %}aria-current="page"{% endif %}>{{lang|upper}}</a>{% endfor %}</div></details></div>
-  </nav>
-  <nav class="categories container" aria-label="{{ ui.news }}">
-    <div class="primary-categories">{% for c in categories %}<a href="/en/?category={{ c.name }}" style="--cat-color: {{ c.color or '#48a6ff' }}">{{ category_labels.get(c.name, c.name) }}</a>{% endfor %}</div>
-    {% if secondary_categories %}<div class="category-menu">
-      <button class="category-menu-button" type="button" aria-label="{{ ui.more_categories }}" aria-haspopup="true" aria-expanded="false" aria-controls="category-dropdown-privacy"><span aria-hidden="true">☰</span></button>
-      <div class="category-dropdown" id="category-dropdown-privacy" hidden>{% for c in categories %}{% if loop.index > 3 %}<a class="mobile-only-category" href="/en/?category={{ c.name }}" style="--cat-color: {{ c.color or '#48a6ff' }}">{{ category_labels.get(c.name, c.name) }}</a>{% endif %}{% endfor %}{% for c in secondary_categories %}<a href="/en/?category={{ c.name }}" style="--cat-color: {{ c.color or '#48a6ff' }}">{{ category_labels.get(c.name, c.name) }}</a>{% endfor %}</div>
-    </div>{% endif %}
-  </nav>
-</header>
-<nav class="fixed-social-sidebar" aria-label="{{ ui.get('social_links', 'Social links and theme switcher') }}">
-  <button id="themeToggle" class="social-button theme-lamp-button" type="button" aria-label="{{ ui.get('switch_dark_mode', 'Switch to dark mode') }}" aria-pressed="false"><span class="theme-icon" aria-hidden="true">💡</span></button>
-  <a class="social-button social-facebook" href="https://www.facebook.com/sharer/sharer.php?u={{ canonical }}" target="_blank" rel="noopener" aria-label="Facebook"><svg class="social-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14.2 8.4V6.7c0-.8.2-1.3 1.4-1.3H17V2.2c-.7-.1-1.6-.2-2.7-.2-2.8 0-4.7 1.7-4.7 4.8v1.6H6.5V12h3.1v10h3.8V12h3.1l.5-3.6h-3z"/></svg></a>
-  <a class="social-button social-youtube" href="https://www.youtube.com/@vasifreyc" target="_blank" rel="noopener noreferrer" aria-label="YouTube"><svg class="social-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M21.6 7.2c-.2-1.1-1-1.9-2.1-2.1C17.6 4.6 12 4.6 12 4.6s-5.6 0-7.5.5c-1.1.2-1.9 1-2.1 2.1C2 9.1 2 12 2 12s0 2.9.4 4.8c.2 1.1 1 1.9 2.1 2.1 1.9.5 7.5.5 7.5.5s5.6 0 7.5-.5c1.1-.2 1.9-1 2.1-2.1.4-1.9.4-4.8.4-4.8s0-2.9-.4-4.8zM10 15.5v-7l6 3.5-6 3.5z"/></svg></a>
-  <a class="social-button social-tiktok" href="https://www.tiktok.com/@vasifreyc" target="_blank" rel="noopener noreferrer" aria-label="TikTok"><svg class="social-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M16.7 2c.4 3 2.1 4.8 5.1 5v3.4c-1.8.2-3.4-.4-5-1.5v6.3c0 7.9-8.6 10.4-12.1 4.7-2.3-3.7-.9-10.1 6.4-10.4v3.6c-.6.1-1.3.3-1.9.6-1.8 1-2.4 2.8-1.7 4.4 1.4 3.1 5.8 2 5.8-2V2h3.4z"/></svg></a>
-  <a class="social-button social-mailru" href="https://mail.ru/" target="_blank" rel="noopener noreferrer" aria-label="Mail.ru"><svg class="social-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2.1C6.3 2.1 2 6.3 2 12c0 5.6 4.2 9.9 10 9.9 1.9 0 3.8-.5 5.3-1.4l-1.1-2.1c-1.2.7-2.6 1.1-4.2 1.1-4.2 0-7.3-3.2-7.3-7.5S7.8 4.5 12 4.5s7.3 3.1 7.3 7.3c0 2.1-.8 3.3-1.8 3.3-.7 0-1-.4-.9-1.1l.7-6.1h-2.6l-.1.9A4 4 0 0 0 11.5 7c-2.8 0-5 2.2-5 5.2 0 2.9 1.8 4.9 4.4 4.9 1.3 0 2.5-.5 3.4-1.5.5 1.1 1.5 1.6 2.8 1.6 2.8 0 4.9-2.2 4.9-5.4 0-5.5-4.3-9.7-10-9.7zm-.5 12.6c-1.4 0-2.3-1-2.3-2.6 0-1.6 1.1-2.8 2.6-2.8 1.4 0 2.3 1 2.3 2.6 0 1.6-1.1 2.8-2.6 2.8z"/></svg></a>
-</nav>
-<main class="section privacy-page">
-  <section class="privacy-hero container glass">
-    <p class="eyebrow">Editorial transparency</p>
-    <h1>{{ ui.get('privacy_policy', 'Privacy Policy') }}</h1>
-    <p>VREYC respects reader privacy. This policy explains how we use cookies, advertising, analytics tools and basic operational data to deliver a professional news experience.</p>
-    <div class="privacy-updated">Last updated: June 5, 2026</div>
-  </section>
-  <div class="privacy-layout container">
-    <aside class="privacy-toc glass" aria-label="Privacy policy sections">
-      <strong>On this page</strong>
-      <a href="#information">Information we collect</a>
-      <a href="#cookies">Cookies policy</a>
-      <a href="#adsense">Google AdSense usage</a>
-      <a href="#analytics">Analytics usage</a>
-      <a href="#rights">User privacy rights</a>
-      <a href="#contact">Contact</a>
-    </aside>
-    <article class="privacy-card glass">
-      <section id="information" class="privacy-section">
-        <h2>Information we collect</h2>
-        <p>When you visit VREYC, we may process limited technical information such as browser type, device type, approximate location, pages viewed, referring pages, timestamps and interaction events. If you contact us directly, we may receive your email address and the information you choose to include in your message.</p>
-        <p>We use this information to operate the website, protect site security, understand audience engagement and improve editorial presentation.</p>
-      </section>
-      <section id="cookies" class="privacy-section">
-        <h2>Cookies policy</h2>
-        <p>Cookies and similar technologies may be used to remember preferences, support security, measure performance, understand traffic patterns and personalize or measure advertising. You can control or delete cookies through your browser settings, though some site features may not work as expected if cookies are disabled.</p>
-        <ul>
-          <li><strong>Essential cookies:</strong> help the site load, maintain basic functionality and protect against misuse.</li>
-          <li><strong>Preference cookies:</strong> may remember choices such as display or browsing preferences.</li>
-          <li><strong>Advertising and measurement cookies:</strong> may help deliver, limit, personalize and evaluate advertisements.</li>
-        </ul>
-      </section>
-      <section id="adsense" class="privacy-section">
-        <h2>Google AdSense usage</h2>
-        <p>VREYC may display ads served by Google AdSense or related Google advertising services. Google and its partners may use cookies, device identifiers or similar technologies to serve ads, measure ad performance, prevent fraud and personalize advertising where permitted by law and your settings.</p>
-        <p>You can manage Google ad personalization through your Google account ad settings or browser privacy controls.</p>
-      </section>
-      <section id="analytics" class="privacy-section">
-        <h2>Analytics usage</h2>
-        <p>We may use analytics services to understand how readers find and use the site. Analytics data helps us identify popular stories, improve navigation, measure page performance and maintain a reliable newsroom experience. Analytics providers may collect usage information through cookies, scripts or similar technologies.</p>
-        <p>Analytics information is reviewed in aggregate whenever practical and is not intended to identify individual readers directly.</p>
-      </section>
-      <section id="rights" class="privacy-section">
-        <h2>User privacy rights</h2>
-        <p>Depending on your location, you may have rights to request access, correction, deletion, restriction, objection or portability of personal information. You may also have the right to withdraw consent for certain processing or opt out of certain advertising and analytics technologies.</p>
-        <p>To exercise privacy rights, please contact us using the email below. We may need to verify your request before taking action.</p>
-      </section>
-      <section id="contact" class="privacy-section privacy-contact-box">
-        <h2>Contact</h2>
-        <p>For privacy questions, requests or concerns, contact VREYC at:</p>
-        <a class="privacy-email" href="mailto:vreyc.com@gmail.com">vreyc.com@gmail.com</a>
-      </section>
-    </article>
-  </div>
-</main>
-<footer class="footer container">
-  <div class="footer-brand">
-    <strong>VREYC</strong>
-    <span>{{ ui.footer_tagline }}</span>
-    <div class="footer-languages">{% for lang in languages %}<a href="/{{lang}}/">{{lang|upper}}</a>{% endfor %}</div>
-    <div class="footer-policy-links"><a class="footer-policy-link" href="/privacy">{{ ui.privacy_policy }}</a><a class="footer-policy-link" href="/terms">{{ ui.terms_of_use }}</a></div>
-  </div>
-  <section class="footer-panel footer-about" aria-labelledby="footer-about-title">
-    <h2 id="footer-about-title">{{ ui.about }}</h2>
-    <p>{{ ui.about_text_1 }}</p>
-    <p>{{ ui.about_text_2 }}</p>
-    <p>{{ ui.founder_ceo }}</p>
-  </section>
-  <section class="footer-panel footer-contact" aria-labelledby="footer-contact-title">
-    <h2 id="footer-contact-title">{{ ui.contact }}</h2>
-    <dl>
-      <div><dt>{{ ui.site_name }}:</dt><dd>vreyc.com</dd></div>
-      <div><dt>{{ ui.domain_owner }}:</dt><dd>Vasif Cəbrayıllı</dd></div>
-      <div><dt>{{ ui.mobile_whatsapp }}:</dt><dd><a href="tel:+994554444730">(055) 444-47-30</a></dd></div>
-      <div><dt>{{ ui.email }}:</dt><dd><a href="mailto:vreyc.com@gmail.com">vreyc.com@gmail.com</a></dd></div>
-      <div><dt>{{ ui.youtube }}:</dt><dd><a class="footer-social-link" href="https://www.youtube.com/@vasifreyc" target="_blank" rel="noopener noreferrer">Vasif REYC</a></dd></div>
-      <div><dt>{{ ui.tiktok }}:</dt><dd><a class="footer-social-link" href="https://www.tiktok.com/@vasifreyc" target="_blank" rel="noopener noreferrer">Vasif REYC</a></dd></div>
-    </dl>
-  </section>
-  <p class="footer-copyright">{{ ui.copyright }} © 2026 VREYC. {{ ui.all_rights_reserved }}</p>
-</footer>
-<script src="/assets/app.js?v={{ app_version }}" defer></script>
-</body>
-</html>
+  <link rel="canonical" href="{{ canonical }}">{% for lang, link in alt_links.items() %}<link rel="alternate" hreflang="{{lang}}" href="{{site_url}}{{link}}">{% endfor %}<link rel="alternate" hreflang="x-default" href="{{ site_url }}/en/privacy">
+  <meta property="og:type" content="website"><meta property="og:site_name" content="{{ site_name }}"><meta property="og:title" content="{{ ui.privacy_policy }} — {{ site_name }}"><meta property="og:description" content="{{ ui.privacy_og_description }}"><meta property="og:url" content="{{ canonical }}"><meta property="og:image" content="{{ site_url }}/assets/og-cover.jpg">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="{{ ui.privacy_policy }} — {{ site_name }}"><meta name="twitter:description" content="{{ ui.privacy_og_description }}"><meta name="twitter:image" content="{{ site_url }}/assets/og-cover.jpg">
+  <script type="application/ld+json">{{ {"@context":"https://schema.org", "@graph": schema_graph}|tojson }}</script>{% include "public/_analytics.html" %}
+</head><body>
+<header class="site-header glass"><nav class="nav container"><a class="logo brand-logo" href="/{{ language }}/" aria-label="Vasif REYC {{ ui.home|lower }}"><img class="logo-avatar" src="https://vreyc.com/static/uploads/images/v-99fe872e6408.png" alt="Vasif REYC"><span class="logo-name">Vasif REYC</span></a><form class="search-wrap" action="/{{ language }}/" role="search"><input type="search" name="q" value="{{q}}" placeholder="{{ ui.search_placeholder }}" aria-label="{{ ui.search }}"></form><div class="header-actions"><details class="language-switcher" aria-label="{{ ui.language_label }}"><summary><span>{{ language|upper }}</span><span class="language-arrow" aria-hidden="true">▾</span></summary><div class="language-dropdown">{% for lang in languages %}<a href="{{ alt_links.get(lang, '/' ~ lang ~ '/privacy') }}" {% if lang == language %}aria-current="page"{% endif %}>{{lang|upper}}</a>{% endfor %}</div></details></div></nav><nav class="categories container" aria-label="{{ ui.news }}"><div class="primary-categories">{% for c in categories %}<a href="/{{ language }}/?category={{ c.name }}" style="--cat-color: {{ c.color or '#48a6ff' }}">{{ category_labels.get(c.name, c.name) }}</a>{% endfor %}</div>{% if secondary_categories %}<div class="category-menu"><button class="category-menu-button" type="button" aria-label="{{ ui.more_categories }}" aria-haspopup="true" aria-expanded="false" aria-controls="category-dropdown-privacy"><span aria-hidden="true">☰</span></button><div class="category-dropdown" id="category-dropdown-privacy" hidden>{% for c in categories %}{% if loop.index > 3 %}<a class="mobile-only-category" href="/{{ language }}/?category={{ c.name }}" style="--cat-color: {{ c.color or '#48a6ff' }}">{{ category_labels.get(c.name, c.name) }}</a>{% endif %}{% endfor %}{% for c in secondary_categories %}<a href="/{{ language }}/?category={{ c.name }}" style="--cat-color: {{ c.color or '#48a6ff' }}">{{ category_labels.get(c.name, c.name) }}</a>{% endfor %}</div></div>{% endif %}</nav></header>
+<main class="section privacy-page"><section class="privacy-hero container glass"><p class="eyebrow">{{ ui.privacy_eyebrow }}</p><h1>{{ ui.privacy_policy }}</h1><p>{{ ui.privacy_intro }}</p><div class="privacy-updated">{{ ui.last_updated }}</div></section><div class="privacy-layout container"><aside class="privacy-toc glass" aria-label="{{ ui.privacy_sections_label }}"><strong>{{ ui.on_this_page }}</strong><a href="#information">{{ ui.privacy_information_title }}</a><a href="#cookies">{{ ui.privacy_cookies_title }}</a><a href="#adsense">{{ ui.privacy_adsense_title }}</a><a href="#analytics">{{ ui.privacy_analytics_title }}</a><a href="#rights">{{ ui.privacy_rights_title }}</a><a href="#contact">{{ ui.contact }}</a></aside><article class="privacy-card glass"><section id="information" class="privacy-section"><h2>{{ ui.privacy_information_title }}</h2><p>{{ ui.privacy_information_p1 }}</p><p>{{ ui.privacy_information_p2 }}</p></section><section id="cookies" class="privacy-section"><h2>{{ ui.privacy_cookies_title }}</h2><p>{{ ui.privacy_cookies_p1 }}</p><ul><li><strong>{{ ui.privacy_essential_cookies }}</strong></li><li><strong>{{ ui.privacy_preference_cookies }}</strong></li><li><strong>{{ ui.privacy_ad_cookies }}</strong></li></ul></section><section id="adsense" class="privacy-section"><h2>{{ ui.privacy_adsense_title }}</h2><p>{{ ui.privacy_adsense_p1 }}</p><p>{{ ui.privacy_adsense_p2 }}</p></section><section id="analytics" class="privacy-section"><h2>{{ ui.privacy_analytics_title }}</h2><p>{{ ui.privacy_analytics_p1 }}</p><p>{{ ui.privacy_analytics_p2 }}</p></section><section id="rights" class="privacy-section"><h2>{{ ui.privacy_rights_title }}</h2><p>{{ ui.privacy_rights_p1 }}</p><p>{{ ui.privacy_rights_p2 }}</p></section><section id="contact" class="privacy-section privacy-contact-box"><h2>{{ ui.contact }}</h2><p>{{ ui.privacy_contact_p }}</p><a class="privacy-email" href="mailto:vreyc.com@gmail.com">vreyc.com@gmail.com</a></section></article></div></main>
+<footer class="footer container"><div class="footer-brand"><strong>VREYC</strong><span>{{ ui.footer_tagline }}</span><div class="footer-languages">{% for lang in languages %}<a href="/{{lang}}/">{{lang|upper}}</a>{% endfor %}</div><div class="footer-policy-links"><a class="footer-policy-link" href="{{ '/privacy' if language == 'en' else '/' ~ language ~ '/privacy' }}">{{ ui.privacy_policy }}</a><a class="footer-policy-link" href="{{ '/terms' if language == 'en' else '/' ~ language ~ '/terms' }}">{{ ui.terms_of_use }}</a></div></div><section class="footer-panel footer-about" aria-labelledby="footer-about-title"><h2 id="footer-about-title">{{ ui.about }}</h2><p>{{ ui.about_text_1 }}</p><p>{{ ui.about_text_2 }}</p><p>{{ ui.founder_ceo }}</p></section><section class="footer-panel footer-contact" aria-labelledby="footer-contact-title"><h2 id="footer-contact-title">{{ ui.contact }}</h2><dl><div><dt>{{ ui.site_name }}:</dt><dd>vreyc.com</dd></div><div><dt>{{ ui.domain_owner }}:</dt><dd>Vasif Cəbrayıllı</dd></div><div><dt>{{ ui.mobile_whatsapp }}:</dt><dd><a href="tel:+994554444730">(055) 444-47-30</a></dd></div><div><dt>{{ ui.email }}:</dt><dd><a href="mailto:vreyc.com@gmail.com">vreyc.com@gmail.com</a></dd></div><div><dt>{{ ui.youtube }}:</dt><dd><a class="footer-social-link" href="https://www.youtube.com/@vasifreyc" target="_blank" rel="noopener noreferrer">Vasif REYC</a></dd></div><div><dt>{{ ui.tiktok }}:</dt><dd><a class="footer-social-link" href="https://www.tiktok.com/@vasifreyc" target="_blank" rel="noopener noreferrer">Vasif REYC</a></dd></div></dl></section><p class="footer-copyright">{{ ui.copyright }} © 2026 VREYC. {{ ui.all_rights_reserved }}</p></footer><script src="/assets/app.js?v={{ app_version }}" defer></script></body></html>
