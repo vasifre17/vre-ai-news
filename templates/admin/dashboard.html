@@ -108,6 +108,19 @@
     {{ status_row('Missing hreflang', dashboard_status.google_seo.missing_hreflang, 'ok' if dashboard_status.google_seo.missing_hreflang == 0 else 'warn') }}
   </div>
 
+
+  <div class="panel dashboard-panel market-admin-panel">
+    <div class="panel-head"><div><p class="eyebrow">Markets</p><h2>Valyuta, Qızıl və Kripto</h2><p class="muted">Cached public API values with safe fallback when providers fail.</p></div><form method="post" action="/admin/market/refresh"><button class="btn primary" type="submit">Refresh now</button></form></div>
+    {% if market_panel %}
+      {{ status_row('Last market update', market_panel.latest_updated_at|format_admin_datetime if market_panel.latest_updated_at else 'Never', 'ok') }}
+      {% for section in market_panel.sections %}
+      <div class="market-admin-section"><strong>{{ section.group|title }}</strong><div>{% for quote in section.items %}<span>{{ quote.label }}: {{ '%.4f'|format(quote.value) if quote.value < 10 else '%.2f'|format(quote.value) }} {{ quote.quote_currency }}</span>{% endfor %}</div></div>
+      {% endfor %}
+    {% else %}
+      {{ status_row('Last market update', 'No cached values yet', 'warn') }}
+    {% endif %}
+  </div>
+
   <div class="panel dashboard-panel seo-fix-center-panel">
     <div class="panel-head"><div><p class="eyebrow">SEO Fix Center</p><h2>SEO Fix Center</h2><p class="muted">One-click repairs for Dashboard 3.1 SEO stabilization.</p></div><a href="/admin/seo">Details</a></div>
     {{ status_row('Missing Meta Descriptions', dashboard_status.google_seo.missing_meta_descriptions, 'ok' if dashboard_status.google_seo.missing_meta_descriptions == 0 else 'warn') }}

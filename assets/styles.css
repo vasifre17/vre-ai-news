@@ -2170,3 +2170,25 @@ main > .section { padding-top: .85rem; }
   .news-hub-thumb .image-placeholder { width: 88px; height: 66px; }
   .news-hub-item-copy h4 { font-size: .94rem; }
 }
+
+.market-panel {
+  margin: 0 0 22px;
+  padding: 18px;
+  border: 1px solid rgba(72, 166, 255, .18);
+  border-radius: 24px;
+  background: linear-gradient(145deg, rgba(8, 20, 38, .92), rgba(17, 42, 74, .82));
+  color: #fff;
+  box-shadow: 0 18px 42px rgba(8, 20, 38, .16);
+}
+.market-panel-head h2 { margin: 3px 0 12px; font-size: 1.15rem; }
+.market-section + .market-section { margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,.12); }
+.market-section h3 { margin: 0 0 8px; font-size: .9rem; color: #9bd7ff; }
+.market-quote-list { display: grid; gap: 8px; }
+.market-quote-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 10px; border-radius: 14px; background: rgba(255,255,255,.07); }
+.market-quote-row span { color: rgba(255,255,255,.78); font-size: .9rem; }
+.market-quote-row strong { font-size: .95rem; white-space: nowrap; }
+.market-updated { display: block; margin-top: 12px; color: rgba(255,255,255,.62); }
+.market-admin-section { margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(15,23,42,.08); }
+.market-admin-section div { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.market-admin-section span { padding: 6px 9px; border-radius: 999px; background: rgba(72,166,255,.11); font-size: .86rem; }
+@media (max-width: 800px) { .market-quote-row { align-items: flex-start; flex-direction: column; gap: 4px; } }
