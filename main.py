@@ -387,6 +387,197 @@ PUBLIC_LABELS["en"].update({
     "news_hub_empty": "Fresh stories for this section will appear soon.",
 })
 
+
+PUBLIC_LABELS["az"].update({
+    "home": "Ana səhifə",
+    "news_feed": "Xəbər lenti",
+    "read_more": "Daha ətraflı",
+    "privacy_policy": "Məxfilik Siyasəti",
+    "terms": "Şərtlər",
+    "terms_of_use": "İstifadə Şərtləri",
+    "copyright": "Müəllif hüquqları",
+    "all_rights_reserved": "Bütün hüquqlar qorunur",
+    "about_text_1": "\"vreyc.com\" saytı 2026-cı ilin mayın 31-də fəaliyyətə başlayıb və müstəqil informasiya siyasəti həyata keçirən media qurumudur.",
+    "about_text_2": "www.vreyc.com saytında Azərbaycanın ictimai, siyasi, sosial və mədəni həyatında baş verən yeniliklərlə yanaşı, digər Qafqaz ölkələrində və dünyada baş verən maraqlı xəbərlər oxuculara çatdırılır. Saytda müxtəlif sahələri əhatə edən müsahibələr, təhlillər, reportajlar, müəllif yazıları və aktual informasiya materialları yayımlanır.",
+    "advertisement": "Reklam",
+    "advertisement_slot": "Reklam yeri",
+    "switch_dark_mode": "Qaranlıq rejimə keç",
+    "social_links": "Sosial linklər və tema dəyişdiricisi",
+    "carousel_controls": "slayder idarəetməsi",
+    "previous_featured_article": "Əvvəlki əsas xəbər",
+    "next_featured_article": "Növbəti əsas xəbər",
+    "show_featured_article": "Əsas xəbəri göstər",
+    "article_metadata": "Məqalə məlumatları",
+    "like_or_dislike": "Bəyən və ya bəyənmə",
+    "privacy_label": "Məxfilik Siyasəti",
+})
+PUBLIC_LABELS["en"].update({
+    "home": "Home",
+    "news_feed": "News Feed",
+    "read_more": "Read More",
+    "privacy_policy": "Privacy Policy",
+    "terms": "Terms",
+    "terms_of_use": "Terms of Use",
+    "copyright": "Copyright",
+    "all_rights_reserved": "All rights reserved",
+    "about_text_1": "VREYC launched on May 31, 2026 as an independent media organization with an independent information policy.",
+    "about_text_2": "VREYC delivers updates from Azerbaijan, the Caucasus and the world, including interviews, analysis, reports, opinion pieces and timely news materials.",
+    "advertisement": "Advertisement",
+    "advertisement_slot": "Advertisement",
+    "switch_dark_mode": "Switch to dark mode",
+    "social_links": "Social links and theme switcher",
+    "carousel_controls": "carousel controls",
+    "previous_featured_article": "Previous featured article",
+    "next_featured_article": "Next featured article",
+    "show_featured_article": "Show featured article",
+    "article_metadata": "Article metadata",
+    "like_or_dislike": "Like or dislike",
+    "privacy_label": "Privacy Policy",
+})
+PUBLIC_LABELS["ru"].update({
+    "home": "Главная",
+    "news_feed": "Лента новостей",
+    "most_viewed": "Самое читаемое",
+    "trending_label": "В тренде",
+    "author_label": "Автор",
+    "source_label": "Источник",
+    "copy_link": "Скопировать ссылку",
+    "copy_success": "Ссылка скопирована",
+    "newsletter_label": "Рассылка",
+    "newsletter_headline": "Получайте главные новости первыми",
+    "newsletter_text": "Премиальная email-рассылка с главными новостями, запусками и аналитикой.",
+    "subscribe_label": "Подписаться",
+    "newsletter_success": "Подписка успешно сохранена.",
+    "newsletter_duplicate": "Этот адрес уже подписан.",
+    "newsletter_invalid": "Введите корректный адрес электронной почты.",
+    "newsletter_error": "Не удалось сохранить подписку. Попробуйте еще раз.",
+    "reading_time_prefix": "Время чтения",
+    "reading_time_minute": "мин",
+    "reader_reaction_title": "Как на вас повлияла эта новость?",
+    "reaction_interesting": "Интересно",
+    "reaction_important": "Важно",
+    "reaction_surprising": "Неожиданно",
+    "reaction_useful": "Полезно",
+    "like_label": "Нравится",
+    "dislike_label": "Не нравится",
+    "comments_label": "Комментарии",
+    "comments_coming_soon": "Система комментариев скоро будет доступна.",
+    "read_more": "Читать далее",
+    "contact": "Контакты",
+    "about": "О нас",
+    "privacy_policy": "Политика конфиденциальности",
+    "terms": "Условия",
+    "terms_of_use": "Условия использования",
+    "copyright": "Авторское право",
+    "all_rights_reserved": "Все права защищены",
+    "about_text_1": "VREYC начал работу 31 мая 2026 года как независимая медиаплатформа с самостоятельной информационной политикой.",
+    "about_text_2": "VREYC публикует новости Азербайджана, Кавказа и мира, а также интервью, аналитику, репортажи, авторские материалы и актуальную информацию.",
+    "site_name": "Название",
+    "domain_owner": "Владелец домена",
+    "mobile_whatsapp": "Мобильный и WhatsApp",
+    "founder_ceo": "Основатель и генеральный директор VREYC — Васиф Джабраилли.",
+    "language_label": "Язык",
+    "open_menu": "Открыть меню",
+    "breaking_news": "Срочная новость",
+    "editorial_flow": "Живая редакционная лента",
+    "sidebar_label": "Новостная панель",
+    "sections_label": "Разделы",
+    "category_blocks_title": "Новости по категориям",
+    "view_all": "Смотреть все",
+    "category_empty": "Новые материалы скоро появятся здесь.",
+    "privacy_label": "Политика конфиденциальности",
+    "sitemap_label": "Карта сайта",
+    "latest_video_label": "Последние Shorts",
+    "load_more": "Показать еще",
+    "advertisement": "Реклама",
+    "advertisement_slot": "Место для рекламы",
+    "switch_dark_mode": "Переключиться на темный режим",
+    "social_links": "Социальные ссылки и переключатель темы",
+    "carousel_controls": "управление каруселью",
+    "previous_featured_article": "Предыдущая главная статья",
+    "next_featured_article": "Следующая главная статья",
+    "show_featured_article": "Показать главную статью",
+    "article_metadata": "Метаданные статьи",
+    "like_or_dislike": "Нравится или не нравится",
+})
+PUBLIC_LABELS["tr"].update({
+    "home": "Ana Sayfa",
+    "news_feed": "Haber Akışı",
+    "most_viewed": "En çok okunanlar",
+    "trending_label": "Trend",
+    "author_label": "Yazar",
+    "source_label": "Kaynak",
+    "copy_link": "Bağlantıyı kopyala",
+    "copy_success": "Bağlantı kopyalandı",
+    "newsletter_label": "Bülten",
+    "newsletter_headline": "Son dakika haberlerini ilk alın",
+    "newsletter_text": "En önemli haberler, gelişmeler ve analizler için premium e-posta özeti.",
+    "subscribe_label": "Abone ol",
+    "newsletter_success": "Abonelik başarıyla kaydedildi.",
+    "newsletter_duplicate": "Bu e-posta zaten abone.",
+    "newsletter_invalid": "Lütfen geçerli bir e-posta adresi girin.",
+    "newsletter_error": "Abonelik kaydedilemedi. Lütfen tekrar deneyin.",
+    "reading_time_prefix": "Okuma süresi",
+    "reading_time_minute": "dk",
+    "reader_reaction_title": "Bu haber sizi nasıl etkiledi?",
+    "reaction_interesting": "İlginç",
+    "reaction_important": "Önemli",
+    "reaction_surprising": "Şaşırtıcı",
+    "reaction_useful": "Faydalı",
+    "like_label": "Beğen",
+    "dislike_label": "Beğenme",
+    "comments_label": "Yorumlar",
+    "comments_coming_soon": "Yorum sistemi yakında aktif olacak.",
+    "read_more": "Devamını Oku",
+    "contact": "İletişim",
+    "about": "Hakkımızda",
+    "privacy_policy": "Gizlilik Politikası",
+    "terms": "Şartlar",
+    "terms_of_use": "Kullanım Şartları",
+    "copyright": "Telif hakkı",
+    "all_rights_reserved": "Tüm hakları saklıdır",
+    "about_text_1": "VREYC, 31 Mayıs 2026'da bağımsız yayın politikası yürüten bir medya kuruluşu olarak faaliyete başladı.",
+    "about_text_2": "VREYC; Azerbaycan, Kafkasya ve dünyadan haberlerin yanı sıra röportajlar, analizler, haber dosyaları, köşe yazıları ve güncel bilgi materyalleri sunar.",
+    "site_name": "Ad",
+    "domain_owner": "Alan adı sahibi",
+    "mobile_whatsapp": "Mobil ve WhatsApp",
+    "founder_ceo": "VREYC'in kurucusu ve CEO'su Vasif Jabrayilli'dir.",
+    "language_label": "Dil",
+    "open_menu": "Menüyü aç",
+    "breaking_news": "Son dakika",
+    "editorial_flow": "Canlı editoryal akış",
+    "sidebar_label": "Haber paneli",
+    "sections_label": "Bölümler",
+    "category_blocks_title": "Kategoriye göre haberler",
+    "view_all": "Tümünü gör",
+    "category_empty": "Yeni haberler yakında burada görünecek.",
+    "privacy_label": "Gizlilik Politikası",
+    "sitemap_label": "Site haritası",
+    "latest_video_label": "Son Shorts",
+    "load_more": "Daha fazla göster",
+    "advertisement": "Reklam",
+    "advertisement_slot": "Reklam alanı",
+    "switch_dark_mode": "Karanlık moda geç",
+    "social_links": "Sosyal bağlantılar ve tema değiştirici",
+    "carousel_controls": "karusel kontrolleri",
+    "previous_featured_article": "Önceki öne çıkan haber",
+    "next_featured_article": "Sonraki öne çıkan haber",
+    "show_featured_article": "Öne çıkan haberi göster",
+    "article_metadata": "Makale bilgileri",
+    "like_or_dislike": "Beğen veya beğenme",
+})
+
+CATEGORY_UI_KEYS = {'az': {'politics': 'Siyasət', 'world': 'Dünya', 'economy': 'İqtisadiyyat', 'technology': 'Texnologiya', 'business': 'Biznes', 'sports': 'İdman', 'health': 'Sağlamlıq', 'country': 'Ölkə', 'incident': 'Hadisə', 'science_and_education': 'Elm və Təhsil', 'show_business': 'Şou Biznes', 'agriculture': 'Kənd təsərrüfatı'}, 'en': {'politics': 'Politics', 'world': 'World', 'economy': 'Economy', 'technology': 'Technology', 'business': 'Business', 'sports': 'Sports', 'health': 'Health', 'country': 'Country', 'incident': 'Incident', 'science_and_education': 'Science and Education', 'show_business': 'Show Business', 'agriculture': 'Agriculture'}, 'ru': {'politics': 'Политика', 'world': 'Мир', 'economy': 'Экономика', 'technology': 'Технологии', 'business': 'Бизнес', 'sports': 'Спорт', 'health': 'Здоровье', 'country': 'Страна', 'incident': 'Происшествия', 'science_and_education': 'Наука и образование', 'show_business': 'Шоу-бизнес', 'agriculture': 'Сельское хозяйство'}, 'tr': {'politics': 'Siyaset', 'world': 'Dünya', 'economy': 'Ekonomi', 'technology': 'Teknoloji', 'business': 'İş dünyası', 'sports': 'Spor', 'health': 'Sağlık', 'country': 'Ülke', 'incident': 'Olay', 'science_and_education': 'Bilim ve Eğitim', 'show_business': 'Şov Biznes', 'agriculture': 'Tarım'}}
+for _lang, _labels in CATEGORY_UI_KEYS.items():
+    PUBLIC_LABELS[_lang].update(_labels)
+
+def t(key: str, lang: str = "az") -> str:
+    """Translate a public UI key for the requested language, falling back to Azerbaijani."""
+    safe_lang = lang if lang in SUPPORTED_LANGUAGES else "az"
+    return PUBLIC_LABELS.get(safe_lang, PUBLIC_LABELS["az"]).get(key, PUBLIC_LABELS["az"].get(key, key))
+
+templates.env.globals["t"] = t
+
 def estimate_reading_time_minutes(content: str | None) -> int:
     """Estimate article reading time using a conservative news-reading pace."""
     text = BeautifulSoup(content or "", "html.parser").get_text(" ")
@@ -395,16 +586,18 @@ def estimate_reading_time_minutes(content: str | None) -> int:
 
 
 def public_labels(language: str) -> dict[str, str]:
-    labels = dict(PUBLIC_LABELS["en"])
-    if language == "az":
-        labels.update(PUBLIC_LABELS["az"])
-        return labels
+    labels = dict(PUBLIC_LABELS["az"])
     labels.update(PUBLIC_LABELS.get(language, PUBLIC_LABELS["az"]))
     return labels
 
 
 def public_category_labels(language: str) -> dict[str, str]:
-    return CATEGORY_LABELS.get(language, CATEGORY_LABELS["az"])
+    labels = dict(CATEGORY_LABELS.get(language, CATEGORY_LABELS["az"]))
+    az_labels = CATEGORY_LABELS["az"]
+    target_labels = CATEGORY_LABELS.get(language, CATEGORY_LABELS["az"])
+    for canonical, az_label in az_labels.items():
+        labels.setdefault(az_label, target_labels.get(canonical, az_label))
+    return labels
 
 PRIMARY_CATEGORY_NAMES = ["Country", "World", "Economy", "Technology", "Business", "Sports", "Politics", "Incident"]
 SECONDARY_CATEGORY_NAMES = ["Health", "Agriculture", "Show Business", "Science and Education"]

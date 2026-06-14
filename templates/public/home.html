@@ -19,7 +19,7 @@
 {% import "public/_ad_macros.html" as ads %}
 <header class="site-header glass">
   <nav class="nav container premium-nav">
-    <a class="logo brand-logo" href="/{{ language }}/" aria-label="Vasif REYC home"><img class="logo-avatar" src="https://vreyc.com/static/uploads/images/v-99fe872e6408.png" alt="Vasif REYC"><span class="logo-mark logo-name" aria-label="Vasif REYC">Vasif REYC</span></a>
+    <a class="logo brand-logo" href="/{{ language }}/" aria-label="Vasif REYC {{ ui.home|lower }}"><img class="logo-avatar" src="https://vreyc.com/static/uploads/images/v-99fe872e6408.png" alt="Vasif REYC"><span class="logo-mark logo-name" aria-label="Vasif REYC">Vasif REYC</span></a>
     <form class="search-wrap desktop-search" action="/{{ language }}/" role="search"><input type="search" name="q" value="{{q}}" placeholder="{{ ui.search_placeholder }}" aria-label="{{ ui.search }}"></form>
     <div class="header-actions"><details class="language-switcher" aria-label="{{ ui.get('language_label', 'Language') }}"><summary><span>AZ</span><span class="language-arrow" aria-hidden="true">▾</span></summary><div class="language-dropdown">{% for lang in ['en', 'ru', 'tr'] %}<a href="{{ alt_links.get(lang, '/' ~ lang ~ '/') }}">{{lang|upper}}</a>{% endfor %}</div></details><button class="mobile-menu-toggle" id="mobileMenuToggle" type="button" aria-label="{{ ui.get('open_menu', 'Open menu') }}" aria-expanded="false" aria-controls="mobile-menu-{{ language }}"><span></span><span></span><span></span></button></div>
   </nav>
@@ -32,11 +32,11 @@
   </nav>
   <div class="mobile-nav-panel container" id="mobile-menu-{{ language }}" hidden>
     <form class="search-wrap mobile-search" action="/{{ language }}/" role="search"><input type="search" name="q" value="{{q}}" placeholder="{{ ui.search_placeholder }}" aria-label="{{ ui.search }}"></form>
-    <div class="mobile-nav-links"><a href="/{{ language }}/">{{ ui.latest_news }}</a><a href="#category-blocks">{{ ui.get('sections_label', 'Sections') }}</a><a href="#newsletter">{{ ui.get('newsletter_label', 'Newsletter') }}</a></div>
+    <div class="mobile-nav-links"><a href="/{{ language }}/">{{ ui.latest_news }}</a><a href="#category-blocks">{{ ui.sections_label }}</a><a href="#newsletter">{{ ui.newsletter_label }}</a></div>
   </div>
 </header>
-<nav class="fixed-social-sidebar" aria-label="Social links and theme switcher">
-  <button id="themeToggle" class="social-button theme-lamp-button" type="button" aria-label="Switch to dark mode" aria-pressed="false"><span class="theme-icon" aria-hidden="true">💡</span></button>
+<nav class="fixed-social-sidebar" aria-label="{{ ui.get('social_links', 'Social links and theme switcher') }}">
+  <button id="themeToggle" class="social-button theme-lamp-button" type="button" aria-label="{{ ui.get('switch_dark_mode', 'Switch to dark mode') }}" aria-pressed="false"><span class="theme-icon" aria-hidden="true">💡</span></button>
   <a class="social-button social-facebook" href="https://www.facebook.com/sharer/sharer.php?u={{ canonical }}" target="_blank" rel="noopener" aria-label="Facebook">
     <svg class="social-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14.2 8.4V6.7c0-.8.2-1.3 1.4-1.3H17V2.2c-.7-.1-1.6-.2-2.7-.2-2.8 0-4.7 1.7-4.7 4.8v1.6H6.5V12h3.1v10h3.8V12h3.1l.5-3.6h-3z"/></svg>
   </a>
@@ -50,14 +50,14 @@
     <svg class="social-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2.1C6.3 2.1 2 6.3 2 12c0 5.6 4.2 9.9 10 9.9 1.9 0 3.8-.5 5.3-1.4l-1.1-2.1c-1.2.7-2.6 1.1-4.2 1.1-4.2 0-7.3-3.2-7.3-7.5S7.8 4.5 12 4.5s7.3 3.1 7.3 7.3c0 2.1-.8 3.3-1.8 3.3-.7 0-1-.4-.9-1.1l.7-6.1h-2.6l-.1.9A4 4 0 0 0 11.5 7c-2.8 0-5 2.2-5 5.2 0 2.9 1.8 4.9 4.4 4.9 1.3 0 2.5-.5 3.4-1.5.5 1.1 1.5 1.6 2.8 1.6 2.8 0 4.9-2.2 4.9-5.4 0-5.5-4.3-9.7-10-9.7zm-.5 12.6c-1.3 0-2.2-1-2.2-2.6s1-2.7 2.4-2.7 2.3 1 2.3 2.5c0 1.7-1.1 2.8-2.5 2.8z"/></svg>
   </a>
 </nav>
-{{ ads.ad_slot("top", "TOP BANNER ADVERTISEMENT", container=True) }}
-{{ ads.ad_slot("left-sidebar", "ADVERTISEMENT", "ad-zone-side ad-zone-side-left") }}
-{{ ads.ad_slot("right-sidebar", "ADVERTISEMENT", "ad-zone-side ad-zone-side-right") }}
+{{ ads.ad_slot("top", ui.advertisement, container=True) }}
+{{ ads.ad_slot("left-sidebar", ui.advertisement, "ad-zone-side ad-zone-side-left") }}
+{{ ads.ad_slot("right-sidebar", ui.advertisement, "ad-zone-side ad-zone-side-right") }}
 <main class="container section page-shell home-shell">
   <div class="news-shell newsroom-home">
   {% if breaking_articles %}
-  <section class="breaking-strip glass" aria-label="{{ ui.get('breaking_news', 'Breaking news') }}">
-    <strong><span aria-hidden="true">●</span> {{ ui.get('breaking_news', 'Breaking news') }}</strong>
+  <section class="breaking-strip glass" aria-label="{{ ui.breaking_news }}">
+    <strong><span aria-hidden="true">●</span> {{ ui.breaking_news }}</strong>
     <div class="breaking-marquee"><div>{% for row in breaking_articles %}<a href="{{ row.url }}">{{ row.title }}</a>{% endfor %}</div></div>
   </section>
   {% endif %}
@@ -80,41 +80,41 @@
         {% endfor %}
       </div>
       {% if slides|length > 1 %}
-      <div class="hero-carousel-controls" aria-label="{{ ui.top_story }} carousel controls">
-        <button class="hero-arrow" type="button" data-hero-prev aria-label="Previous featured article">‹</button>
+      <div class="hero-carousel-controls" aria-label="{{ ui.top_story }} {{ ui.carousel_controls }}">
+        <button class="hero-arrow" type="button" data-hero-prev aria-label="{{ ui.previous_featured_article }}">‹</button>
         <div class="hero-dots" role="tablist" aria-label="{{ ui.top_story }}">
-          {% for slide in slides %}<button class="hero-dot{% if loop.first %} is-active{% endif %}" type="button" data-hero-dot="{{ loop.index0 }}" aria-label="Show featured article {{ loop.index }}" aria-selected="{{ 'true' if loop.first else 'false' }}">{{ loop.index }}</button>{% endfor %}
+          {% for slide in slides %}<button class="hero-dot{% if loop.first %} is-active{% endif %}" type="button" data-hero-dot="{{ loop.index0 }}" aria-label="{{ ui.show_featured_article }} {{ loop.index }}" aria-selected="{{ 'true' if loop.first else 'false' }}">{{ loop.index }}</button>{% endfor %}
         </div>
-        <button class="hero-arrow" type="button" data-hero-next aria-label="Next featured article">›</button>
+        <button class="hero-arrow" type="button" data-hero-next aria-label="{{ ui.next_featured_article }}">›</button>
       </div>
       {% endif %}
     </section>
     <aside class="youtube-latest-card glass" aria-labelledby="youtube-latest-title">
       <div class="youtube-latest-head">
         <p class="eyebrow">YouTube</p>
-        <h2 id="youtube-latest-title">{{ ui.get('latest_video_label', 'Son Shorts' if language == 'az' else 'Latest Shorts') }}</h2>
+        <h2 id="youtube-latest-title">{{ ui.latest_video_label }}</h2>
       </div>
       {% if youtube_item and youtube_item.embed_url %}
-      <div class="youtube-short-card youtube-short-embed" data-youtube-short-embed aria-label="{{ ui.get('latest_video_label', 'Son Shorts' if language == 'az' else 'Latest Shorts') }}">
-        <iframe class="youtube-short-iframe" src="{{ youtube_item.embed_url }}" title="{{ ui.get('latest_video_label', 'Son Shorts' if language == 'az' else 'Latest Shorts') }}" loading="lazy" allow="autoplay; encrypted-media; picture-in-picture; web-share" allowfullscreen></iframe>
+      <div class="youtube-short-card youtube-short-embed" data-youtube-short-embed aria-label="{{ ui.latest_video_label }}">
+        <iframe class="youtube-short-iframe" src="{{ youtube_item.embed_url }}" title="{{ ui.latest_video_label }}" loading="lazy" allow="autoplay; encrypted-media; picture-in-picture; web-share" allowfullscreen></iframe>
         <div class="youtube-embed-fallback" data-youtube-short-fallback>
-          <img class="youtube-thumbnail" src="{{ youtube_item.thumbnail }}" alt="{{ ui.get('latest_video_label', 'Son Shorts' if language == 'az' else 'Latest Shorts') }}" loading="lazy">
+          <img class="youtube-thumbnail" src="{{ youtube_item.thumbnail }}" alt="{{ ui.latest_video_label }}" loading="lazy">
           <span class="youtube-play-icon" aria-hidden="true">▶</span>
         </div>
       </div>
       {% else %}
-      <div class="youtube-short-card youtube-embed-fallback youtube-fallback-card" aria-label="{{ ui.get('latest_video_label', 'Son Shorts' if language == 'az' else 'Latest Shorts') }}">
+      <div class="youtube-short-card youtube-embed-fallback youtube-fallback-card" aria-label="{{ ui.latest_video_label }}">
         <span class="youtube-play-icon" aria-hidden="true">▶</span>
       </div>
       {% endif %}
       <span class="youtube-channel-link" aria-hidden="true">Vasif REYC Shorts</span>
     </aside>
   </div>
-  {{ ads.ad_slot("hero", "ADVERTISEMENT") }}
+  {{ ads.ad_slot("hero", ui.advertisement) }}
   {% endif %}
   <div class="portal-layout">
     <section aria-labelledby="latest-news-title">
-      <div class="section-title"><div><p class="eyebrow">{{ ui.get('editorial_flow', 'Live editorial flow') }}</p><h2 id="latest-news-title">{{ ui.latest_news }}</h2></div></div>
+      <div class="section-title"><div><p class="eyebrow">{{ ui.editorial_flow }}</p><h2 id="latest-news-title">{{ ui.latest_news }}</h2></div></div>
       {% if latest_articles|length == 0 %}<div class="glass empty-state">{{ ui.no_articles }}</div>{% endif %}
       <div class="latest-grid">
         {% for row in latest_articles %}
@@ -129,52 +129,52 @@
             <small class="meta-row"><time datetime="{{ row.article.published_at.isoformat() if row.article.published_at else '' }}" itemprop="datePublished">{{row.article.published_at|format_public_published_at}}</time><span>{{ row.category_label }}</span><span>{{ row.view_count }} {{ ui.views_label|lower }}</span></small>
           </div>
         </article>
-        {% if loop.index is divisibleby 6 %}{{ ads.ad_slot("infeed", "ADVERTISEMENT") }}{% endif %}
+        {% if loop.index is divisibleby 6 %}{{ ads.ad_slot("infeed", ui.advertisement) }}{% endif %}
         {% endfor %}
       </div>
     </section>
-    <aside class="trending-sidebar premium-sidebar glass" aria-label="{{ ui.get('sidebar_label', 'News sidebar') }}">
+    <aside class="trending-sidebar premium-sidebar glass" aria-label="{{ ui.sidebar_label }}">
       <section>
         <h2>{{ ui.most_watched }}</h2>
         <div class="trending-list sidebar-feed-list" data-sidebar-feed>
           {% for row in sidebar_articles %}<a href="{{ row.url }}"{% if loop.index > 20 %} hidden{% endif %}><div><strong>{{ row.title }}</strong><small>{{ row.category_label }} • {{ row.article.published_at|format_public_published_at }}</small></div></a>{% endfor %}
         </div>
-        {% if sidebar_articles|length > 20 %}<button class="sidebar-load-more" type="button" data-sidebar-load-more>{{ ui.get('load_more', 'Daha çox göstər') }}</button>{% endif %}
+        {% if sidebar_articles|length > 20 %}<button class="sidebar-load-more" type="button" data-sidebar-load-more>{{ ui.load_more }}</button>{% endif %}
       </section>
-      <section><h2>{{ ui.get('most_viewed', 'Most viewed') }}</h2><div class="trending-list ranked-list">{% for row in most_viewed_articles %}<a href="{{ row.url }}"><span>{{ loop.index }}</span><div><strong>{{ row.title }}</strong><small>{{ row.view_count }} {{ ui.views_label|lower }} • {{ row.article.published_at|format_public_published_at }}</small></div></a>{% endfor %}</div></section>
+      <section><h2>{{ ui.most_viewed }}</h2><div class="trending-list ranked-list">{% for row in most_viewed_articles %}<a href="{{ row.url }}"><span>{{ loop.index }}</span><div><strong>{{ row.title }}</strong><small>{{ row.view_count }} {{ ui.views_label|lower }} • {{ row.article.published_at|format_public_published_at }}</small></div></a>{% endfor %}</div></section>
     </aside>
   </div>
   {% if category_blocks %}
   <section class="category-blocks" id="category-blocks" aria-labelledby="category-blocks-title">
-    <div class="section-title"><div><p class="eyebrow">{{ ui.get('sections_label', 'Sections') }}</p><h2 id="category-blocks-title">{{ ui.get('category_blocks_title', 'Explore by category') }}</h2></div></div>
+    <div class="section-title"><div><p class="eyebrow">{{ ui.sections_label }}</p><h2 id="category-blocks-title">{{ ui.category_blocks_title }}</h2></div></div>
     <div class="category-block-grid">
       {% for block in category_blocks %}
       <section class="category-block glass" style="--cat-color: {{ block.color }}">
-        <a class="category-block-head" href="/{{ language }}/?category={{ block.name }}"><span>{{ block.label }}</span><small>{{ ui.get('view_all', 'View all') }}</small></a>
-        {% if block.articles %}<div class="category-block-list">{% for row in block.articles %}<a href="{{ row.url }}"><strong>{{ row.title }}</strong><small>{{ row.article.published_at|format_public_published_at }}</small></a>{% endfor %}</div>{% else %}<p>{{ ui.get('category_empty', 'Fresh stories will appear here soon.') }}</p>{% endif %}
+        <a class="category-block-head" href="/{{ language }}/?category={{ block.name }}"><span>{{ block.label }}</span><small>{{ ui.view_all }}</small></a>
+        {% if block.articles %}<div class="category-block-list">{% for row in block.articles %}<a href="{{ row.url }}"><strong>{{ row.title }}</strong><small>{{ row.article.published_at|format_public_published_at }}</small></a>{% endfor %}</div>{% else %}<p>{{ ui.category_empty }}</p>{% endif %}
       </section>
       {% endfor %}
     </div>
   </section>
   {% endif %}
   <section class="newsletter-card glass" id="newsletter" aria-labelledby="newsletter-title">
-    <div><p class="eyebrow">{{ ui.get('newsletter_label', 'Newsletter') }}</p><h2 id="newsletter-title">{{ ui.get('newsletter_headline', 'Get breaking news first') }}</h2><p>{{ ui.get('newsletter_text', 'A premium inbox briefing for the biggest stories, launches and analysis.') }}</p></div>
-    <form class="newsletter-form" data-newsletter-form action="/{{ language }}/newsletter/subscribe" method="post" data-success="{{ ui.get('newsletter_success', 'Subscription saved successfully.') }}" data-invalid="{{ ui.get('newsletter_invalid', 'Please enter a valid email address.') }}" data-error="{{ ui.get('newsletter_error', 'Subscription could not be saved. Please try again.') }}"><input name="email" type="email" placeholder="{{ ui.email }}" aria-label="{{ ui.email }}" autocomplete="email" required><button type="submit">{{ ui.get('subscribe_label', 'Subscribe') }}</button><p class="newsletter-message" data-newsletter-message role="status" aria-live="polite"></p></form>
+    <div><p class="eyebrow">{{ ui.newsletter_label }}</p><h2 id="newsletter-title">{{ ui.newsletter_headline }}</h2><p>{{ ui.newsletter_text }}</p></div>
+    <form class="newsletter-form" data-newsletter-form action="/{{ language }}/newsletter/subscribe" method="post" data-success="{{ ui.newsletter_success }}" data-invalid="{{ ui.newsletter_invalid }}" data-error="{{ ui.newsletter_error }}"><input name="email" type="email" placeholder="{{ ui.email }}" aria-label="{{ ui.email }}" autocomplete="email" required><button type="submit">{{ ui.subscribe_label }}</button><p class="newsletter-message" data-newsletter-message role="status" aria-live="polite"></p></form>
   </section>
   </div>
 </main>
-{{ ads.ad_slot("footer", "ADVERTISEMENT", container=True) }}
+{{ ads.ad_slot("footer", ui.advertisement, container=True) }}
 <footer class="footer container">
   <div class="footer-brand">
     <strong>VREYC</strong>
     <span>{{ ui.footer_tagline }}</span>
     <div class="footer-languages">{% for lang in languages %}<a href="/{{lang}}/">{{lang|upper}}</a>{% endfor %}</div>
-    <div class="footer-policy-links"><a class="footer-policy-link" href="/privacy">{{ ui.get('privacy_label', 'Privacy') }}</a><a class="footer-policy-link" href="/terms">Terms of Use</a><a class="footer-policy-link" href="/sitemap.xml">{{ ui.get('sitemap_label', 'Sitemap') }}</a></div>
+    <div class="footer-policy-links"><a class="footer-policy-link" href="/privacy">{{ ui.privacy_policy }}</a><a class="footer-policy-link" href="/terms">{{ ui.terms_of_use }}</a><a class="footer-policy-link" href="/sitemap.xml">{{ ui.get('sitemap_label', 'Sitemap') }}</a></div>
   </div>
   <section class="footer-panel footer-about" aria-labelledby="footer-about-title">
     <h2 id="footer-about-title">{{ ui.about }}</h2>
-    <p>"vreyc.com" saytı 2026-cı ilin mayın 31-də fəaliyyətə başlayıb və müstəqil informasiya siyasəti həyata keçirən media qurumudur.</p>
-    <p>www.vreyc.com saytında Azərbaycanın ictimai, siyasi, sosial və mədəni həyatında baş verən yeniliklərlə yanaşı, digər Qafqaz ölkələrində və dünyada baş verən maraqlı xəbərlər oxuculara çatdırılır. Saytda müxtəlif sahələri əhatə edən müsahibələr, təhlillər, reportajlar, müəllif yazıları və aktual informasiya materialları yayımlanır.</p>
+    <p>{{ ui.get('about_text_1', 'VREYC is an independent media organization with an independent information policy.') }}</p>
+    <p>{{ ui.get('about_text_2', 'VREYC delivers updates from Azerbaijan, the Caucasus and the world, including interviews, analysis, reports, opinion pieces and timely news materials.') }}</p>
     <p>{{ ui.founder_ceo }}</p>
   </section>
   <section class="footer-panel footer-contact" aria-labelledby="footer-contact-title">
@@ -188,6 +188,7 @@
       <div><dt>{{ ui.tiktok }}:</dt><dd><a class="footer-social-link" href="https://www.tiktok.com/@vasifreyc" target="_blank" rel="noopener noreferrer">Vasif REYC</a></dd></div>
     </dl>
   </section>
+  <p class="footer-copyright">{{ ui.copyright }} © 2026 VREYC. {{ ui.all_rights_reserved }}</p>
 </footer>
 <script src="/assets/app.js?v={{ app_version }}" defer></script>
 </body>
