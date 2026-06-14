@@ -35,7 +35,7 @@ from database.models import Article, ArticleRevision, ArticleView, FetchLog, Set
 from cms.auth.security import is_authenticated, set_session, clear_session, verify_password
 from scheduler.jobs import run_fetch_pipeline, queue_narration, generate_pending_narrations
 from ai.pipeline import AIEngine, OPENAI_MODEL_OPTIONS, openai_runtime_settings
-from market_data import ensure_market_settings, market_panel_context, refresh_market_quotes, seed_market_fallbacks
+from services.market_service import ensure_market_settings, market_panel_context, refresh_market_quotes
 from ai.translation_service import (
     AI_TRANSLATION_WARNING,
     TRANSLATION_LANGUAGES,
@@ -2862,7 +2862,6 @@ def startup() -> None:
     db = SessionLocal()
     apply_schema_migrations(db)
     ensure_market_settings(db)
-    seed_market_fallbacks(db)
     ensure_categories(db)
     ensure_slugs(db)
     missing_images = validate_image_references(db)
@@ -2872,6 +2871,7 @@ def startup() -> None:
     scheduler.add_job(run_fetch_pipeline, "interval", minutes=max(13, min(17, settings.fetch_interval_min)), id="fetch_job", replace_existing=True)
     scheduler.add_job(generate_pending_narrations, "interval", seconds=45, id="narration_job", replace_existing=True)
     scheduler.add_job(run_scheduled_publish_check, "interval", seconds=60, id="scheduled_publish_job", replace_existing=True)
+    scheduler.add_job(refresh_market_quotes, "date", args=["all"], id="market_startup_refresh", replace_existing=True)
     scheduler.add_job(refresh_market_quotes, "interval", days=1, args=["currency"], id="market_currency_job", replace_existing=True)
     scheduler.add_job(refresh_market_quotes, "interval", minutes=30, args=["gold"], id="market_gold_job", replace_existing=True)
     scheduler.add_job(refresh_market_quotes, "interval", minutes=5, args=["crypto"], id="market_crypto_job", replace_existing=True)
