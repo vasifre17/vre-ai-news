@@ -67,7 +67,7 @@
           <button class="btn small share-action share-copy js-copy-link" type="button" data-copy-url="{{ share_url }}" data-copy-label="{{ ui.copy_link }}" data-copy-success="{{ ui.copy_success }}">{{ ui.copy_link }}</button>
         </div>
         <div class="ad-zone ad-zone-article" role="complementary" aria-label="{{ ui.get('advertisement', 'Advertisement') }}"><span>{{ ui.get('advertisement_slot', ui.advertisement) }}</span></div>
-        <section class="glass audio-news" data-audio-ready="{{ '1' if narration and narration.status == 'ready' else '0' }}"><h3>{{ ui.audio_narration }}</h3>{% if narration and narration.status == 'ready' and narration.audio_path %}<audio id="narration" preload="none" src="{{narration.audio_path}}"></audio><div class="audio-controls"><button class="btn" id="playBtn" type="button">{{ ui.play }}</button><button class="btn" id="pauseBtn" type="button">{{ ui.pause }}</button><input id="seek" type="range" value="0" min="0" step="1"><span id="time">0:00 / 0:00</span><select id="speed"><option>1</option><option>1.25</option><option>1.5</option><option>1.75</option><option>2</option></select>{% if narration.allow_download %}<a class="btn" href="{{narration.audio_path}}" download>{{ ui.download }}</a>{% endif %}</div>{% else %}<p>{{ ui.narration_pending }}</p>{% endif %}</section>
+        {% if narration and narration.status == 'ready' and narration.audio_path %}<section class="glass audio-news" data-audio-ready="1"><h3>{{ ui.audio_narration }}</h3><audio id="narration" preload="none" src="{{narration.audio_path}}"></audio><div class="audio-controls"><button class="btn" id="playBtn" type="button">{{ ui.play }}</button><button class="btn" id="pauseBtn" type="button">{{ ui.pause }}</button><input id="seek" type="range" value="0" min="0" step="1"><span id="time">0:00 / 0:00</span><select id="speed"><option>1</option><option>1.25</option><option>1.5</option><option>1.75</option><option>2</option></select>{% if narration.allow_download %}<a class="btn" href="{{narration.audio_path}}" download>{{ ui.download }}</a>{% endif %}</div></section>{% endif %}
         <div class="article-content" itemprop="articleBody">{{ article.content_html|safe }}<div class="ad-zone ad-zone-content" role="complementary" aria-label="{{ ui.get('advertisement', 'Advertisement') }}"><span>{{ ui.get('advertisement_slot', ui.advertisement) }}</span></div></div>
         <section class="article-engagement-panel glass" aria-labelledby="article-reaction-title">
           <div class="reader-reaction-block">
@@ -124,7 +124,7 @@
     <h2 id="footer-contact-title">{{ ui.contact }}</h2>
     <dl>
       <div><dt>{{ ui.site_name }}:</dt><dd>vreyc.com</dd></div>
-      <div><dt>{{ ui.domain_owner }}:</dt><dd>Vasif Cəbrayıllı</dd></div>
+      <div><dt>{{ ui.domain_owner }}:</dt><dd>{{ ui.domain_owner_name }}</dd></div>
       <div><dt>{{ ui.mobile_whatsapp }}:</dt><dd><a href="tel:+994554444730">(055) 444-47-30</a></dd></div>
       <div><dt>{{ ui.email }}:</dt><dd><a href="mailto:vreyc.com@gmail.com">vreyc.com@gmail.com</a></dd></div>
       <div><dt>{{ ui.youtube }}:</dt><dd><a class="footer-social-link" href="https://www.youtube.com/@vasifreyc" target="_blank" rel="noopener noreferrer">Vasif REYC</a></dd></div>
