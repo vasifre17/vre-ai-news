@@ -2933,6 +2933,71 @@ def newsletter_subscribe(request: Request, language: str, email: str = Form(""))
     return {"ok": True, "message": labels.get("newsletter_success", "Subscription saved successfully.")}
 
 
+
+
+DIGITAL_WHATSAPP_URL = "https://wa.me/994503440108?text=Hello%20VREYC%20Digital%2C%20I%20want%20a%20premium%20website"
+DIGITAL_PROJECTS = [
+    {"name": "VREYC.COM", "status": "Live Project", "text": "AI-powered multilingual news portal with modern publishing, admin and SEO workflows.", "href": "/digital/projects/vreyc", "button": "View Live Project"},
+    {"name": "BuildPro Construction", "status": "Demo Project", "text": "Premium construction company website concept with cinematic sections and lead CTAs.", "href": "/digital/projects/buildpro", "button": "View Demo"},
+    {"name": "Royal Restaurant", "status": "Coming Soon", "text": "Luxury restaurant website concept for menus, reservations and brand storytelling.", "href": "/digital/projects", "button": "Coming Soon"},
+    {"name": "MedLife Clinic", "status": "Coming Soon", "text": "Modern healthcare website concept for clinics, doctors, appointments and trust signals.", "href": "/digital/projects", "button": "Coming Soon"},
+    {"name": "TravelX Tourism", "status": "Coming Soon", "text": "Immersive tourism website concept for destinations, packages and booking enquiries.", "href": "/digital/projects", "button": "Coming Soon"},
+]
+
+
+def digital_template_context(request: Request, path: str, title: str) -> dict:
+    return {
+        "request": request,
+        "title": title,
+        "canonical": canonical_url(request, path),
+        "app_version": APP_VERSION,
+        "whatsapp_url": DIGITAL_WHATSAPP_URL,
+    }
+
+
+@app.get("/digital", response_class=HTMLResponse)
+def digital_home(request: Request):
+    context = digital_template_context(request, "digital", "VREYC Digital — Premium Websites • SEO • AI Solutions")
+    context.update({
+        "services": [
+            {"icon": "✦", "title": "Premium Websites", "text": "Responsive landing pages, business websites and portfolio experiences designed for high-value brands."},
+            {"icon": "⌁", "title": "SEO Foundations", "text": "Clean structure, metadata, speed-focused layouts and content sections built to support discoverability."},
+            {"icon": "AI", "title": "AI Solutions", "text": "AI-ready website flows, automation concepts and smart content systems for modern businesses."},
+        ],
+        "why_choose": [
+            {"title": "2026 visual quality", "text": "Dark luxury interfaces, glassmorphism and smooth responsive sections that feel current."},
+            {"title": "Conversion-first pages", "text": "Clear offers, trust blocks and direct WhatsApp actions help turn visitors into leads."},
+            {"title": "Scalable project system", "text": "Portfolio and demo pages can expand without affecting the existing news portal."},
+        ],
+        "projects": DIGITAL_PROJECTS,
+        "process": [
+            {"title": "Discover", "text": "Define goals, audience, pages and conversion actions."},
+            {"title": "Design", "text": "Create a premium visual direction and page structure."},
+            {"title": "Build", "text": "Develop responsive pages with clean public routes."},
+            {"title": "Launch", "text": "Review, polish and prepare the website for promotion."},
+        ],
+    })
+    return templates.TemplateResponse("public/digital.html", context)
+
+
+@app.get("/digital/projects", response_class=HTMLResponse)
+def digital_projects(request: Request):
+    context = digital_template_context(request, "digital/projects", "VREYC Digital Portfolio Projects")
+    context["projects"] = DIGITAL_PROJECTS
+    return templates.TemplateResponse("public/digital_projects.html", context)
+
+
+@app.get("/digital/projects/vreyc", response_class=HTMLResponse)
+def digital_project_vreyc(request: Request):
+    context = digital_template_context(request, "digital/projects/vreyc", "VREYC.COM Live Project — VREYC Digital")
+    return templates.TemplateResponse("public/digital_project_vreyc.html", context)
+
+
+@app.get("/digital/projects/buildpro", response_class=HTMLResponse)
+def digital_project_buildpro(request: Request):
+    context = digital_template_context(request, "digital/projects/buildpro", "BuildPro Construction Demo — VREYC Digital")
+    return templates.TemplateResponse("public/digital_project_buildpro.html", context)
+
 @app.get("/", response_class=HTMLResponse)
 @app.get("/{language}/", response_class=HTMLResponse)
 def home(request: Request, language: str = "az", q: str = "", category: str = "", db=Depends(get_db)):
