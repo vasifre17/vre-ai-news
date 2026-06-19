@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title }}</title>
+  <meta name="description" content="Premium websites, SEO and AI solutions by VREYC Digital.">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <link rel="canonical" href="{{ canonical }}">
+  <link rel="stylesheet" href="/assets/digital.css?v={{ app_version }}">
+  {% include "public/_brand_assets.html" %}
+  {% include "public/_analytics.html" %}
+</head>
+<body class="digital-body">
+  <div class="digital-orb orb-one"></div><div class="digital-orb orb-two"></div>
+  <header class="digital-header">
+    <a class="digital-logo" href="/digital" aria-label="VREYC Digital home"><span>VD</span><strong>VREYC Digital</strong></a>
+    <nav><a href="/digital#services">Services</a><a href="/digital/projects">Portfolio</a><a href="/">News Portal</a></nav>
+    <a class="digital-whatsapp" href="{{ whatsapp_url }}" target="_blank" rel="noopener">Contact on WhatsApp</a>
+  </header>
+  <main>
+    <section class="digital-hero">
+      <div class="hero-copy glass-panel">
+        <span class="eyebrow">2026 premium web studio</span>
+        <h1>VREYC Digital builds websites that look elite and convert faster.</h1>
+        <p class="slogan">Premium Websites • SEO • AI Solutions</p>
+        <p>Launch a fast, search-ready and AI-enhanced digital presence for your company, brand or next big project.</p>
+        <div class="button-row"><a class="primary-btn" href="/digital/projects">View Demo</a><a class="ghost-btn" href="{{ whatsapp_url }}" target="_blank" rel="noopener">Contact on WhatsApp</a></div>
+      </div>
+      <div class="hero-visual glass-panel" aria-label="Website performance highlights"><div class="metric-card"><b>98</b><span>Performance concept</span></div><div class="preview-window"><span></span><h2>Luxury UI systems</h2><p>Glass cards, cinematic hero sections and conversion-focused journeys.</p></div><div class="metric-card accent"><b>AI</b><span>Automation ready</span></div></div>
+    </section>
+
+    <section id="services" class="digital-section"><span class="eyebrow">Services</span><h2>Everything your digital launch needs</h2><div class="card-grid three">{% for service in services %}<article class="glass-card"><div class="icon">{{ service.icon }}</div><h3>{{ service.title }}</h3><p>{{ service.text }}</p></article>{% endfor %}</div></section>
+    <section class="digital-section split-section"><div><span class="eyebrow">Why choose us</span><h2>Premium design with practical business outcomes.</h2></div><div class="why-list">{% for item in why_choose %}<div class="why-item"><strong>{{ item.title }}</strong><p>{{ item.text }}</p></div>{% endfor %}</div></section>
+    <section id="portfolio" class="digital-section"><div class="section-head"><div><span class="eyebrow">Portfolio</span><h2>Live and demo project concepts</h2></div><a class="ghost-btn" href="/digital/projects">All projects</a></div><div class="card-grid portfolio-grid">{% for project in projects %}<article class="portfolio-card glass-card"><span class="status">{{ project.status }}</span><h3>{{ project.name }}</h3><p>{{ project.text }}</p><a href="{{ project.href }}">{{ project.button }}</a></article>{% endfor %}</div></section>
+    <section class="digital-section"><span class="eyebrow">Process</span><h2>A smooth workflow from idea to launch</h2><div class="process-row">{% for step in process %}<div class="process-step"><span>0{{ loop.index }}</span><h3>{{ step.title }}</h3><p>{{ step.text }}</p></div>{% endfor %}</div></section>
+    <section class="contact-cta glass-panel"><span class="eyebrow">Ready to build?</span><h2>Let’s create your premium website with VREYC Digital.</h2><a class="primary-btn" href="{{ whatsapp_url }}" target="_blank" rel="noopener">Contact on WhatsApp</a></section>
+  </main>
+</body>
+</html>

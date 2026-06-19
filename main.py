@@ -2955,6 +2955,7 @@ def digital_template_context(request: Request, path: str, title: str) -> dict:
     }
 
 
+@app.get("/digital/", response_class=HTMLResponse)
 @app.get("/digital", response_class=HTMLResponse)
 def digital_home(request: Request):
     context = digital_template_context(request, "digital", "VREYC Digital — Premium Websites • SEO • AI Solutions")
@@ -2977,14 +2978,14 @@ def digital_home(request: Request):
             {"title": "Launch", "text": "Review, polish and prepare the website for promotion."},
         ],
     })
-    return templates.TemplateResponse("public/digital.html", context)
+    return templates.TemplateResponse("digital/index.html", context)
 
 
 @app.get("/digital/projects", response_class=HTMLResponse)
 def digital_projects(request: Request):
     context = digital_template_context(request, "digital/projects", "VREYC Digital Portfolio Projects")
     context["projects"] = DIGITAL_PROJECTS
-    return templates.TemplateResponse("public/digital_projects.html", context)
+    return templates.TemplateResponse("digital/projects.html", context)
 
 
 @app.get("/digital/projects/vreyc", response_class=HTMLResponse)
@@ -2996,7 +2997,7 @@ def digital_project_vreyc(request: Request):
 @app.get("/digital/projects/buildpro", response_class=HTMLResponse)
 def digital_project_buildpro(request: Request):
     context = digital_template_context(request, "digital/projects/buildpro", "BuildPro Construction Demo — VREYC Digital")
-    return templates.TemplateResponse("public/digital_project_buildpro.html", context)
+    return templates.TemplateResponse("digital/buildpro.html", context)
 
 @app.get("/", response_class=HTMLResponse)
 @app.get("/{language}/", response_class=HTMLResponse)
